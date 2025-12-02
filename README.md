@@ -14,6 +14,10 @@ It is possible to generate counterexamples to locate the failure in a branch. On
 Limitations: Only one counterexample is generated per program. If there are multiple failure points, the others may not be detected after generating the first counterexample.
 
 ## Use Isolate Assertions with isolate\_paths 
+Not needed in the sense that the counteexamples generated one by one is able to retrieve the path (and seems a better aprroach for now)
+
+
+
 By passing the --isolate-assertions flag to the verifier and using isolate\_paths as a plugin, all paths and assertions are verified separately. This allows pinpointing exactly which paths caused failures and provides a complete list of all failing paths and assertions.
 
 Explanation from Dafny documentation:
@@ -41,6 +45,19 @@ It’s unclear how generic this approach would be or how easily it could be adap
 Option 3 seems the most practical and least reinventive. It integrates well with the current verifier.
 
 A potential implementation could be a Dafny plugin that, after resolution, adds {:isolate "paths"} to the relevant paths. Using this approach, it might also be possible to generate counterexamples for all failing paths.
+
+It seems that option 3 is not needed:
+
+1) We can extend counterexmaple generations to achieve complete counterexample creation.
+2) From the complete list of countexamples traces we can metric the most promising lines where the deffects are
+
+3) We can also use Coverage metrics as a heuristic: If a line is used in a assertion prove maybe it is correct only ones that are not maybe are incorrect (and this can possible speed up things)
+
+
+# If wanted to generate tests we could create a took that from the couterexamples creates runnable tests.
+
+But really with this i do not see the usecase for generating tests
+
 
 # TODOS 
 - Make Dataset small to test ideas 
