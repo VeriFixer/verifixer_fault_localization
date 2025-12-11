@@ -1,5 +1,12 @@
 # This Repo Explores diverse ideas to find fault localization in dafny programns 
 
+After running mutdafny and some dataset and generating the mutants and the original dir. 
+get\_pos computes the diff from the original program. 
+
+It generates a folder pos\_mutation with:
+original/{names}.dfy containing all programs original (after post resolution) 
+killed/{names}\_\_{infos}.dfy with the mutant
+killed/{names}\_\_{infos}.txt with the diff between original program and mutant
 
 # Possibilities 
 
