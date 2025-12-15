@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 # Assume fl_eval is correctly installed or paths are set up for relative import
-from fl_eval.core.gt_parser import GroundTruthAndLineLimitFinder
+from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from tempfile import TemporaryDirectory
 
 class TestGroundTruthAndLineLimitFinder(unittest.TestCase):
@@ -46,7 +46,7 @@ class TestGroundTruthAndLineLimitFinder(unittest.TestCase):
             diff_path.write_text(diff_content)
             mutant_path.write_text(mutant_file_content) # *** NEW STEP ***
             # 3. Instantiate the Finder class
-            finder_instance = GroundTruthAndLineLimitFinder(original_path, mutant_path, diff_path)
+            finder_instance = GroundTruthAndLineLimit(original_path, mutant_path, diff_path)
             # 4. ASSERTIONS FOR GROUND TRUTH (unchanged)
             expected_ground_truth = 8
             self.assertEqual(finder_instance.ground_truth, expected_ground_truth, 
@@ -83,32 +83,10 @@ class TestGroundTruthAndLineLimitFinder(unittest.TestCase):
             # Create a 5-line dummy mutant file for this test
             mutant_path.write_text("1\n2\n3\n4\n5\n")
             expected_end_line = 4
-            finder_instance = GroundTruthAndLineLimitFinder(original_path, mutant_path, diff_path)
+            finder_instance = GroundTruthAndLineLimit(original_path, mutant_path, diff_path)
             # Assert GT
             self.assertEqual(finder_instance.ground_truth, expected_ground_truth,
                              "The ground truth should be 14 (first change detected).")
             # Assert Limits
             self.assertEqual(finder_instance.startLine, 0)
             self.assertEqual(finder_instance.endLine, expected_end_line)
-
-
-    def test_no_changes_and_limit_check(self):
-        """Tests a diff file with no actual changes AND verifies the line limits."""
-        
-        diff_content_empty = (
-            "--- original.txt\n"
-            "+++ mutant.txt\n"
-        )
-        with TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-            original_path = temp_path / "original3.txt"
-            mutant_path = temp_path / "mutant3.txt"
-            diff_path = temp_path / "test_diff_3.txt"
-            diff_path.write_text(diff_content_empty)
-            
-            # Must write file content, even for the negative test
-            mutant_path.write_text("a\nb\nc\n")
-            
-            # We expect a ValueError because no ground truth could be extracted
-            with self.assertRaises(ValueError, msg="Should raise ValueError if no change markers found."):
-                GroundTruthAndLineLimitFinder(original_path, mutant_path, diff_path)

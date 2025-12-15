@@ -1,3 +1,6 @@
+from fl_eval.core.abstract import FLTechnique 
+from fl_eval.core.gt_parser import GroundTruthAndLineLimit
+
 def compute_exam_score_one_file(
     predictions: list[int], 
     ground_truth: int, 
@@ -50,5 +53,23 @@ def compute_exam_score_one_file(
     found_in_predictions = rank_index < len(predictions)
     exam_score = rank_index / total_lines
     return (found_in_predictions, exam_score)
+
+
+
+def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthAndLineLimit) -> tuple[bool, float]:
+    predictions = flt.get_fault_localization(Gtruth.mutantfile) 
+    
+    ground_truth = Gtruth.ground_truth
+    total_line_start = Gtruth.startLine
+    total_line_end = Gtruth.endLine
+    
+    return compute_exam_score_one_file(
+        predictions, 
+        ground_truth, 
+        total_line_start, 
+        total_line_end
+    )
+
+
 
 

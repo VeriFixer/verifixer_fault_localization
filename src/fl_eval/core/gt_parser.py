@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional
 from fl_eval.util.file_helpers import read_diff_file  # Import helper from the same package
 
-class GroundTruthAndLineLimitFinder:
+class GroundTruthAndLineLimit:
     """
     Represents the ground truth for a fault localization task where the 
     MUTANT file is the buggy version under test. The ground truth is the 
@@ -13,7 +13,7 @@ class GroundTruthAndLineLimitFinder:
         self.originalfile = originalfile
         self.mutantfile = mutantfile
         self.difffile = difffile
-        self.ground_truth: Optional[int] = None
+        self.ground_truth: int = -1
         self.startLine : int = -1
         self.endLine : int = -1
         self._parse_ground_truth()
