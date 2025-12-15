@@ -14,7 +14,10 @@ class GroundTruthAndLineLimitFinder:
         self.mutantfile = mutantfile
         self.difffile = difffile
         self.ground_truth: Optional[int] = None
+        self.startLine : int = -1
+        self.endLine : int = -1
         self._parse_ground_truth()
+        self._parse_limits()
 
     def _read_diff_file(self) -> str:
         """Helper to safely read the content of the diff file."""
@@ -24,6 +27,31 @@ class GroundTruthAndLineLimitFinder:
             raise FileNotFoundError(f"Diff file not found at {self.difffile}")
         except Exception as e:
             raise IOError(f"Error reading diff file {self.difffile}: {e}")
+
+    def _get_line_count(self, file_path: Path) -> int:
+        """Helper to count the lines in a given file."""
+        try:
+            with file_path.open('r', encoding='utf-8') as f:
+                return sum(1 for line in f)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Source file not found at {file_path}")
+        except Exception as e:
+            raise IOError(f"Error reading file {file_path}: {e}")
+        
+
+    def _parse_limits(self):
+        # TODO Limits are giving complete file (this will need to be changed to buggy method or buggy function)
+        """
+        # TODO: This logic must be replaced by an external tool/command to
+        # find the actual method/function boundaries surrounding the ground truth.
+        """
+        # We need the limits of the buggy file (the mutant file)
+        last_line = self._get_line_count(self.mutantfile)
+        
+        self.startLine = 0
+        self.endLine = last_line - 1
+        if self.endLine < 0:
+             raise ValueError(f"Mutant file appears empty: {self.mutantfile}")
 
     def _parse_ground_truth(self):
         """

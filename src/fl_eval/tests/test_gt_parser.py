@@ -1,15 +1,15 @@
 import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-
 # Assume fl_eval is correctly installed or paths are set up for relative import
 from fl_eval.core.gt_parser import GroundTruthAndLineLimitFinder
-
 from tempfile import TemporaryDirectory
+
 class TestGroundTruthAndLineLimitFinder(unittest.TestCase):
-    
-    def test_given_file_content(self):
-        """Tests the specific diff content provided by the user (8c8)."""
+    def test_given_file_content_and_line_limits(self):
+        """
+        Tests the ground truth extraction (8c8) AND the new line limit logic.
+        """
         
         # 1. Define the specific diff content
         diff_content = (
@@ -19,7 +19,22 @@ class TestGroundTruthAndLineLimitFinder(unittest.TestCase):
             "> \tif true {"
         )
         
-        # 2. Use a temporary directory to create the dummy files safely
+        # 2. Define content for the mutant file (used to determine line limits)
+        mutant_file_content = (
+            "line 1\n"
+            "line 2\n"
+            "line 3\n"
+            "line 4\n"
+            "line 5\n"
+            "line 6\n"
+            "line 7\n"
+            "line 8 (The bug)\n"
+            "line 9\n"
+            "line 10\n"
+            # This file has exactly 10 lines.
+        )
+        expected_end_line = 9
+        
         with TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             
@@ -27,21 +42,23 @@ class TestGroundTruthAndLineLimitFinder(unittest.TestCase):
             original_path = temp_path / "original.txt"
             mutant_path = temp_path / "mutant.txt"
             diff_path = temp_path / "abs__124_BBR_true.txt"
-            
-            # Write the diff content to the specified file path
+            # Write contents to the necessary files
             diff_path.write_text(diff_content)
-
-            # 3. Instantiate the Prevision class
-            prevision_instance = GroundTruthAndLineLimitFinder(original_path, mutant_path, diff_path)
-            
-            # 4. Assert the expected ground truth
+            mutant_path.write_text(mutant_file_content) # *** NEW STEP ***
+            # 3. Instantiate the Finder class
+            finder_instance = GroundTruthAndLineLimitFinder(original_path, mutant_path, diff_path)
+            # 4. ASSERTIONS FOR GROUND TRUTH (unchanged)
             expected_ground_truth = 8
-            self.assertEqual(prevision_instance.ground_truth, expected_ground_truth, 
+            self.assertEqual(finder_instance.ground_truth, expected_ground_truth, 
                              "The ground truth should be 8 for the '8c8' diff.")
+            # 5. ASSERTIONS FOR LINE LIMITS (*** NEW ASSERTIONS ***)
+            self.assertEqual(finder_instance.startLine, 0,
+                             "startLine should be 0 (start of the file).")
+            self.assertEqual(finder_instance.endLine, expected_end_line,
+                             f"endLine should be {expected_end_line} (last line of mutant file).")
 
     def test_diff_with_range_and_delete(self):
         """Tests a different diff format: a range and a delete operation."""
-        
         diff_content_range = (
             "15d14\n"
             "<     // Deleted line\n"
@@ -54,29 +71,34 @@ class TestGroundTruthAndLineLimitFinder(unittest.TestCase):
             "> line 21 new\n"
             "> line 22 new\n"
         )
-        
-        # In this case, the first change is at line 15 ('15d14'), so 15 is the ground truth.
+        # Since we are not explicitly writing content for mutant2.txt, 
+        # the line count will be 0, which should trigger a ValueError.
         expected_ground_truth = 14
-        
         with TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             original_path = temp_path / "original2.txt"
             mutant_path = temp_path / "mutant2.txt"
             diff_path = temp_path / "test_diff_2.txt"
             diff_path.write_text(diff_content_range)
-            
-            prevision_instance = GroundTruthAndLineLimitFinder(original_path, mutant_path, diff_path)
-            self.assertEqual(prevision_instance.ground_truth, expected_ground_truth,
+            # Create a 5-line dummy mutant file for this test
+            mutant_path.write_text("1\n2\n3\n4\n5\n")
+            expected_end_line = 4
+            finder_instance = GroundTruthAndLineLimitFinder(original_path, mutant_path, diff_path)
+            # Assert GT
+            self.assertEqual(finder_instance.ground_truth, expected_ground_truth,
                              "The ground truth should be 14 (first change detected).")
+            # Assert Limits
+            self.assertEqual(finder_instance.startLine, 0)
+            self.assertEqual(finder_instance.endLine, expected_end_line)
 
-    def test_no_changes(self):
-        """Tests a diff file with no actual changes."""
+
+    def test_no_changes_and_limit_check(self):
+        """Tests a diff file with no actual changes AND verifies the line limits."""
         
         diff_content_empty = (
             "--- original.txt\n"
             "+++ mutant.txt\n"
         )
-        
         with TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             original_path = temp_path / "original3.txt"
@@ -84,6 +106,9 @@ class TestGroundTruthAndLineLimitFinder(unittest.TestCase):
             diff_path = temp_path / "test_diff_3.txt"
             diff_path.write_text(diff_content_empty)
             
+            # Must write file content, even for the negative test
+            mutant_path.write_text("a\nb\nc\n")
+            
             # We expect a ValueError because no ground truth could be extracted
-            with self.assertRaises(ValueError):
+            with self.assertRaises(ValueError, msg="Should raise ValueError if no change markers found."):
                 GroundTruthAndLineLimitFinder(original_path, mutant_path, diff_path)
