@@ -1,7 +1,16 @@
 # This Repo Explores diverse ideas to find fault localization in dafny programns 
 
+# Generate the dataset to evaluate the mutants and the FL methods
+ ./src/generate\_mutdafny\_datset.sh 
+
+
+
+
 After running mutdafny and some dataset and generating the mutants and the original dir. 
 get\_pos computes the diff from the original program. 
+
+change to src directory and run:
+./get\_pos.sh
 
 It generates a folder pos\_mutation with:
 original/{names}.dfy containing all programs original (after post resolution) 
