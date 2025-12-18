@@ -6,6 +6,7 @@ from typing import Dict, Type, List, Tuple
 # --- Import Core Components from fl_eval package ---
 from fl_eval.core.abstract import FLTechnique
 from fl_eval.core.baselines import RandomRanker
+from fl_eval.core.baselines import CounterExampleBaseRanker
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import compute_exam_score
 
@@ -13,6 +14,7 @@ from typing import Dict, Type, List, Tuple, Optional
 # --- Mapping of Technique Names to Classes ---
 TECHNIQUE_MAP: Dict[str, Type[FLTechnique]] = {
     "random": RandomRanker,
+    "counterBase": CounterExampleBaseRanker,
     # TODO: Add other FL techniques here as they are implemented
 }
 
@@ -105,7 +107,7 @@ def _generate_report(flt_name: str, all_scores: List[float]) -> None:
         print("\nNo mutations were successfully evaluated.")
 
 # --- Orchestrator Function ---
-
+from tqdm import tqdm
 def compute_metrics(flt_name: str, base_path: Path) -> None:
     """
     Receives a technique name and directory, iterates through mutation files, 
@@ -117,9 +119,9 @@ def compute_metrics(flt_name: str, base_path: Path) -> None:
         
     fl_technique, killed_dir, original_dir = setup_result
     all_scores: List[float] = []
-    
-    # Iterate over all diff files
-    for diff_path in killed_dir.glob("*.txt"):
+
+    diff_paths = list(killed_dir.glob("*.txt"))
+    for diff_path in tqdm(diff_paths, desc=f"Get metrics for {flt_name}", total=len(diff_paths)):
         score = _process_mutation(diff_path, fl_technique, killed_dir, original_dir)
         if score is not None:
             all_scores.append(score)
