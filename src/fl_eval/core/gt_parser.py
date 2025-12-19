@@ -48,8 +48,8 @@ class GroundTruthAndLineLimit:
         # We need the limits of the buggy file (the mutant file)
         last_line = self._get_line_count(self.mutantfile)
         
-        self.startLine = 0
-        self.endLine = last_line - 1
+        self.startLine = 1
+        self.endLine = last_line
         if self.endLine < 0:
              raise ValueError(f"Mutant file appears empty: {self.mutantfile}")
 

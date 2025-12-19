@@ -11,8 +11,17 @@ def compute_exam_score_one_file(
     Evaluates the effectiveness of a fault localization technique by calculating the EXAM score.
 
     The EXAM score represents the percentage of executable statements that must be 
-    inspected to find the fault. This function ensures the ranking is complete by 
-    appending any unranked lines to the end of the provided prediction list.
+    inspected to find the fault. The Exam Score works best by ranking all lines, prior work appended
+    missing lines unranked lines to the prediciton list to make it complete.
+
+    However this is statistical unstable, what we will do instead is use the acually ranked lines by the predictor
+    And if the line is not there, use the remaining N-len(predictions) to compute the expected number of lines.
+    If the ground_truth is not in the predictions, the function calculates the Expected Value 
+    of the rank assuming the fault is uniformly distributed among the unranked lines.
+
+    Exam score must be 0 if perfect predicted and 1 if line is the last to be found. it measures the total number of wasted 
+    Cecks, at maximum I will waste N-1 lines (as the last one is correct) Therefore the score is computed as 
+    Rank[0 index] / (N-1) , and for N=1 returns 0 imediatly
 
     Args:
         predictions (list[int]): A list of line numbers ranked by suspiciousness (descending).
@@ -35,23 +44,30 @@ def compute_exam_score_one_file(
 
     if not (total_line_start <= ground_truth <= total_line_end):
         raise ValueError(f"Ground truth {ground_truth} is out of bounds ({total_line_start}-{total_line_end})")
-
-    prediction_set = set(predictions)
-    missing_lines: list[int] = []
     
-    for i in range(total_line_start, total_line_end + 1):
-        if i not in prediction_set:
-            missing_lines.append(i)
-            
-    full_ranking = predictions + missing_lines
+    if  len(list(filter(lambda x: (x < total_line_start) or (x > total_line_end), predictions))) != 0:
+        raise ValueError(f"Some predictions are outside the bounds of the line start {total_line_start} line end {total_line_end}")
+
+    if(total_lines == 1): # If one line it is found and exam is always 0 as no effort is wasted
+        return(predictions != [], 0)
 
     try:
-        rank_index = full_ranking.index(ground_truth)
+        rank = predictions.index(ground_truth)
+        found_in_predictions = True
+        
     except ValueError:
-        raise ValueError("Ground truth not found in the constructed line list.")
+        found_in_predictions = False
+        lines_inspected_so_far = len(predictions)
+        remaining_unranked_lines = total_lines - lines_inspected_so_far
+        
+        if remaining_unranked_lines <= 0:
+             raise ValueError("Predictions cover all lines but ground truth is missing.")
+        # We assume the fault is one of the remaining unranked lines.
+        # The expected position of the fault in the unranked set is the average position.
+        expected_position_in_unranked = (remaining_unranked_lines-1) / 2
+        rank = lines_inspected_so_far + expected_position_in_unranked
 
-    found_in_predictions = rank_index < len(predictions)
-    exam_score = rank_index / total_lines
+    exam_score = rank / (total_lines-1)
     return (found_in_predictions, exam_score)
 
 
@@ -69,7 +85,3 @@ def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthAndLineLimit) -> t
         total_line_start, 
         total_line_end
     )
-
-
-
-

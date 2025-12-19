@@ -5,21 +5,20 @@ from typing import Dict, Type, List, Tuple
 
 # --- Import Core Components from fl_eval package ---
 from fl_eval.core.abstract import FLTechnique
-from fl_eval.core.baselines import RandomRanker
-from fl_eval.core.baselines import CounterExampleBaseRanker
+from fl_eval.core.baselines import RandomRanker, CounterExampleBaseRanker, EmptyRanker
+
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import compute_exam_score
 
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
-RUN_PARALLEL = True
-
-
+from fl_eval.util.globals import *
 
 from typing import Dict, Type, List, Tuple, Optional
 # --- Mapping of Technique Names to Classes ---
 TECHNIQUE_MAP: Dict[str, Type[FLTechnique]] = {
     "random": RandomRanker,
     "counterBase": CounterExampleBaseRanker,
+    "empty": EmptyRanker
     # TODO: Add other FL techniques here as they are implemented
 }
 
@@ -54,7 +53,7 @@ def _process_mutation(
     fl_technique: FLTechnique, 
     killed_dir: Path, 
     original_dir: Path
-) -> Optional[float]:
+) -> Optional[tuple[bool,float]]:
     """
     Processes a single mutation file pair, computes the EXAM score, and returns it.
     Returns None if any error occurs.
@@ -82,9 +81,9 @@ def _process_mutation(
             difffile=diff_path
         )
         # Note: compute_exam_score handles calling the FL technique
-        _, exam_score = compute_exam_score(fl_technique, gtruth_finder)
+        (found, exam_score) = compute_exam_score(fl_technique, gtruth_finder)
         
-        return exam_score
+        return (found, exam_score)
 
     except ValueError as e:
         print(f"Error processing {mutation_name} (Value Error): {e}. Skipping.")
@@ -97,16 +96,18 @@ def _process_mutation(
 
 # --- Helper 3: Reporting ---
 
-def _generate_report(flt_name: str, all_scores: List[float]) -> None:
+def _generate_report(flt_name: str, all_scores: List[tuple[bool,float]]) -> None:
     """
     Computes the final average and prints the evaluation summary.
     """
     if all_scores:
-        average_score = sum(all_scores) / len(all_scores)
+        found_score = sum([x[0] for x in all_scores])/len(all_scores)
+        average_score = sum([x[1] for x in all_scores])/ len(all_scores)
         print("\n" + "="*50)
-        print(f"| Evaluation Summary for: {flt_name.upper():<27} |")
-        print(f"| Total Mutations Evaluated: {len(all_scores):<27} |")
-        print(f"| Average EXAM Score: {average_score:.6f}{'':<20} |")
+        print(f"| Evaluation Summary for: {flt_name.upper():<27}")
+        print(f"| Total Mutations Evaluated: {len(all_scores):<27}")
+        print(f"| Average EXAM Score: {average_score:.6f}{'':<20}")
+        print(f"| % where Fault was in the predictions: {found_score:.6f}{'':<20}")
         print("="*50)
     else:
         print("\nNo mutations were successfully evaluated.")
@@ -122,15 +123,14 @@ def compute_metrics(flt_name: str, base_path: Path) -> None:
         return
         
     fl_technique, killed_dir, original_dir = setup_result
-    all_scores: list[float | None] = []
+    all_scores: list[tuple[bool,float] | None] = []
 
     diff_paths = list(killed_dir.glob("*.txt"))
 
     all_scores = run_parallel_or_seq(RUN_PARALLEL, f"Get metrics for {flt_name}",
                                      diff_paths, _process_mutation, 
                                      fl_technique, killed_dir, original_dir)
-    
-    all_scores_clean : list[float] = list(filter(lambda x: x is not None, all_scores))
+    all_scores_clean : list[tuple[bool,float]] = list(filter(lambda x: x is not None, all_scores))
     _generate_report(flt_name, all_scores_clean)
 
 

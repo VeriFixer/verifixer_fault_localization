@@ -48,3 +48,62 @@ class TestExamMetric(unittest.TestCase):
         """Ensure error is raised if ground truth is outside file lines."""
         with self.assertRaises(ValueError):
             compute_exam_score_one_file([1, 2], 99, 1, 10)
+    def test_exam_score_lots_of_cases(self):
+        # Prediction Inside ranks
+        flag, score = compute_exam_score_one_file([1], 1, 1, 1)
+        self.assertEqual(flag, True)
+        self.assertAlmostEqual(score, 0)
+
+        # Other extreme cases
+        flag, score = compute_exam_score_one_file([1, 3, 2], 1, 1, 3)
+        self.assertEqual(flag, True)
+        self.assertAlmostEqual(score, 0)
+
+        flag, score = compute_exam_score_one_file([1, 3, 2], 2, 1, 3)
+        self.assertEqual(flag, True)
+        self.assertAlmostEqual(score, 1)
+
+        flag, score = compute_exam_score_one_file([1, 3, 2], 3, 1, 3)
+        self.assertEqual(flag, True)
+        self.assertAlmostEqual(score, 0.5)
+
+        # Predictions not inside ranks
+        flag, score = compute_exam_score_one_file([], 1, 1, 1)
+        self.assertEqual(flag, False)
+        self.assertAlmostEqual(score, 0)
+
+        # When there are multiple equally-likely ranks the expected average is 0.5
+        flag, score = compute_exam_score_one_file([], 1, 1, 2)
+        self.assertEqual(flag, False)
+        self.assertAlmostEqual(score, 0.5)
+
+        flag, score = compute_exam_score_one_file([], 1, 1, 3)
+        self.assertEqual(flag, False)
+        self.assertAlmostEqual(score, 0.5)
+
+        flag, score = compute_exam_score_one_file([], 1, 1, 4)
+        self.assertEqual(flag, False)
+        self.assertAlmostEqual(score, 0.5)
+
+        # Complex scenarios that mix both (here should be 0 or -1 depending on case)
+        flag, score = compute_exam_score_one_file([1], 1, 1, 3)
+        self.assertEqual(flag, True)
+        self.assertAlmostEqual(score, 0)
+
+        flag, score = compute_exam_score_one_file([1, 2], 1, 1, 3)
+        self.assertEqual(flag, True)
+        self.assertAlmostEqual(score, 0)
+
+        flag, score = compute_exam_score_one_file([1, 2], 3, 1, 3)
+        self.assertEqual(flag, False)
+        self.assertAlmostEqual(score, 1)
+
+        # Possibilities [1,2,3] gives 0.5 and [1,3,2] gives 1 => mean 0.75
+        flag, score = compute_exam_score_one_file([1], 2, 1, 3)
+        self.assertEqual(flag, False)
+        self.assertAlmostEqual(score, 0.75)
+
+        # Possibilities [1,2,3,4,5] and [1,2,3,5,4] both score 1/(5-1) = 0.25
+        flag, score = compute_exam_score_one_file([1, 2, 3], 2, 1, 5)
+        self.assertEqual(flag, True)
+        self.assertAlmostEqual(score, 0.25) 

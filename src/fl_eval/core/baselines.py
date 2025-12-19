@@ -1,7 +1,23 @@
 from pathlib import Path
 import random
 from fl_eval.core.abstract import FLTechnique # Import ABC
+import os
+import subprocess
+import json
+import re
 
+# Empty ranker in the score function is equivalent to 
+# chosing on average the correct line in half the entries
+# As the score function for the non selected lines returns the expected
+# lines to test from the non tested lines for completness
+class EmptyRanker(FLTechnique):
+    def __init__(self, name: str, **kwargs) -> None:
+        super().__init__(name, **kwargs)
+
+    def get_fault_localization(self, file: Path) -> list[int]:
+        line_numbers: list[int] = []
+        return line_numbers
+    
 class RandomRanker(FLTechnique):
     def __init__(self, name: str, **kwargs) -> None:
         super().__init__(name, **kwargs)
@@ -9,15 +25,9 @@ class RandomRanker(FLTechnique):
     def get_fault_localization(self, file: Path) -> list[int]:
         with open(file, "r") as f:
             lines = f.readlines()
-
         line_numbers = list(range(1, len(lines) + 1))
         random.shuffle(line_numbers)
         return line_numbers
-
-import os
-import subprocess
-import json
-import re
 
 class CounterExampleBaseRanker(FLTechnique):
     def __init__(self, name: str, **kwargs) -> None:
