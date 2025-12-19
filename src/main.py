@@ -10,6 +10,11 @@ from fl_eval.core.baselines import CounterExampleBaseRanker
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import compute_exam_score
 
+from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
+RUN_PARALLEL = True
+
+
+
 from typing import Dict, Type, List, Tuple, Optional
 # --- Mapping of Technique Names to Classes ---
 TECHNIQUE_MAP: Dict[str, Type[FLTechnique]] = {
@@ -107,7 +112,6 @@ def _generate_report(flt_name: str, all_scores: List[float]) -> None:
         print("\nNo mutations were successfully evaluated.")
 
 # --- Orchestrator Function ---
-from tqdm import tqdm
 def compute_metrics(flt_name: str, base_path: Path) -> None:
     """
     Receives a technique name and directory, iterates through mutation files, 
@@ -118,22 +122,22 @@ def compute_metrics(flt_name: str, base_path: Path) -> None:
         return
         
     fl_technique, killed_dir, original_dir = setup_result
-    all_scores: List[float] = []
+    all_scores: list[float | None] = []
 
     diff_paths = list(killed_dir.glob("*.txt"))
-    for diff_path in tqdm(diff_paths, desc=f"Get metrics for {flt_name}", total=len(diff_paths)):
-        score = _process_mutation(diff_path, fl_technique, killed_dir, original_dir)
-        if score is not None:
-            all_scores.append(score)
-            
-    # Generate the final report
-    _generate_report(flt_name, all_scores)
+
+    all_scores = run_parallel_or_seq(RUN_PARALLEL, f"Get metrics for {flt_name}",
+                                     diff_paths, _process_mutation, 
+                                     fl_technique, killed_dir, original_dir)
+    
+    all_scores_clean : list[float] = list(filter(lambda x: x is not None, all_scores))
+    _generate_report(flt_name, all_scores_clean)
 
 
 
 if __name__ == "__main__":
     # Define a clear usage example for the epilog
-    USAGE_EXAMPLE = """
+    USAGE_EXAMPLE = """"
 How to use:
   Run the script from the project root directory.
 

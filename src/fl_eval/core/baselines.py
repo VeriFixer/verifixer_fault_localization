@@ -22,6 +22,8 @@ import re
 class CounterExampleBaseRanker(FLTechnique):
     def __init__(self, name: str, **kwargs) -> None:
         super().__init__(name, **kwargs)
+        self.dafny = os.environ.get("DAFNY_EXEC")
+        assert (self.dafny != None), "an environmental variable DAFNY_EXEC must be set to dafny binary path"
 
     def get_counterexample_lines_from_json_diagnostic(self, diagnostic : dict[Any]) -> tuple[bool, list[int]]:
         lines_on_counterexamples : list[int] = []
@@ -49,13 +51,11 @@ class CounterExampleBaseRanker(FLTechnique):
         return (was_found_counter_example, lines_on_counterexamples)
 
     def get_fault_localization(self, file: Path) -> list[int]:
-        DAFNY_EXEC = os.environ.get("DAFNY_EXEC")
-        assert (DAFNY_EXEC != None), "an environmental variable DAFNY_EXEC must be set to dafny binary path"
         assert(file.exists()), "File should exist when calling this function"
 
         # run this command and get the output on a variable
         command = [
-            DAFNY_EXEC,
+            self.dafny,
             "verify",
             str(file),
             "--extract-counterexample",
@@ -102,4 +102,4 @@ class CounterExampleBaseRanker(FLTechnique):
 
 #file = "/home/ricostynha/Desktop/verifixer_fault_localization/abs__-_ODL_Add-left.dfy"
 #ct = CounterExampleBaseRanker("counter1")
-#ct.get_fault_localization(Path(file))
+#print(ct.get_fault_localization(Path(file)))
