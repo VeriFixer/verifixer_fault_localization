@@ -107,7 +107,7 @@ def _generate_report(flt_name: str, all_scores: List[tuple[bool,float]]) -> None
         print(f"| Evaluation Summary for: {flt_name.upper():<27}")
         print(f"| Total Mutations Evaluated: {len(all_scores):<27}")
         print(f"| Average EXAM Score: {average_score:.6f}{'':<20}")
-        print(f"| % where Fault was in the predictions: {found_score:.6f}{'':<20}")
+        print(f"| Fault found in predictions (%): {found_score:.6f}{'':<20}")
         print("="*50)
     else:
         print("\nNo mutations were successfully evaluated.")
