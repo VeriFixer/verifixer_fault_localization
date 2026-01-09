@@ -1,5 +1,7 @@
 from fl_eval.core.abstract import FLTechnique 
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
+from pathlib import Path
+import json
 
 def compute_exam_score_one_file(
     predictions: list[int], 
@@ -70,10 +72,37 @@ def compute_exam_score_one_file(
     exam_score = rank / (total_lines-1)
     return (found_in_predictions, exam_score)
 
+def _results_file_path(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> Path:
+    top_folder = Gtruth.mutantfile.parent.parent.parent
+    return  top_folder / "cached_results" / flt.name / f"{Gtruth.mutantfile.name}.json"
+
+
+def save_to_file_output( flt: FLTechnique, Gtruth: GroundTruthAndLineLimit,  predictions: list[int]):
+    # Top-level folder (e.g., project root)
+    results_file = _results_file_path(flt, Gtruth)
+    results_file.parent.mkdir(parents=True, exist_ok=True)
+
+    with results_file.open("w", encoding="utf-8") as f:
+         json.dump(predictions, f)
+
+
+def load_from_file_output(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> list[int]:
+    results_file = _results_file_path(flt, Gtruth)
+    if not results_file.exists():
+        raise FileNotFoundError(f"Cached results not found: {results_file}")
+    with results_file.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+    return data
 
 
 def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthAndLineLimit) -> tuple[bool, float]:
-    predictions = flt.get_fault_localization(Gtruth.mutantfile) 
+    try : 
+        # Try loading from cached results
+        predictions = load_from_file_output(flt, Gtruth)
+    except FileNotFoundError:
+        # Compute predictions localization
+        predictions = flt.get_fault_localization(Gtruth.mutantfile) 
+        save_to_file_output( flt, Gtruth ,  predictions)
     
     ground_truth = Gtruth.ground_truth
     total_line_start = Gtruth.startLine

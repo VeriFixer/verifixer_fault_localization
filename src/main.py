@@ -2,6 +2,7 @@
 import argparse
 from pathlib import Path
 from typing import Dict, Type, List, Tuple
+import shutil
 
 # --- Import Core Components from fl_eval package ---
 from fl_eval.core.abstract import FLTechnique
@@ -47,7 +48,6 @@ def _setup_evaluation(flt_name: str, base_path: Path) -> Optional[Tuple[FLTechni
     return fl_technique, killed_dir, original_dir
 
 # --- Helper 2: Process a Single Mutation ---
-
 def _process_mutation(
     diff_path: Path, 
     fl_technique: FLTechnique, 
@@ -82,6 +82,8 @@ def _process_mutation(
         )
         # Note: compute_exam_score handles calling the FL technique
         (found, exam_score) = compute_exam_score(fl_technique, gtruth_finder)
+
+
         
         return (found, exam_score)
 
@@ -166,12 +168,29 @@ How to use:
         type=Path,
         help="The path to the parent directory containing the 'killed' and 'original' folders (e.g., src/pos_test)."
     )
+
+    parser.add_argument(
+      "--clean-cache",
+      action="store_true",
+      help="Clean cached results before running"
+    )
     
     args = parser.parse_args()
     
+
     # Check if the path exists before proceeding
     if not args.data_path.exists():
         print(f"Error: Data path not found: {args.data_path}")
         parser.print_help()
     else:
+        if args.clean_cache:
+            print("Cleaning: Results Cache")
+            cache_dir = args.data_path.parent / "cached_results"
+            if cache_dir.exists():
+                shutil.rmtree(cache_dir)
+                print(f"Removed cache directory: {cache_dir}")
+            else:
+                print(f"No cache directory found at: {cache_dir}")
+        else:
+            print(f"Using cached Results if any")
         compute_metrics(args.technique_name, args.data_path)

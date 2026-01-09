@@ -40,9 +40,7 @@ class GroundTruthAndLineLimit:
         
 
     def _parse_limits(self):
-        # TODO Limits are giving complete file (this will need to be changed to buggy method or buggy function)
         """
-        # TODO: This logic must be replaced by an external tool/command to
         # find the actual method/function boundaries surrounding the ground truth.
         """
         # We need the limits of the buggy file (the mutant file)

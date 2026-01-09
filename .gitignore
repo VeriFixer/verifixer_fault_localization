@@ -1,4 +1,5 @@
 src/pos_mutation/*
+src/cached_results/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
