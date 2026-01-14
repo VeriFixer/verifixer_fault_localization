@@ -6,7 +6,7 @@ import shutil
 
 # --- Import Core Components from fl_eval package ---
 from fl_eval.core.abstract import FLTechnique
-from fl_eval.core.baselines import RandomRanker, CounterExampleBaseRanker, EmptyRanker
+from fl_eval.core.baselines import RandomRanker, CounterExampleBaseRanker, EmptyRanker,  RandomLineOfMethodThatFails
 
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import compute_exam_score
@@ -19,7 +19,8 @@ from typing import Dict, Type, List, Tuple, Optional
 TECHNIQUE_MAP: Dict[str, Type[FLTechnique]] = {
     "random": RandomRanker,
     "counterBase": CounterExampleBaseRanker,
-    "empty": EmptyRanker
+    "empty": EmptyRanker,
+    "randomOnFailingMethod" : RandomLineOfMethodThatFails
     # TODO: Add other FL techniques here as they are implemented
 }
 
@@ -174,7 +175,7 @@ How to use:
       action="store_true",
       help="Clean cached results before running"
     )
-    
+     
     args = parser.parse_args()
     
 

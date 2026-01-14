@@ -1,0 +1,66 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- ============================= -->
+  <!-- Dafny + Boogie assemblies     -->
+  <!-- ============================= -->
+  <ItemGroup>
+    <Reference Include="Dafny">
+      <HintPath>../../dafny/Binaries/Dafny.dll</HintPath>
+    </Reference>
+
+    <Reference Include="DafnyCore">
+      <HintPath>../../dafny/Binaries/DafnyCore.dll</HintPath>
+    </Reference>
+
+    <Reference Include="DafnyDriver">
+      <HintPath>../../dafny/Binaries/DafnyDriver.dll</HintPath>
+    </Reference>
+
+    <Reference Include="Boogie.ExecutionEngine">
+      <HintPath>../../dafny/Binaries/Boogie.ExecutionEngine.dll</HintPath>
+    </Reference>
+
+    <Reference Include="Boogie.Core">
+      <HintPath>../../dafny/Binaries/Boogie.Core.dll</HintPath>
+    </Reference>
+
+    <Reference Include="Boogie.VCGeneration">
+      <HintPath>../../dafny/Binaries/Boogie.VCGeneration.dll</HintPath>
+    </Reference>
+
+    <Reference Include="Microsoft.Extensions.Logging.Abstractions">
+      <HintPath>../../dafny/Binaries/Microsoft.Extensions.Logging.Abstractions.dll</HintPath>
+      </Reference>
+
+      <Reference Include="Boogie.Provers.SMTLib">
+     <HintPath>../../dafny/Binaries/Boogie.Provers.SMTLib.dll</HintPath>
+   </Reference>
+  </ItemGroup>
+
+  <!-- ============================= -->
+  <!-- REQUIRED RUNTIME FILES        -->
+  <!-- ============================= -->
+
+  <ItemGroup>
+  <None Include="../../dafny/Binaries/DafnyPrelude.bpl">
+    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+  </None>
+  <None Include="../../dafny/Binaries/DafnyStandardLibraries*.doo">
+    <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+  </None>
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
+  </ItemGroup>
+
+</Project>
+

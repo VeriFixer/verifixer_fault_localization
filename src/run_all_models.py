@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
-
+from scipy.stats import gaussian_kde
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
 from fl_eval.util.globals import RUN_PARALLEL
 from run_1_model import (
@@ -64,101 +64,126 @@ def _print_latex_table(stats: Dict[str, dict]):
     print("--------------------------\n")
 
 
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
+from pathlib import Path
+from matplotlib.patches import Patch
+
 def _generate_plots(raw_results: Dict[str, List[tuple[bool, float]]], output_path: Path): 
-    """
-    Generates a combined figure with a distribution plot (Box Plot overlayed with Violin Plot) 
-    and a Bar Chart.
-    """
-    import matplotlib.pyplot as plt
-    import numpy as np
-    from pathlib import Path
-
     techniques = list(raw_results.keys())
+    labels = [t for t in techniques if raw_results[t]]
     
-    # Extract data, filtering out techniques with no results
-    scores_data = []
-    labels = []
-    
-    for tech in techniques:
-        data = [x[1] for x in raw_results[tech]]
-        if data:
-            scores_data.append(data)
-            labels.append(tech)
-    
-    if not scores_data:
-        print("No data available to plot.")
-        return
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
+    fig.suptitle('Fault Localization Benchmark: Comprehensive Analysis', fontsize=18, fontweight='bold')
 
-    # --- Setup Figure: Two subplots (Distribution + Bar Chart) ---
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
-    fig.suptitle('Fault Localization Benchmark Results', fontsize=16)
+    y_grid = np.linspace(0, 1, 500)
+    scale_factor = 0.4 
+
+    for i, tech in enumerate(labels):
+        data = raw_results[tech]
+        all_scores = np.array([x[1] for x in data])
+        found_scores = np.array([x[1] for x in data if x[0]])
+        not_found_scores = np.array([x[1] for x in data if not x[0]])
+        total_count = len(data)
+
+        # --- 1. Draw Density Background ---
+        def draw_half_violin(ax, scores, pos, side='left'):
+            if len(scores) == 0: return
+            color = '#2ecc71' if side == 'left' else '#e74c3c'
+            weight = len(scores) / total_count
+            
+            if np.all(scores == scores[0]): # Zero variance case
+                val = scores[0]
+                ax.hlines(val, pos, pos + (scale_factor * weight if side == 'right' else -scale_factor * weight), 
+                          colors=color, lw=6, alpha=0.6)
+            else:
+                try:
+                    kde = gaussian_kde(scores, bw_method='silverman')
+                    dens = kde.evaluate(y_grid)
+                    dens = (dens / (max(dens) + 1e-9)) * scale_factor * weight
+                    if side == 'left':
+                        ax.fill_betweenx(y_grid, pos - dens, pos, color=color, alpha=0.5)
+                    else:
+                        ax.fill_betweenx(y_grid, pos, pos + dens, color=color, alpha=0.5)
+                except: pass
+
+        draw_half_violin(ax1, found_scores, i, side='left')
+        draw_half_violin(ax1, not_found_scores, i, side='right')
+
+        # --- 2. Overlay Overall Box Plot ---
+        # This shows the trend of ALL data (Found + Not Found combined)
+        ax1.boxplot(all_scores, positions=[i], vert=True, widths=0.25,
+                    showfliers=False, # Keeps the plot clean
+                    patch_artist=True,
+                    showmeans=True,
+                    meanprops=dict(marker='D', markerfacecolor='gold', 
+                                  markeredgecolor='black', markersize=8),
+                    boxprops=dict(facecolor='white', color='black', alpha=0.5, linewidth=2.5),
+                    medianprops=dict(color='blue', linewidth=2),
+                    whiskerprops=dict(color='black', linewidth=2),
+                    capprops=dict(color='black', linewidth=2))
+
+    # Styling ax1
+    ax1.set_title('Density Breakdown with Overall Box Plot Overlay', fontsize=14)
+    ax1.set_xticks(range(len(labels)))
+    ax1.set_xticklabels(labels, rotation=15)
+    ax1.set_ylabel('EXAM Score (Lower is Better)', fontsize=12)
+    ax1.set_ylim(-0.02, 1.05)
+    ax1.grid(axis='y', linestyle='--', alpha=0.3)
     
-    # 1. Distribution Plot: Violin Plot with Box Plot Overlay
-    # --- A. Violin Plot (Background) ---
-    # Use different colors for better contrast
-    violin_colors = ['#88CCEE', '#CC6677', '#DDCC77', '#117733', '#332288', '#AA4499'] * len(labels)
     
-    parts = ax1.violinplot(
-        scores_data, 
-        showmeans=False, 
-        showmedians=False, # We let the boxplot show the median
-        showextrema=False, # We let the boxplot show the extrema/whiskers
-        widths=0.9
-    )
+    legend_elements = [
+        Patch(facecolor='#2ecc71', alpha=0.6, label='Found Density'),
+        Patch(facecolor='#e74c3c', alpha=0.6, label='Not Found Density'),
+        plt.Line2D([0], [0], color='blue', lw=2, label='Median Score'),
+        plt.Line2D([0], [0], marker='D', color='w', markerfacecolor='gold', 
+                   markeredgecolor='black', markersize=10, label='Mean Score')
+    ]
     
-    # Customize Violin Colors and Opacity
-    for i, pc in enumerate(parts['bodies']):
-        pc.set_facecolor(violin_colors[i])
-        pc.set_edgecolor('black')
-        pc.set_alpha(0.5) # Lower alpha to allow boxplot to show through
+    
+    ax1.legend(handles=legend_elements, loc='upper right')
+
+    # --- Plot 2: ECDF with Numeric Success Annotations ---
+    for tech in labels:
+        tech_data = sorted(raw_results[tech], key=lambda x: x[1])
+        scores = [x[1] for x in tech_data]
+        found_flags = [1 if x[0] else 0 for x in tech_data]
         
-    # --- B. Box Plot (Overlay) ---
-    # Plotting this *after* the violin plot ensures it is rendered on top
-    box_plot = ax1.boxplot(
-        scores_data, 
-        vert=True, 
-        patch_artist=True, # Allows filling boxes with color
-        medianprops={'color': 'red', 'linewidth': 2},
-        whiskerprops={'color': 'black'},
-        capprops={'color': 'black'},
-        flierprops={'marker': 'o', 'markerfacecolor': 'black', 'markeredgecolor': 'black', 'markersize': 5, 'alpha': 0.7}
-    )
-    
-    # Set box colors (e.g., lighter shade of the violin color for contrast)
-    box_colors = ['#AADDEE', '#FFBBCC', '#FFEECB', '#BBFFCC', '#BBCCFF', '#FFAAFF'] * len(labels)
-    for i, patch in enumerate(box_plot['boxes']):
-        patch.set_facecolor(box_colors[i])
-        patch.set_edgecolor('black')
-        patch.set_alpha(0.7)
+        # Calculate cumulative percentage
+        y_vals = np.cumsum(found_flags) / len(raw_results[tech])
+        
+        # --- THE FIX: Force line to span to 1.0 ---
+        # Add a final point at x=1.0 with the last known y-value
+        plot_x = scores + [1.0]
+        plot_y = list(y_vals) + [y_vals[-1]]
+        
+        line, = ax2.step(plot_x, plot_y, where='post', label=tech, lw=2.5)
+        
+        # Final Numeric Label at the very edge (x=1.0)
+        final_pct = y_vals[-1] * 100
+        ax2.text(1.01, y_vals[-1], f'{final_pct:.1f}%', 
+                color=line.get_color(), fontweight='bold', va='center', fontsize=10)
 
-    ax1.set_title('Score Distribution (Violin + Box Plot)')
-    ax1.set_ylabel('EXAM Score (Lower is Better)')
-    ax1.set_xticks(np.arange(1, len(labels) + 1))
-    ax1.set_xticklabels(labels)
-    ax1.grid(True, linestyle='--', alpha=0.6)
+    # Define the 'Critical Efforts' (e.g., 1%, 5%, 10% of code)
+    critical_thresholds = [0.01, 0.05, 0.10, 0.25, 0.50]
+    for thresh in critical_thresholds:
+        ax2.axvline(x=thresh, color='gray', linestyle='--', alpha=0.3)
+        ax2.text(thresh, 0.02, f' Top-{int(thresh*100)}%', rotation=90, fontsize=9, alpha=0.7)
 
-    # 2. Bar Chart (Average Performance)
-    avgs = [np.mean(d) for d in scores_data]
-    x_pos = np.arange(len(labels))
-    
-    bars = ax2.bar(x_pos, avgs, align='center', alpha=0.8, color='#4682B4', capsize=10)
-    ax2.set_xticks(x_pos)
-    ax2.set_xticklabels(labels)
-    ax2.set_ylabel('Average EXAM Score')
-    ax2.set_title('Average Performance Comparison')
-    ax2.grid(axis='y', linestyle='--', alpha=0.5)
-    
-    # Add values on top of bars
-    for bar in bars:
-        height = bar.get_height()
-        ax2.text(bar.get_x() + bar.get_width()/2., height,
-                f'{height:.4f}', ha='center', va='bottom')
+    ax2.set_title('Success Rate vs. Inspection Effort', fontsize=14)
+    ax2.set_xlabel('EXAM Score Threshold (Effort)', fontsize=12)
+    ax2.set_ylabel('% of Total Faults Found', fontsize=12)
+    ax2.set_xlim(0, 1.1) # Extra space for the text labels
+    ax2.set_ylim(0, 1.05)
+    ax2.grid(True, linestyle=':', alpha=0.6)
+    ax2.legend(loc='lower right')
 
     plt.tight_layout()
-    # Save file
-    filename = output_path / "benchmark_combined_distribution.png"
+    filename = output_path / "benchmark_hybrid_analysis.png"
     plt.savefig(filename)
-    print(f"Graphs saved to: {filename}") 
+    print(f"Final hybrid plots saved to: {filename}")
+
 
 def run_benchmark(base_path: Path):
     print(f"Starting Benchmark on: {base_path}")
@@ -175,13 +200,13 @@ def run_benchmark(base_path: Path):
         fl_technique, killed_dir, original_dir = setup_res
         diff_paths = list(killed_dir.glob("*.txt"))
         scores_dirty = run_parallel_or_seq(
-            RUN_PARALLEL, 
-            f"Eval {tech_name}", 
             diff_paths, 
             _process_mutation, 
+            f"Eval {tech_name}", 
             fl_technique, 
             killed_dir, 
-            original_dir
+            original_dir,
+            parallel= RUN_PARALLEL
         )
         scores_clean = [s for s in scores_dirty if s is not None]
         raw_results[tech_name] = scores_clean

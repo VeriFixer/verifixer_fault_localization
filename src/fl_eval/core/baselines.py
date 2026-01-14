@@ -6,6 +6,8 @@ import subprocess
 import json
 import re
 
+import fl_eval.util.run_external_cmd as run_cmd
+
 # Empty ranker in the score function is equivalent to 
 # chosing on average the correct line in half the entries
 # As the score function for the non selected lines returns the expected
@@ -29,10 +31,50 @@ class RandomRanker(FLTechnique):
         random.shuffle(line_numbers)
         return line_numbers
 
+import fl_eval.util.globals as gl
+class RandomLineOfMethodThatFails(FLTechnique):
+    def __init__(self, name: str, **kwargs) -> None:
+        super().__init__(name, **kwargs)
+
+    def get_fault_localization(self, file: Path) -> list[int]:
+        # Create command to run 
+        exec = gl.BASE_PATH / "strategies/ReturnAtRandomAllLinesOfFailingMethod/bin/Debug/net8.0/ReturnAtRandomAllLinesOfFailingMethod"
+               # run this command and get the output on a variable
+        command = [
+             exec,
+            str(file),
+        ]
+
+        (status, stdout, stderr) = run_cmd.run_external_cmd(command)
+        if(status != run_cmd.Status.OK):
+            # If run cmd finished by any reason with error send empty prediction
+            print(command)
+            print(status)
+            print(stdout)
+            print(stderr)
+
+            print("---------------------")
+            return []
+
+        match = re.search(r"spans lines (\d+) to (\d+)", stdout)
+        if match:
+            start_line = int(match.group(1))
+            end_line = int(match.group(2))
+            line_numbers = list(range(start_line, end_line + 1))
+            # Not ranodm random was worse
+            #random.shuffle(line_numbers)
+            return line_numbers
+        else:
+            # NOTE Dany printing creates variables with underscores at the beginning that cannot be
+            # Parsed using dafny verify, see example on pos_mutation/killed/BinaryAddition__3122_LVR_0.dfy 
+            # The only way to solve it is to rename variables beginning with underscore
+            return [] 
+
+
 class CounterExampleBaseRanker(FLTechnique):
     def __init__(self, name: str, **kwargs) -> None:
         super().__init__(name, **kwargs)
-        self.dafny = os.environ.get("DAFNY_EXEC")
+        self.dafny = os.environ.get("DAFNY_EXEC") or ""
         assert (self.dafny != None), "an environmental variable DAFNY_EXEC must be set to dafny binary path"
 
     def get_counterexample_lines_from_json_diagnostic(self, diagnostic : dict[Any]) -> tuple[bool, list[int]]:
@@ -64,7 +106,7 @@ class CounterExampleBaseRanker(FLTechnique):
         assert(file.exists()), "File should exist when calling this function"
 
         # run this command and get the output on a variable
-        command = [
+        command: list[str] = [
             self.dafny,
             "verify",
             str(file),
@@ -72,16 +114,14 @@ class CounterExampleBaseRanker(FLTechnique):
             "--json-output"
         ]
 
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            check=False  # Don't raise exception for non-zero exit codes yet
-        )
-
+        (status, stdout, _) = run_cmd.run_external_cmd(command)
+        if(status != run_cmd.Status.OK):
+            # If run cmd finished by any reason with error send empty prediction
+            return []
+        
         # Separate json in actuall newlines need to escape new lines \\n inside json and put them back together
         placeholder = "___ESCAPED_NEWLINE_PLACEHOLDER___"
-        result_changed_stdout = result.stdout.replace("\\n",placeholder)
+        result_changed_stdout = stdout.replace("\\n",placeholder)
         results_json_list: list[str] = result_changed_stdout.split("\n")
         results_json_list = list(filter(lambda x: len(x) > 0, results_json_list))
         results_json_list = [r.replace(placeholder,"\\n") for r in results_json_list]
