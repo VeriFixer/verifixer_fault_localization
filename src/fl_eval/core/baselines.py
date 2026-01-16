@@ -8,6 +8,15 @@ import re
 
 import fl_eval.util.run_external_cmd as run_cmd
 
+def _find_executable(base_dir : Path, pattern : str) -> Path:
+        # rglob searches recursively
+        for path in base_dir.rglob(pattern):
+            # Ensure we skip intermediate 'ref' or 'publish' folders if they exist
+            if path.is_file() and "ref" not in path.parts:
+                return path
+                    
+        raise FileNotFoundError(f"Could not find {pattern} executable in {base_dir}")
+
 # Empty ranker in the score function is equivalent to 
 # chosing on average the correct line in half the entries
 # As the score function for the non selected lines returns the expected
@@ -32,13 +41,65 @@ class RandomRanker(FLTechnique):
         return line_numbers
 
 import fl_eval.util.globals as gl
+
+class CounterExampleIf(FLTechnique):
+    def __init__(self, name: str, **kwargs) -> None:
+        super().__init__(name, **kwargs)
+
+    def get_fault_localization(self, file: Path) -> list[int]:
+        # Create command to run 
+        base_dir = gl.BASE_PATH / "strategies/CounterExampleIf/bin/Debug"
+        pattern = "**/CounterExampleIf"
+        exec = _find_executable(base_dir, pattern)
+               # run this command and get the output on a variable
+        command = [
+             exec,
+            str(file),
+        ]
+
+        (status, stdout, stderr) = run_cmd.run_external_cmd(command)
+        if(status != run_cmd.Status.OK):
+            # If run cmd finished by any reason with error send empty prediction
+            print(command)
+            print(status)
+            print(stdout)
+            print(stderr)
+
+            print("---------------------")
+            return []
+        
+        json_pattern = r"```json\s*(.*?)\s*```"
+        matches = re.findall(json_pattern, stdout, re.DOTALL)
+
+        all_results = []
+        for json_str in matches:
+            try:
+                # 2. Parse the string into a Python dictionary
+                data = json.loads(json_str)
+                all_results.append(data)
+            except json.JSONDecodeError as e:
+                print(f"Failed to parse a JSON block: {e}")
+                continue
+        lines: list[int] = []
+        
+        for result in all_results:
+            nodes = result["Nodes"]
+            for node in nodes:
+                lines.append(node["Line"])
+        return lines
+        
+
+
+
 class RandomLineOfMethodThatFails(FLTechnique):
     def __init__(self, name: str, **kwargs) -> None:
         super().__init__(name, **kwargs)
 
     def get_fault_localization(self, file: Path) -> list[int]:
         # Create command to run 
-        exec = gl.BASE_PATH / "strategies/ReturnAtRandomAllLinesOfFailingMethod/bin/Debug/net8.0/ReturnAtRandomAllLinesOfFailingMethod"
+        base_dir = gl.BASE_PATH / "strategies/ReturnAtRandomAllLinesOfFailingMethod/bin/Debug"
+        pattern = "**/ReturnAtRandomAllLinesOfFailingMethod"
+        exec = _find_executable(base_dir, pattern)
                # run this command and get the output on a variable
         command = [
              exec,

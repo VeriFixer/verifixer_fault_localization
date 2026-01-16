@@ -6,7 +6,7 @@ import shutil
 
 # --- Import Core Components from fl_eval package ---
 from fl_eval.core.abstract import FLTechnique
-from fl_eval.core.baselines import RandomRanker, CounterExampleBaseRanker, EmptyRanker,  RandomLineOfMethodThatFails
+from fl_eval.core.baselines import RandomRanker, CounterExampleBaseRanker, EmptyRanker,  RandomLineOfMethodThatFails, CounterExampleIf
 
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import compute_exam_score
@@ -20,8 +20,8 @@ TECHNIQUE_MAP: Dict[str, Type[FLTechnique]] = {
     "random": RandomRanker,
     "counterBase": CounterExampleBaseRanker,
     "empty": EmptyRanker,
-    "randomOnFailingMethod" : RandomLineOfMethodThatFails
-    # TODO: Add other FL techniques here as they are implemented
+    "randomOnFailingMethod" : RandomLineOfMethodThatFails,
+    "counterExampleIf": CounterExampleIf    # TODO: Add other FL techniques here as they are implemented
 }
 
 def _setup_evaluation(flt_name: str, base_path: Path) -> Optional[Tuple[FLTechnique, Path, Path]]:
