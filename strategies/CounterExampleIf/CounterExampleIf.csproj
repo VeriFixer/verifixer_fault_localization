@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.10</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -42,6 +42,14 @@
       <Reference Include="Boogie.Provers.SMTLib">
      <HintPath>../../dafny/Binaries/Boogie.Provers.SMTLib.dll</HintPath>
    </Reference>
+
+   <Reference Include="Boogie.Model">
+      <HintPath>../../dafny/Binaries/Boogie.Model.dll</HintPath>
+    </Reference>
+
+    <Reference Include="Boogie.BaseTypes">
+      <HintPath>../../dafny/Binaries/Boogie.BaseTypes.dll</HintPath>
+    </Reference>
   </ItemGroup>
 
   <!-- ============================= -->

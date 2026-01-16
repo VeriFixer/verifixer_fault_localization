@@ -31,17 +31,13 @@ namespace returnMethodLinesRandom
             options.AllowSourceFolders = true;
             options.Set(CommonOptionBag.AllowWarnings, true);
 
-            // THIS IS CRITICAL
             options.CliRootSourceUris.Add(new Uri("file://" + filename));
 
 
-            // Create CLI-equivalent compilation
             var compilation = CliCompilation.Create(options);
 
-            // Start parsing + resolution
             compilation.Start();
 
-            // Run verification
             var fails = new List<CanVerifyResult>();
 
             await foreach (var result in compilation.VerifyAllLazily())
@@ -54,9 +50,6 @@ namespace returnMethodLinesRandom
                     }
                 }
             }
-            // Gatherer results where verification fails 
-
-            // This writes to a file passes in command line all method lines 
             foreach (var fail in fails)
             {
                 if (fail.CanVerify is Method method)
@@ -66,14 +59,12 @@ namespace returnMethodLinesRandom
                     {
                         var startTok = body.StartToken;
                         var endTok = body.EndToken;
-                        // Dafny tokens use zero-based indexing, add 1 if you want 1-based line numbers
                         var startLine = startTok.line;
                         var endLine = endTok.line;
                         Console.WriteLine($"Method '{method.Name}': spans lines {startLine} to {endLine}");
                     }
                 }
             }
-            // Get final exit code (same as CLI)
             var exitCode = await compilation.GetAndReportExitCode();
             return exitCode;
         }

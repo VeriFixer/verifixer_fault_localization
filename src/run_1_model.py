@@ -130,9 +130,8 @@ def compute_metrics(flt_name: str, base_path: Path) -> None:
 
     diff_paths = list(killed_dir.glob("*.txt"))
 
-    all_scores = run_parallel_or_seq(RUN_PARALLEL, f"Get metrics for {flt_name}",
-                                     diff_paths, _process_mutation, 
-                                     fl_technique, killed_dir, original_dir)
+    all_scores = run_parallel_or_seq(diff_paths, _process_mutation, f"Get metrics for {flt_name}",
+                                     fl_technique, killed_dir, original_dir, parallel=True)
     all_scores_clean : list[tuple[bool,float]] = list(filter(lambda x: x is not None, all_scores))
     _generate_report(flt_name, all_scores_clean)
 
