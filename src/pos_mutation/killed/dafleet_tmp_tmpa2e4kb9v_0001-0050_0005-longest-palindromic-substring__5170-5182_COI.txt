@@ -1,0 +1,6 @@
+84c84
+<   while center < |s'|
+---
+>   while !(center < |s'|)
+91d90
+<     decreases |s'| - center

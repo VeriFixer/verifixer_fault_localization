@@ -1,0 +1,4 @@
+93c93
+<     loop_counter_outer := loop_counter_outer + 1;
+---
+>     loop_counter_outer := loop_counter_outer + 2;

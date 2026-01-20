@@ -1,0 +1,8 @@
+18c18
+<   while i < r.Length
+---
+>   while 0 < r.Length
+21c21
+<     decreases r.Length - i
+---
+>     decreases r.Length - 0

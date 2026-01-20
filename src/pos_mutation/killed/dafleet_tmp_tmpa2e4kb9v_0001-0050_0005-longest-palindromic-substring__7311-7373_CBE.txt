@@ -1,0 +1,14 @@
+118,127c118,119
+<       if radii[mirrored_center] < max_mirrored_radius {
+<         radii[center] := radii[mirrored_center];
+<         center := center + 1;
+<       } else if radii[mirrored_center] > max_mirrored_radius {
+<         radii[center] := max_mirrored_radius;
+<         center := center + 1;
+<       } else {
+<         radius := max_mirrored_radius;
+<         break;
+<       }
+---
+>       radius := max_mirrored_radius;
+>       break;

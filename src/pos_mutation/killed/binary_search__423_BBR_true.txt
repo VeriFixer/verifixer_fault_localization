@@ -1,0 +1,6 @@
+21c21
+<   while low <= high
+---
+>   while true
+24d23
+<     decreases high - low

@@ -1,0 +1,6 @@
+13c13
+<   while p < c
+---
+>   while true
+15d14
+<     decreases c - p

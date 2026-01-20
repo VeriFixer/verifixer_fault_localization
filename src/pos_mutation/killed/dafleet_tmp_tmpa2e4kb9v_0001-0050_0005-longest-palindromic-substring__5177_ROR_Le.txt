@@ -1,0 +1,4 @@
+84c84
+<   while center < |s'|
+---
+>   while center <= |s'|

@@ -1,0 +1,4 @@
+80c80
+<   var s' := insert_bogus_chars(s, bogus);
+---
+>   var s' := s;

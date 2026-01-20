@@ -1,0 +1,14 @@
+31c31
+<   while lo - 1 >= 0 && hi < |s| && s[lo - 1] == s[hi]
+---
+>   while s[lo - 1] == s[hi]
+34d33
+<     decreases lo - 1 - 0, if lo - 1 >= 0 then |s| - hi else 0 - 1
+38c37
+<   forall i: int, j: int | 0 <= i <= j <= |s| && i + j == i0 + j0 && j - i > hi - lo
+---
+>   forall i: int, j: int | j - i > hi - lo
+94c93
+<     while center - (radius + 1) >= 0 && center + radius + 1 < |s'| && s'[center - (radius + 1)] == s'[center + radius + 1]
+---
+>     while s'[center - (radius + 1)] == s'[center + radius + 1]

@@ -1,0 +1,4 @@
+65c65
+<     if d - c > hi - lo {
+---
+>     if !(d - c > hi - lo) {

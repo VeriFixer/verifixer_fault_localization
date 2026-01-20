@@ -1,0 +1,3 @@
+29,30d28
+<     } else if a[mid] > x {
+<       high := mid - 1;

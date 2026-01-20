@@ -1,0 +1,4 @@
+38c38
+<   forall i: int, j: int | 0 <= i <= j <= |s| && i + j == i0 + j0 && j - i > hi - lo
+---
+>   forall i: int, j: int | 0 <= i <= j <= |s| && i + j == i0 + j0 && lo - i > hi - lo

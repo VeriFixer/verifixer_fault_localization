@@ -1,0 +1,2 @@
+117d116
+<       lemma_mirrored_palindrome(s', old_center, old_radius, mirrored_center, radii[mirrored_center], center);

@@ -1,0 +1,30 @@
+272,273c272,273
+<       b[i + 1] := key;
+<       k := i + 1;
+---
+>       b[1] := key;
+>       k := 1;
+275c275
+<       b[i + 1] := a[i];
+---
+>       b[1] := a[i];
+277c277
+<     i := i + 1;
+---
+>     i := 1;
+281c281
+<   DistributiveIn(a[..limit], b[..limit + 1], k, key);
+---
+>   DistributiveIn(a[..limit], b[..1], k, key);
+283c283
+<   DistributiveGreater(a[..limit], b[..limit + 1], k, key);
+---
+>   DistributiveGreater(a[..limit], b[..1], k, key);
+285c285
+<   i := limit + 1;
+---
+>   i := 1;
+294c294
+<     i := i + 1;
+---
+>     i := 1;

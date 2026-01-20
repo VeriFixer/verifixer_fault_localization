@@ -1,0 +1,4 @@
+137c137
+<   return s[lo .. hi], lo, hi;
+---
+>   return s[..hi], lo, hi;

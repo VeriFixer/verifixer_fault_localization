@@ -1,0 +1,4 @@
+23c23
+<     if a[i] > best {
+---
+>     if 0 > best {

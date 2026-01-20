@@ -1,0 +1,8 @@
+10c10
+<   while i > 0
+---
+>   while i != 0
+16c16
+<     decreases i - 0
+---
+>     decreases if i <= 0 then 0 - i else i - 0

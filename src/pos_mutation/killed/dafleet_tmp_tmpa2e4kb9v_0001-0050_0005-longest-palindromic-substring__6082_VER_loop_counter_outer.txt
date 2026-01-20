@@ -1,0 +1,4 @@
+99c99
+<       loop_counter_inner1 := loop_counter_inner1 + 1;
+---
+>       loop_counter_inner1 := loop_counter_outer + 1;

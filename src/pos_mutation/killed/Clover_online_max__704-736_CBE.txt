@@ -1,0 +1,8 @@
+35,38c35,36
+<     if a[i] > best {
+<       p := i;
+<       return;
+<     }
+---
+>     p := i;
+>     return;

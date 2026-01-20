@@ -1,0 +1,4 @@
+122d121
+<         radii[center] := max_mirrored_radius;
+123a123
+>         radii[center] := max_mirrored_radius;

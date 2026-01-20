@@ -1,0 +1,4 @@
+103c103
+<     radii[center] := radius;
+---
+>     radii[center] := 0;

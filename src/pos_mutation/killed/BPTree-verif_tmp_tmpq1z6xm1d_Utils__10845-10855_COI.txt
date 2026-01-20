@@ -1,0 +1,6 @@
+256c256
+<   while i < limit
+---
+>   while !(i < limit)
+267d266
+<     decreases limit - i

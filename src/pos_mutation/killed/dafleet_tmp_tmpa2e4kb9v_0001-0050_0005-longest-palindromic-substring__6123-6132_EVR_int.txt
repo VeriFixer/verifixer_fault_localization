@@ -1,0 +1,4 @@
+100c100
+<       radius := radius + 1;
+---
+>       radius := 0;

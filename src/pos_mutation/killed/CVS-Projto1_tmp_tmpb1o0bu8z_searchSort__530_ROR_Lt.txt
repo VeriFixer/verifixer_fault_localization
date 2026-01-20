@@ -1,0 +1,4 @@
+30c30
+<   if b.Length == 0 {
+---
+>   if b.Length < 0 {

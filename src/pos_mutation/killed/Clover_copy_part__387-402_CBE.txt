@@ -1,0 +1,6 @@
+13,15c13
+<   if len == 0 {
+<     return dest;
+<   }
+---
+>   return dest;

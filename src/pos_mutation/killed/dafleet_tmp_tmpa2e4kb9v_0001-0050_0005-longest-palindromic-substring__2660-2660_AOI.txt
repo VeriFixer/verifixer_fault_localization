@@ -1,0 +1,4 @@
+60c60
+<     var a, b := expand_from_center(s, k, k);
+---
+>     var a, b := expand_from_center(s, k, -k);

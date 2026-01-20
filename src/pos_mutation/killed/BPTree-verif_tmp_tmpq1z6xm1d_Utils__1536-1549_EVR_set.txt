@@ -1,0 +1,4 @@
+21c21
+<   set_memebrship_implies_cardinality(s, set x: int {:trigger x in t} | x in t);
+---
+>   set_memebrship_implies_cardinality(s, {});

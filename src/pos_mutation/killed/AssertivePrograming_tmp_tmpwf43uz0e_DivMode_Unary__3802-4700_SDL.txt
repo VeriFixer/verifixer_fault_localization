@@ -1,0 +1,32 @@
+188,218d187
+<   } else {
+<     assert !Less(x, y);
+<     assert y != Zero;
+<     var x0: Unary := x;
+<     assert Mul(Zero, y) == Zero;
+<     d := Zero;
+<     assert Mul(d, y) == Zero;
+<     AddZero(x);
+<     assert Add(Zero, x) == x;
+<     assert Add(Mul(d, y), x) == x;
+<     assert Add(Mul(d, y), x0) == x;
+<     while !Less(x0, y)
+<       invariant Add(Mul(d, y), x0) == x
+<       decreases x0
+<     {
+<       assert Add(Mul(d, y), x0) == x;
+<       assert !Less(x0, y);
+<       assert y != Zero;
+<       AddMulSucSubEqAddMul(d, y, x0);
+<       assert Add(Mul(Suc(d), y), Sub(x0, y)) == Add(Mul(d, y), x0);
+<       assert Add(Mul(Suc(d), y), Sub(x0, y)) == x;
+<       d := Suc(d);
+<       assert !Less(x0, y) && y != Zero;
+<       SubStructurallySmaller(x0, y);
+<       assert Sub(x0, y) < x0;
+<       x0 := Sub(x0, y);
+<       assert Add(Mul(d, y), x0) == x;
+<     }
+<     assert Add(Mul(d, y), x0) == x;
+<     m := x0;
+<     assert Add(Mul(d, y), m) == x;

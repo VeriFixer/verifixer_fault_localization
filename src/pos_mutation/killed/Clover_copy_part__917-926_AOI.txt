@@ -1,0 +1,4 @@
+36c36
+<     r[dStart + i] := src[sStart + i];
+---
+>     r[dStart + i] := src[-(sStart + i)];

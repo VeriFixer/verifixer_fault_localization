@@ -1,0 +1,4 @@
+206c206
+<       AddMulSucSubEqAddMul(d, y, x0);
+---
+>       AddMulSucSubEqAddMul(d, x, x0);

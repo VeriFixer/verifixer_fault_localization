@@ -1,0 +1,4 @@
+38c38
+<     if a.Length - p < b.Length {
+---
+>     if a.Length - p > b.Length {

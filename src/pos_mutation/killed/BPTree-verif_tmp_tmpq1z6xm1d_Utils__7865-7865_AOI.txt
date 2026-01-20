@@ -1,0 +1,8 @@
+185c185
+<   forall i: int {:trigger a[i]} :: 
+---
+>   forall i: int :: 
+187c187
+<       a[i] >= key
+---
+>       a[-i] >= key

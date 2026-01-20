@@ -1,0 +1,4 @@
+54a55
+>   return s[lo .. hi], lo, hi;
+69d69
+<   return s[lo .. hi], lo, hi;

@@ -1,0 +1,4 @@
+30c30
+<   while i < a.Length
+---
+>   while i <= a.Length

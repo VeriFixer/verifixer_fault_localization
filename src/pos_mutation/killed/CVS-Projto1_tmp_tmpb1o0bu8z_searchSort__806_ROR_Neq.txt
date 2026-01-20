@@ -1,0 +1,6 @@
+43,44c43,44
+<       while i < b.Length
+<         decreases b.Length - i
+---
+>       while i != b.Length
+>         decreases if i <= b.Length then b.Length - i else i - b.Length

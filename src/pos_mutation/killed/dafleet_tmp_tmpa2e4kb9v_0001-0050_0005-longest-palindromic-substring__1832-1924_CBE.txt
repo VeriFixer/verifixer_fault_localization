@@ -1,0 +1,6 @@
+41,43c41
+<     if palindromic(s, i, j) {
+<       lemma_palindromic_contains(s, i, j, lo - 1, hi + 1);
+<     }
+---
+>     lemma_palindromic_contains(s, i, j, lo - 1, hi + 1);

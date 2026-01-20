@@ -1,0 +1,4 @@
+82c82
+<   var center, radius := 0, 0;
+---
+>   var center, radius := 0, 1;

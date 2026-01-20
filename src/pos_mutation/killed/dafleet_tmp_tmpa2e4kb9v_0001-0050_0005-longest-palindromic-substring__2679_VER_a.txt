@@ -1,0 +1,4 @@
+61c61
+<     if b - a > hi - lo {
+---
+>     if b - a > a - lo {

@@ -1,0 +1,4 @@
+119d118
+<         radii[center] := radii[mirrored_center];
+120a120
+>         radii[center] := radii[mirrored_center];

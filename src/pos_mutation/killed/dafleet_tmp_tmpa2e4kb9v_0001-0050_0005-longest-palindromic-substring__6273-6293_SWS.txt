@@ -1,0 +1,4 @@
+104d103
+<     var old_center, old_radius := center, radius;
+105a105
+>     var old_center, old_radius := center, radius;

@@ -1,0 +1,4 @@
+211c211
+<       SubStructurallySmaller(x0, y);
+---
+>       SubStructurallySmaller(x0, x);

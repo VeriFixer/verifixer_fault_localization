@@ -1,0 +1,2 @@
+25d24
+<   set_memebrship_implies_cardinality(s, s2);

@@ -1,0 +1,4 @@
+9c9
+<   var i := a.Length - 1;
+---
+>   var i := a.Length * 1;

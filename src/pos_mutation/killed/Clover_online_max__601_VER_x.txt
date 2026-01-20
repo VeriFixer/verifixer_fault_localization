@@ -1,0 +1,8 @@
+30c30
+<   while i < a.Length
+---
+>   while x < a.Length
+33c33
+<     decreases a.Length - i
+---
+>     decreases a.Length - x

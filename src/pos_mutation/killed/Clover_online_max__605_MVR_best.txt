@@ -1,0 +1,8 @@
+30c30
+<   while i < a.Length
+---
+>   while i < best
+33c33
+<     decreases a.Length - i
+---
+>     decreases best - i

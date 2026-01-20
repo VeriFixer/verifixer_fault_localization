@@ -1,0 +1,4 @@
+286c286
+<   while i < b.Length
+---
+>   while i <= b.Length

@@ -1,0 +1,4 @@
+15c15
+<   s := set x: int {:trigger x in t} | x in t;
+---
+>   s := {};

@@ -1,0 +1,4 @@
+274c274
+<     } else if a[i] >= key {
+---
+>     } else if a[key] >= key {

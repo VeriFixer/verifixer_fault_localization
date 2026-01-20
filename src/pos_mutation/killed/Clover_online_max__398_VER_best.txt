@@ -1,0 +1,8 @@
+17c17
+<   while i < x
+---
+>   while i < best
+21c21
+<     decreases x - i
+---
+>     decreases best - i

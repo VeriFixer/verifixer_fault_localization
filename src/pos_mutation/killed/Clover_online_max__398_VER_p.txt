@@ -1,0 +1,8 @@
+17c17
+<   while i < x
+---
+>   while i < p
+21c21
+<     decreases x - i
+---
+>     decreases p - i

@@ -1,0 +1,42 @@
+31c31
+<   while lo - 1 >= 0 && hi < |s| && s[lo - 1] == s[hi]
+---
+>   while lo >= 0 && hi < |s| && s[lo] == s[hi]
+34c34
+<     decreases lo - 1 - 0, if lo - 1 >= 0 then |s| - hi else 0 - 1
+---
+>     decreases lo - 0, if lo >= 0 then |s| - hi else 0 - 1
+36c36
+<     lo, hi := lo - 1, hi + 1;
+---
+>     lo, hi := lo, hi + 1;
+38c38
+<   forall i: int, j: int | 0 <= i <= j <= |s| && i + j == i0 + j0 && j - i > hi - lo
+---
+>   forall i: int, j: int | 0 <= i <= j <= |s| && i + j == i0 + j0 && j > hi
+42c42
+<       lemma_palindromic_contains(s, i, j, lo - 1, hi + 1);
+---
+>       lemma_palindromic_contains(s, i, j, lo, hi + 1);
+61c61
+<     if b - a > hi - lo {
+---
+>     if b > hi {
+65c65
+<     if d - c > hi - lo {
+---
+>     if d > hi {
+94c94
+<     while center - (radius + 1) >= 0 && center + radius + 1 < |s'| && s'[center - (radius + 1)] == s'[center + radius + 1]
+---
+>     while center >= 0 && center + radius + 1 < |s'| && s'[center] == s'[center + radius + 1]
+115,116c115,116
+<       var mirrored_center := old_center - (center - old_center);
+<       var max_mirrored_radius := old_center + old_radius - center;
+---
+>       var mirrored_center := old_center;
+>       var max_mirrored_radius := old_center + old_radius;
+135c135
+<   lo, hi := (c - r) / 2, (c + r) / 2;
+---
+>   lo, hi := c / 2, (c + r) / 2;

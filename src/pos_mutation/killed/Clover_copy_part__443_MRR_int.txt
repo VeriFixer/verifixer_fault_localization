@@ -1,0 +1,4 @@
+17c17
+<   r := new int[dest.Length];
+---
+>   r := new int[0];

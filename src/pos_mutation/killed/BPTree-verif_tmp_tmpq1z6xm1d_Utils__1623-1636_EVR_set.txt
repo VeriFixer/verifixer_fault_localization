@@ -1,0 +1,4 @@
+22c22
+<   var s2: set<int> := set x: int {:trigger x in t} | x in t;
+---
+>   var s2: set<int> := {};

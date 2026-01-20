@@ -1,0 +1,5 @@
+32,35d31
+<     if t < 0 {
+<       result := true;
+<       return;
+<     }

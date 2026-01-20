@@ -1,0 +1,4 @@
+33c33
+<       result := true;
+---
+>       result := !true;

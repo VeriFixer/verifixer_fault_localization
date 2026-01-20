@@ -1,0 +1,8 @@
+28c28
+<   while i < len
+---
+>   while 0 < len
+33c33
+<     decreases len - i
+---
+>     decreases len - 0

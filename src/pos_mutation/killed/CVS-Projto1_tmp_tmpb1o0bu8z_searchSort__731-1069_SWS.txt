@@ -1,0 +1,8 @@
+38,40d37
+<     if a.Length - p < b.Length {
+<       return pos;
+<     }
+51a49,51
+>       return pos;
+>     }
+>     if a.Length - p < b.Length {

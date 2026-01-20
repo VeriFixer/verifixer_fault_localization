@@ -1,0 +1,6 @@
+17c17
+<   while i < x
+---
+>   while true
+21d20
+<     decreases x - i

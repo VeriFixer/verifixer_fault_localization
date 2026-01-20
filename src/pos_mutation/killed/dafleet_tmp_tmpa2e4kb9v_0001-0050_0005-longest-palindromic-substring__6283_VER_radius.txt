@@ -1,0 +1,4 @@
+105c105
+<     center := center + 1;
+---
+>     center := radius + 1;

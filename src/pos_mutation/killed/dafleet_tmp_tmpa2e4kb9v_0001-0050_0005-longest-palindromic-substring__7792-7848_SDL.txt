@@ -1,0 +1,2 @@
+136d135
+<   lemma_result_transfer(s, s', bogus, radii, c, r, hi, lo);

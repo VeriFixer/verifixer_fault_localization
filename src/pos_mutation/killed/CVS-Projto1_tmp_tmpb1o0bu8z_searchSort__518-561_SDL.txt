@@ -1,0 +1,4 @@
+30,32d29
+<   if b.Length == 0 {
+<     return pos;
+<   }

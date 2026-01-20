@@ -1,0 +1,4 @@
+79c79
+<   var bogus: char :| true;
+---
+>   var bogus: char :| !true;

@@ -1,0 +1,4 @@
+15c15
+<   var best := a[0];
+---
+>   var best := a[-1];

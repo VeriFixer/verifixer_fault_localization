@@ -1,0 +1,6 @@
+15,16c15,16
+<   var best := a[0];
+<   var i := 1;
+---
+>   var best := 1;
+>   var i := a[0];

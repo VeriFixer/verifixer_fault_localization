@@ -1,0 +1,4 @@
+26d25
+<     mid := (high + low) / 2;
+33a33
+>     mid := (high + low) / 2;

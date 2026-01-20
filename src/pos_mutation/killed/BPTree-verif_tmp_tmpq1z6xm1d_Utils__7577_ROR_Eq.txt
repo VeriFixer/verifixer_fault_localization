@@ -1,0 +1,6 @@
+161,162c161,162
+<   forall i: int, j: int {:trigger a[j], a[i]} :: 
+<     0 <= i < j < |a| ==>
+---
+>   forall j: int, i: int {:trigger a[j], a[i]} :: 
+>     0 <= i < j == |a| ==>

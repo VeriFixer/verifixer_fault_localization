@@ -1,0 +1,6 @@
+23,25c23
+<     if a[i] > best {
+<       best := a[i];
+<     }
+---
+>     best := a[i];

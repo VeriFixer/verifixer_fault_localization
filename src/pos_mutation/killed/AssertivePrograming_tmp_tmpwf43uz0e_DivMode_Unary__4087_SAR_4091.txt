@@ -1,0 +1,4 @@
+199c199
+<     while !Less(x0, y)
+---
+>     while !Less(y, x0)

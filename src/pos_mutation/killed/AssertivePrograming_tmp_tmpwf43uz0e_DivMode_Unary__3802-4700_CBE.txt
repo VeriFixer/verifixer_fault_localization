@@ -1,0 +1,73 @@
+177,197c177,190
+<   if Less(x, y) {
+<     assert Less(x, y);
+<     AddZero(x);
+<     assert Add(Zero, x) == x;
+<     assert Mul(Zero, y) == Zero;
+<     assert Add(Mul(Zero, y), x) == x;
+<     d := Zero;
+<     m := x;
+<     assert Add(Mul(d, y), m) == m;
+<     assert Less(m, y);
+<     assert Add(Mul(d, y), m) == x && Less(m, y);
+<   } else {
+<     assert !Less(x, y);
+<     assert y != Zero;
+<     var x0: Unary := x;
+<     assert Mul(Zero, y) == Zero;
+<     d := Zero;
+<     assert Mul(d, y) == Zero;
+<     AddZero(x);
+<     assert Add(Zero, x) == x;
+<     assert Add(Mul(d, y), x) == x;
+---
+>   assert !Less(x, y);
+>   assert y != Zero;
+>   var x0: Unary := x;
+>   assert Mul(Zero, y) == Zero;
+>   d := Zero;
+>   assert Mul(d, y) == Zero;
+>   AddZero(x);
+>   assert Add(Zero, x) == x;
+>   assert Add(Mul(d, y), x) == x;
+>   assert Add(Mul(d, y), x0) == x;
+>   while !Less(x0, y)
+>     invariant Add(Mul(d, y), x0) == x
+>     decreases x0
+>   {
+199,215c192,201
+<     while !Less(x0, y)
+<       invariant Add(Mul(d, y), x0) == x
+<       decreases x0
+<     {
+<       assert Add(Mul(d, y), x0) == x;
+<       assert !Less(x0, y);
+<       assert y != Zero;
+<       AddMulSucSubEqAddMul(d, y, x0);
+<       assert Add(Mul(Suc(d), y), Sub(x0, y)) == Add(Mul(d, y), x0);
+<       assert Add(Mul(Suc(d), y), Sub(x0, y)) == x;
+<       d := Suc(d);
+<       assert !Less(x0, y) && y != Zero;
+<       SubStructurallySmaller(x0, y);
+<       assert Sub(x0, y) < x0;
+<       x0 := Sub(x0, y);
+<       assert Add(Mul(d, y), x0) == x;
+<     }
+---
+>     assert !Less(x0, y);
+>     assert y != Zero;
+>     AddMulSucSubEqAddMul(d, y, x0);
+>     assert Add(Mul(Suc(d), y), Sub(x0, y)) == Add(Mul(d, y), x0);
+>     assert Add(Mul(Suc(d), y), Sub(x0, y)) == x;
+>     d := Suc(d);
+>     assert !Less(x0, y) && y != Zero;
+>     SubStructurallySmaller(x0, y);
+>     assert Sub(x0, y) < x0;
+>     x0 := Sub(x0, y);
+217,218d202
+<     m := x0;
+<     assert Add(Mul(d, y), m) == x;
+219a204,206
+>   assert Add(Mul(d, y), x0) == x;
+>   m := x0;
+>   assert Add(Mul(d, y), m) == x;
