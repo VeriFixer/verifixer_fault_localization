@@ -2,12 +2,10 @@ import unittest
 from pathlib import Path
 
 # Assume fl_eval is correctly installed or paths are set up for relative import
-from fl_eval.core.baselines import RandomRanker
+from fl_eval.strategies.random_ranker import RandomRanker
 from pathlib import Path
-from unittest.mock import MagicMock
 
 # Assume fl_eval is correctly installed or paths are set up for relative import
-from fl_eval.core.baselines import RandomRanker
 from fl_eval.metrics.scoring import compute_exam_score # Assuming this is the renamed compute_exam_score_one_file
 
 # --- MOCK CLASSES (needed for the test environment) ---

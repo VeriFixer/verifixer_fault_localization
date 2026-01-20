@@ -6,7 +6,14 @@ import shutil
 
 # --- Import Core Components from fl_eval package ---
 from fl_eval.core.abstract import FLTechnique
-from fl_eval.core.baselines import RandomRanker, CounterExampleBaseRanker, EmptyRanker,  RandomLineOfMethodThatFails, CounterExampleIf
+
+# Import rankers
+from fl_eval.strategies.random_ranker  import RandomRanker
+from fl_eval.strategies.counter_example_base_ranker import CounterExampleBaseRanker
+from fl_eval.strategies.empty_ranker import EmptyRanker
+from fl_eval.strategies.random_line_of_method_that_fails import RandomLineOfMethodThatFails
+from fl_eval.strategies.counter_example_if import CounterExampleIf
+
 
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import compute_exam_score

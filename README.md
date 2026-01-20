@@ -1,82 +1,115 @@
-# This Repo Explores diverse ideas to find fault localization in dafny programns 
+# Fault Localization for Dafny Programs
 
-# Generate the dataset to evaluate the mutants and the FL methods
- ./src/generate\_mutdafny\_datset.sh 
+This repository explores multiple strategies for **fault localization in Dafny programs**, focusing on identifying missing or incorrect assertion locations using heuristic, randomized, and model-based techniques.
 
+---
 
+## Getting Started
 
+If you are **not using the datasets already included in the repository**, and you want to generate datasets such as `pos_mutation` or `pos_test`, run:
 
-After running mutdafny and some dataset and generating the mutants and the original dir. 
-get\_pos computes the diff from the original program. 
+```bash
+./src/generate_mutdafny_dataset.sh
+```
 
-change to src directory and run:
-./get\_pos.sh
+> Skip this step if you plan to use the datasets already provided.
 
-It generates a folder pos\_mutation with:
-original/{names}.dfy containing all programs original (after post resolution) 
-killed/{names}\_\_{infos}.dfy with the mutant
-killed/{names}\_\_{infos}.txt with the diff between original program and mutant
+---
 
-# Possibilities 
+## Running a Single Model
 
-##  Build in Dafny
-The Dafny verifier already produces a basic identification of the failure positions. Internally, it adds assertions of postconditions on all function returns, which in some cases allows identifying where the failure occurs.
+To run a specific fault localization technique on a dataset:
 
-That said, if the failure does not occur in a return statement, this method is not effectiv#e
+```bash
+cd src
+python run_1_model.py [model_name] dataset_path
+```
 
-## Use Counterexamples to identify failure Positions 
-It is possible to generate counterexamples to locate the failure in a branch. Once a counterexample is generated, the affected positions in the source code can be identified.
+To list all available models:
 
-Limitations: Only one counterexample is generated per program. If there are multiple failure points, the others may not be detected after generating the first counterexample.
+```bash
+python run_1_model.py
+```
 
-## Use Isolate Assertions with isolate\_paths 
-Not needed in the sense that the counteexamples generated one by one is able to retrieve the path (and seems a better aprroach for now)
+### Example
 
+Run the random strategy on the full mutation dataset:
 
+```bash
+python run_1_model.py random pos_mutation
+```
 
-By passing the --isolate-assertions flag to the verifier and using isolate\_paths as a plugin, all paths and assertions are verified separately. This allows pinpointing exactly which paths caused failures and provides a complete list of all failing paths and assertions.
+* `pos_mutation`: ~1800 test cases
+* `pos_test`: 30 test cases
 
-Explanation from Dafny documentation:
+Choose the dataset based on your experimental goals.
 
-You can instruct Dafny to verify individual assertions in separate batches.
+---
 
-The {:isolate} attribute can be placed on a single assertion to isolate it, or on a symbol (like a function or method) with {:isolate\_assertions} to isolate all assertions in that symbol.
+## Running All Models and Generating Results
 
-The CLI option --isolate-assertions isolates all assertions in all symbols.
+To execute **all available models** on a dataset and generate result tables and plots:
 
-{:isolate} can be used on assert, return, and continue statements. Placed on a return, it verifies postconditions for all paths leading to that return in a separate batch. Placed on a continue, it verifies loop invariants for all paths leading to that continue.
+```bash
+python run_all_models.py dataset_path
+```
 
-Furthermore, each control flow path leading to an isolated assertion can also be placed in a separate batch using {:isolate "paths"}.
+This will:
 
-This approach could allow generating counterexamples for all failing paths.
+* Run every strategy on the given dataset
+* Generate result tables
+* Produce summary graphs with overall scores
 
-## Extend Previous Work
-Reference: Specification-Guided Repair of Arithmetic Errors in Dafny Programs using LLMs
-https://arxiv.org/pdf/2507.03659
+> Currently, the best-performing strategy is `counterExampleIf`, with a mean exam score of approximately **0.08**.
 
-It’s unclear how generic this approach would be or how easily it could be adapted to other transformations, as it relies on weakest precondition (WP) calculation, which bypasses Dafny’s framework.
+---
 
+## Caching
 
-# Recommended Approach 
-Option 3 seems the most practical and least reinventive. It integrates well with the current verifier.
+Results are cached across runs to avoid recomputation.
 
-A potential implementation could be a Dafny plugin that, after resolution, adds {:isolate "paths"} to the relevant paths. Using this approach, it might also be possible to generate counterexamples for all failing paths.
+To delete cached results for a specific model:
 
-It seems that option 3 is not needed:
+```bash
+rm -rf cached_results/{model_name}
+```
 
-1) We can extend counterexmaple generations to achieve complete counterexample creation.
-2) From the complete list of countexamples traces we can metric the most promising lines where the deffects are
+---
 
-3) We can also use Coverage metrics as a heuristic: If a line is used in a assertion prove maybe it is correct only ones that are not maybe are incorrect (and this can possible speed up things)
+## Creating New Models
 
+To add a new fault localization strategy:
 
-# If wanted to generate tests we could create a took that from the couterexamples creates runnable tests.
+1. Navigate to:
 
-But really with this i do not see the usecase for generating tests
+   ```text
+   src/fl_eval/strategies
+   ```
 
+2. Create a new strategy file implementing the `FLTechnique` class.
 
-# TODOS 
-- Make Dataset small to test ideas 
+3. Implement the method:
 
+   ```python
+   get_fault_localization(dafny_file) -> list[int]
+   ```
 
+   This method should return a list of line numbers (ordered by importance) where faults are suspected.
 
+### Examples
+
+* See `random_line_of_method_that_fails.py` for a simple strategy.
+* This example also demonstrates how to invoke an **external program** (e.g., a C# executable).
+
+### External C# Strategies
+
+If your strategy relies on a new C# executable:
+
+* Place the corresponding project under the top-level `strategies/` directory.
+* Example:
+
+  ```text
+  strategies/ReturnAtRandomAllLinesOfFailingMethod
+  ```
+
+> Docker support is planned; once available, these projects will be built automatically.
