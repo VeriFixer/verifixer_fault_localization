@@ -53,7 +53,8 @@ COPY . /app
 RUN cd dafny && \
     git fetch --tags && \
     git checkout ${DAFNY_VERSION} && \
-    make
+    make && \
+    ln -s /app/dafny/Binaries/Dafny /usr/local/bin/dafny
 
 
 CMD ["bash"]

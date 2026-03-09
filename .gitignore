@@ -4,6 +4,7 @@ src/cached_results/*
 # Setting the datasets
 datasets/*
 !datasets/dafnybench_all_mutants.tar.gz
+!datasets/dafnybench_original_can_run.tar.gz
 
 
 

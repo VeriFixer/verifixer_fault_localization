@@ -31,7 +31,7 @@ docker run --rm -it \
   -u $(id -u):$(id -g) \
   -v "$(pwd)/src:/app/src:delegated" \
   -v "$(pwd)/mutdafny:/app/mutdafny:delegated" \
-  -v "$(pwd)/dataset:/app/dataset:delegated" \
+  -v "$(pwd)/datasets:/app/datasets:delegated" \
   -w /app \
   dafny_research:latest bash
 ```

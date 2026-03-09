@@ -10,7 +10,17 @@ If you are **not using the datasets already included in the repository**, and yo
 
 ```bash
 ./src/generate_mutdafny_dataset.sh
+./src/clean_mutdafny_datset.sh
+./src/get_pos.sh  
 ```
+
+these creat the diff files and create two datasets 
+the complete from mutdafny will all the files under 
+"datasets/dafnybench_all_mutants"
+and the one where the orignial runs with the versions of the tools
+"datasets/dafnybench_original_can_run"
+
+For both of them on killed in writes the diff from the initial original file
 
 > Skip this step if you plan to use the datasets already provided.
 
