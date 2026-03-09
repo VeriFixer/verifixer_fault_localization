@@ -75,7 +75,7 @@ def _process_mutation(
 
     try:
         # DYNAMIC ORIGINAL FILE IDENTIFICATION
-        base_name_raw = mutation_name.split('__')[0]
+        base_name_raw = "__".join(mutation_name.split('__')[:-1])
         original_file = original_dir / f"{base_name_raw}.dfy"
         
         if not original_file.is_file():
@@ -190,14 +190,14 @@ How to use:
         print(f"Error: Data path not found: {args.data_path}")
         parser.print_help()
     else:
+        cache_dir = args.data_path.parent / "cached_results"
         if args.clean_cache:
             print("Cleaning: Results Cache")
-            cache_dir = args.data_path.parent / "cached_results"
             if cache_dir.exists():
                 shutil.rmtree(cache_dir)
                 print(f"Removed cache directory: {cache_dir}")
             else:
                 print(f"No cache directory found at: {cache_dir}")
         else:
-            print(f"Using cached Results if any")
+            print(f"Using cached Results if any at {cache_dir}")
         compute_metrics(args.technique_name, args.data_path)

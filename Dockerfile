@@ -49,6 +49,15 @@ ENV PATH="$JAVA_HOME/bin:$PATH"
 ENV DAFNY_VERSION=v4.11.0
 
 COPY . /app
+
+# --- Python virtual environment ---
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN pip install --upgrade pip && \
+    pip install -r /app/src/requirements.txt
+
+
 # --- Build Dafny fork ---
 RUN cd dafny && \
     git fetch --tags && \
@@ -56,6 +65,12 @@ RUN cd dafny && \
     make && \
     ln -s /app/dafny/Binaries/Dafny /usr/local/bin/dafny
 
+# --- Build all dotnet strategies ---
+RUN for dir in strategies/*/; do \
+        if [ -d "$dir" ]; then \
+            dotnet build "$dir" -c Release -o /app/build_output/$(basename "$dir"); \
+        fi; \
+    done
 
 CMD ["bash"]
 

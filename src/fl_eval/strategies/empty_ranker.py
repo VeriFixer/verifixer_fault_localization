@@ -1,4 +1,5 @@
 from fl_eval.core.abstract import FLTechnique 
+from pathlib import Path
 
 # Empty ranker in the score function is equivalent to 
 # chosing on average the correct line in half the entries

@@ -3,6 +3,7 @@ import fl_eval.util.run_external_cmd as run_cmd
 import fl_eval.util.globals as gl
 import json
 import re
+from pathlib import Path
 
 # This will try to find globs like this base_dir/**pattern see other files for more examples
 def _find_executable(base_dir : Path, pattern : str) -> Path:
@@ -19,7 +20,7 @@ class CounterExampleIf(FLTechnique):
 
     def get_fault_localization(self, file: Path) -> list[int]:
         # Create command to run 
-        base_dir = gl.BASE_PATH / "strategies/CounterExampleIf/bin/Debug"
+        base_dir = gl.BASE_PATH / "build_output/CounterExampleIf"
         pattern = "**/CounterExampleIf"
         exec = _find_executable(base_dir, pattern)
                # run this command and get the output on a variable

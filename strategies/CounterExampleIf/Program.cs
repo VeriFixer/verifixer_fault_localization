@@ -42,6 +42,8 @@ namespace returnMethodLinesRandom
 
         private static DafnyOptions SetupDafnyOptions(string filePath)
         {
+            string repoRoot = PathHelper.FindRepoRoot();
+
             var options = new DafnyOptions(Console.In, Console.Out, Console.Error);
             options.ApplyDefaultOptions();
 
@@ -49,7 +51,7 @@ namespace returnMethodLinesRandom
             options.DafnyVerify = true;
             options.EmitDebugInformation = true;
             options.Compile = false;
-            options.DafnyPrelude = "/home/ricostynha/Desktop/verifixer_fault_localization/dafny/Binaries/DafnyPrelude.bpl";
+            options.DafnyPrelude = Path.Combine(repoRoot, "dafny", "Binaries", "DafnyPrelude.bpl");
 
             // Counterexample Configuration
             options.ModelViewFile = "-";
@@ -184,5 +186,26 @@ namespace returnMethodLinesRandom
             bool colMatch = stmt.StartToken.col <= targetCol && targetCol <= stmt.EndToken.col;
             return lineMatch && colMatch;
         }
+    }
+}
+
+public static class PathHelper
+{
+    public static string FindRepoRoot(string marker = ".repo_verifixer_fault_localizaion_marker")
+    {
+        // Start from the current running assembly directory
+        var current = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
+
+        while (current != null)
+        {
+            if (File.Exists(Path.Combine(current.FullName, marker)) || 
+                Directory.Exists(Path.Combine(current.FullName, marker)))
+            {
+                return current.FullName;
+            }
+            current = current.Parent;
+        }
+
+        throw new DirectoryNotFoundException("Could not find repository root. Marker missing: " + marker);
     }
 }

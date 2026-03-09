@@ -9,7 +9,7 @@ R = TypeVar('R')
 
 # 1. The Core Limit (Physical reality)
 PHYSICAL_CORES = psutil.cpu_count(logical=False) or 1
-SAFE_THREADS = max(1, PHYSICAL_CORES - 1)
+SAFE_THREADS = max(1, PHYSICAL_CORES)
 CPU_LIMITER = threading.BoundedSemaphore(SAFE_THREADS)
 
 # 2. The Management Limit (Virtual capacity)

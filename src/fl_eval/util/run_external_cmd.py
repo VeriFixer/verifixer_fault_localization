@@ -10,15 +10,7 @@ class Status(Enum):
     ERROR_EXIT_CODE = 4
 
 def run_external_cmd(cmd: list[str]) -> tuple[Status, str, str]:
-    systemd_cmd: list[str] = [
-        "systemd-run",
-        "--user",
-        "--scope",
-        "-p", f"MemoryMax={gl.MAX_RAM_EXTERNAL_PROGRAMS}G",
-        "-p", f"RuntimeMaxSec={gl.MAX_TIME_EXTERNAL_PROGRAMS}",
-        "--",
-        *cmd
-    ]
+    systemd_cmd: list[str] = cmd
 
     try:
         result = subprocess.run(

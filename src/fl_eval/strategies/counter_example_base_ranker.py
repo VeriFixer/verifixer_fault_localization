@@ -1,5 +1,8 @@
 from fl_eval.core.abstract import FLTechnique
 import fl_eval.util.run_external_cmd as run_cmd
+import fl_eval.util.globals as gl
+from typing import Any
+from pathlib import Path
 import json
 import re
 import os
@@ -7,7 +10,7 @@ import os
 class CounterExampleBaseRanker(FLTechnique):
     def __init__(self, name: str, **kwargs) -> None:
         super().__init__(name, **kwargs)
-        self.dafny = os.environ.get("DAFNY_EXEC") or ""
+        self.dafny = os.environ.get("DAFNY_EXEC") or "dafny"
         assert (self.dafny != None), "an environmental variable DAFNY_EXEC must be set to dafny binary path"
 
     def get_counterexample_lines_from_json_diagnostic(self, diagnostic : dict[Any]) -> tuple[bool, list[int]]:
@@ -43,14 +46,15 @@ class CounterExampleBaseRanker(FLTechnique):
             self.dafny,
             "verify",
             str(file),
+            "--allow-warnings",
             "--extract-counterexample",
-            "--json-output"
+            "--json-output",
+            "--verification-time-limit", str(gl.MAX_TIME_EXTERNAL_PROGRAMS),
+            f"--solver-option:O:memory_max_size={gl.MAX_RAM_EXTERNAL_PROGRAMS*1000}"
+
         ]
 
-        (status, stdout, _) = run_cmd.run_external_cmd(command)
-        if(status != run_cmd.Status.OK):
-            # If run cmd finished by any reason with error send empty prediction
-            return []
+        (status, stdout, stderr) = run_cmd.run_external_cmd(command)
         
         # Separate json in actuall newlines need to escape new lines \\n inside json and put them back together
         placeholder = "___ESCAPED_NEWLINE_PLACEHOLDER___"

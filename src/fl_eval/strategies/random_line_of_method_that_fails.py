@@ -1,6 +1,7 @@
 from fl_eval.core.abstract import FLTechnique
 import fl_eval.util.run_external_cmd as run_cmd
 import fl_eval.util.globals as gl
+from pathlib import Path
 import json
 import re
 
@@ -19,7 +20,7 @@ class RandomLineOfMethodThatFails(FLTechnique):
 
     def get_fault_localization(self, file: Path) -> list[int]:
         # Create command to run 
-        base_dir = gl.BASE_PATH / "strategies/ReturnAtRandomAllLinesOfFailingMethod/bin/Debug"
+        base_dir = gl.BASE_PATH / "build_output/ReturnAtRandomAllLinesOfFailingMethod"
         pattern = "**/ReturnAtRandomAllLinesOfFailingMethod"
         exec = _find_executable(base_dir, pattern)
                # run this command and get the output on a variable
