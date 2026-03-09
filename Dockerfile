@@ -14,16 +14,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     rm -rf /var/lib/apt/lists/*
 
 # --- Install z3 
-# Build and install Z3 from the tagged source to ensure exact version
-ARG Z3_VERSION="4.15.2"
+# Build and install using some version of vscode extension ships with
+# Note that also it ships with two this and 4.12.1
+ARG Z3_VERSION="4.12.1"
 ENV Z3_VERSION=${Z3_VERSION}
 
 RUN set -eux; \
-    url="https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/z3-${Z3_VERSION}-x64-glibc-2.39.zip"; \
+    url="https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/z3-${Z3_VERSION}-x64-glibc-2.35.zip"; \
     echo "Downloading Z3 from $url"; \
     curl -L -o z3-${Z3_VERSION}.zip "$url"; \
     unzip z3-${Z3_VERSION}.zip; \
-    # Determine the extracted folder (likely something like z3-${Z3_VERSION}-x64-glibc-2.39) \
+    # Determine the extracted folder (likely something like z3-${Z3_VERSION}-x64-glibc-2.35) \
     dir="$(unzip -Z -1 z3-${Z3_VERSION}.zip | head -n1 | cut -d/ -f1)"; \
     echo "Installing Z3 from folder: $dir"; \
     cp -a "$dir"/bin/* /usr/local/bin/; \
@@ -45,14 +46,15 @@ RUN apt-get update && apt-get install -y openjdk-17-jdk && \
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH="$JAVA_HOME/bin:$PATH"
 
+ENV DAFNY_VERSION=v4.11.0
+
 COPY . /app
 # --- Build Dafny fork ---
-RUN cd dafny && make
+RUN cd dafny && \
+    git fetch --tags && \
+    git checkout ${DAFNY_VERSION} && \
+    make
 
-# --- Create a non-root user ---
-RUN useradd --create-home researcher
-USER researcher
-ENV HOME=/home/researcher
-# Default command
+
 CMD ["bash"]
 
