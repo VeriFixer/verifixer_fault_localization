@@ -5,7 +5,8 @@
 SCRIPT_BASE_DIR="$(pwd)"
 
 # The relative paths provided by the user:
-RELATIVE_DATASET_DIR="dataset/base_dataset_for_mutdafny"
+RELATIVE_DATASET_DIR="dafnybench/DafnyBench/dataset/ground_truth"
+#RELATIVE_DATASET_DIR="dataset/test_mutdafny"
 RELATIVE_TARGET_SCRIPT="mutdafny/run.sh"
 RELATIVE_TARGET_SCRIPT_DIR="mutdafny"
 
@@ -27,11 +28,13 @@ if [ ! -d "$DATASET_DIR" ] || [ ! -x "$TARGET_SCRIPT" ]; then
     exit 1
 fi
 
-# Iterate over all files and directories inside the DATASET_DIR
+# Count total items
+TOTAL=$(find "$DATASET_DIR" -mindepth 1 -maxdepth 1 | wc -l)
+DONE=0
+START_TIME=$(date +%s)
+
 for item in "$DATASET_DIR"/*; do
     # $item contains the absolute path to the data file.
-    
-    echo "--- Processing: $(basename "$item") (Absolute Path: $item) ---"
     
     # 4. CRUCIAL FIX: Run the command inside a subshell
     # The subshell:
@@ -43,7 +46,7 @@ for item in "$DATASET_DIR"/*; do
         cd "$TARGET_SCRIPT_DIR" || exit 1 # Move to project root where Dafny and mutdafny are found
         
         # Execute run.sh with the absolute path of the item
-        "$TARGET_SCRIPT" "$item"
+        "$TARGET_SCRIPT" "$item" --quiet
         
     ) # End of subshell
 
@@ -51,6 +54,16 @@ for item in "$DATASET_DIR"/*; do
     if [ $? -ne 0 ]; then
         echo "Warning: ${TARGET_SCRIPT} failed for item $item (Exit Code: $?)"
     fi
+
+    DONE=$((DONE + 1))
+    
+    NOW=$(date +%s)
+    ELAPSED=$((NOW - START_TIME))
+
+    AVG=$((ELAPSED / DONE))
+    REMAINING=$((AVG * (TOTAL - DONE)))
+
+    printf "\rProgress: %d/%d | Avg: %ds | Untill Finish: %ds" "$DONE" "$TOTAL" "$AVG" "$REMAINING"
     
 done
 

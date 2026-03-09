@@ -1,5 +1,12 @@
 src/cached_results/*
 
+
+# Setting the datasets
+datasets/*
+!datasets/dafnybench_all_mutants.tar.gz
+
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.pyc
