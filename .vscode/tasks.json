@@ -1,0 +1,15 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build CounterExampleIfReassume",
+            "type": "shell",
+            "command": "dotnet build ${workspaceFolder}/strategies/CounterExampleIfReassume/CounterExampleIfReassume.csproj",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": "$msCompile"
+        }
+    ]
+}

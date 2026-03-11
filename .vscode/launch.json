@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug CounterExampleIfReassume",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/strategies/CounterExampleIfReassume/bin/Debug/net8.0/CounterExampleIfReassume.dll",
+            "args": [
+                "${workspaceFolder}/strategies/CounterExampleIfReassume/example_to_test.dfy"
+            ],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "console": "integratedTerminal",
+            "preLaunchTask": "build CounterExampleIfReassume"
+        }
+    ]
+}
