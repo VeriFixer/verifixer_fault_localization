@@ -89,3 +89,30 @@ augmenting to 1.
  And if we ignore the inital state the only line repeated is that line, so it is the one that has the error
 
 # Counterexample Returning complete counterexample with decision lines (ifs)
+
+After a counterexample the postcondition that fails in the first counterexaxmple is simply assumed on top.
+
+The best to achieve the best: is for only that branch to be assumed that postcondition ! (Example)
+
+method abs(x : int) returns (y:int)
+    ensures (x > 0) ==> y == x
+    //ensures (x <= 0) ==> y == -x
+{
+    if(x > 3){
+        y := x + 1; // Verification trace gets localization precisely
+        assume (x > 0) ==> y == x; // Added assume postcondition when fails in that branch manages to catch more counterexamples
+        return y;
+    } 
+
+    if(x > 1){
+        return x + 1; // Line captured with the modification !!!! 
+    }
+    
+   
+    return x;
+}
+
+// Thats the problem the counterexample only generate 1 counteexample for each postcondiiton
+// What I can is if fails assume the postcondition on the failing branch before return 
+// And rerun it
+

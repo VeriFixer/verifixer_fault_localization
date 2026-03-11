@@ -10,7 +10,7 @@ WORKDIR /app
 # --- Install system dependencies ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl wget sudo make build-essential unzip zip python3 python3-pip python3-venv \
-    libicu-dev tzdata ca-certificates git && \
+    libicu-dev tzdata ca-certificates git openssh-client && \
     rm -rf /var/lib/apt/lists/*
 
 # --- Install z3 
@@ -39,6 +39,9 @@ RUN wget https://dot.net/v1/dotnet-install.sh -O /tmp/dotnet-install.sh && \
     /tmp/dotnet-install.sh --channel 8.0 --install-dir /usr/share/dotnet && \
     ln -s /usr/share/dotnet/dotnet /usr/bin/dotnet
 
+#ENV DOTNET_CLI_HOME=/tmp
+#ENV HOME=/tmp
+
 # Install OpenJDK for Java/Gradle builds
 RUN apt-get update && apt-get install -y openjdk-17-jdk && \
     rm -rf /var/lib/apt/lists/*
@@ -58,19 +61,24 @@ RUN pip install --upgrade pip && \
     pip install -r /app/src/requirements.txt
 
 
-# --- Build Dafny fork ---
-RUN cd dafny && \
-    git fetch --tags && \
-    git checkout ${DAFNY_VERSION} && \
+# --- Build Dafny version v4.11.0 (it is not a fork)
+
+ARG DAFNY_VERSION=v4.11.0
+
+RUN git clone --depth 1 --branch ${DAFNY_VERSION} \
+    https://github.com/dafny-lang/dafny.git dafny &&\
+    cd dafny && \
     make && \
-    ln -s /app/dafny/Binaries/Dafny /usr/local/bin/dafny
+    ln -s dafny/Binaries/Dafny /usr/local/bin/dafny
+
+
 
 # --- Build all dotnet strategies ---
-RUN for dir in strategies/*/; do \
-        if [ -d "$dir" ]; then \
-            dotnet build "$dir" -c Release -o /app/build_output/$(basename "$dir"); \
-        fi; \
-    done
+#RUN for dir in strategies/*/; do \
+#        if [ -d "$dir" ]; then \
+#            dotnet build "$dir" -c Release -o /app/build_output/$(basename "$dir"); \
+#        fi; \
+#    done
 
 CMD ["bash"]
 
