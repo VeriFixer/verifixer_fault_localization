@@ -4,19 +4,24 @@
 
 method abs1(x: int) returns (y: int)
   ensures x > 0 ==> y == x
+  ensures x<  0 ==> y == x + 1
   decreases x
 {
-  if x > 3 {
+  if x > 1 {
     y := x + 1;
     return y;
   }
-  if x > 1 {
-    y := x + 1;
-    return x + 1;
+  if x > 0 {
+    y := x + 2;
+    return y;
+  }
+  if x < -1 {
+    y := x + 2;
+    return y;
+  }
+  if x < 0 {
+    y := x + 3;
+    return y;
   }
   return x;
 }
-// ---- Suspicious nodes detected ----
-// Suspicious node at line 15
-// Suspicious node at line 16
-// Suspicious node at line 17

@@ -1,9 +1,7 @@
 ﻿using Microsoft.Dafny;
 using DafnyDriver.Commands;
 using Microsoft.Boogie;
-using System.Text.Json;
-using Std.Wrappers;
-using System.Diagnostics.Metrics;
+using System.Text.RegularExpressions;
 
 namespace ReturnMethodLinesRandom
 {
@@ -27,8 +25,78 @@ namespace ReturnMethodLinesRandom
             var runner = new VerificationRunner(config);
             await runner.Run();
 
+            // --- Parse all solution files ---
+            string tempDir = Path.Combine(Path.GetTempPath(), "DafnyFaultLocalization");
+            if (!Directory.Exists(tempDir))
+            {
+                Console.WriteLine("No solution files found.");
+                return 0;
+            }
+
+            var allSuspiciousLines = new List<List<int>>();
+            var solutionFiles = Directory.GetFiles(tempDir, "*_solution.dfy");
+
+            foreach (var file in solutionFiles)
+            {
+                var assumeFalseLines = new List<int>();
+                var LooplineNumber = -1;
+
+                var fileLinesShifter = new List<int>();
+                var lines = await File.ReadAllLinesAsync(file);
+                bool suspiciousSection = false;
+
+                foreach (var line in lines)
+                {
+                    LooplineNumber += 1;
+                    if(line.Contains("assume false"))
+                    {
+                        assumeFalseLines.Add(LooplineNumber);
+                    }
+
+                    if (line.Contains("---- Suspicious nodes ----"))
+                    {
+                        suspiciousSection = true;
+                        continue;
+                    }
+                    if (suspiciousSection)
+                    {
+                        var match = Regex.Match(line, @"// line (\d+)");
+                        if (match.Success && int.TryParse(match.Groups[1].Value, out int lineNumber))
+                        {
+                            // Need to find the original position ignoring the lines of assume false
+                            // Basically if "assume false" line is before the line in question reduce the counter
+                            foreach (var assumeFalseLine in assumeFalseLines)
+                            {
+                                if(assumeFalseLine < lineNumber)
+                                {
+                                    lineNumber -= 1;
+                                }
+                            }
+                            fileLinesShifter.Add(lineNumber);
+                        }
+                        else if (line.StartsWith("// Postcondition"))
+                        {
+                            suspiciousSection = false;
+                        }
+                    }
+                }
+                allSuspiciousLines.Add(fileLinesShifter);
+            }
+            Console.WriteLine("[");
+            foreach (var list in allSuspiciousLines)
+            {
+                Console.WriteLine("  [" + string.Join(", ", list) + "],");
+            }
+            Console.WriteLine("]");
+
+            Directory.Delete(tempDir, true); 
             return 0;
         }
+    }
+
+    class StaticCounter
+    {
+        public static int GlobalIteration = 0;
     }
 
     class VerificationConfig
@@ -42,8 +110,6 @@ namespace ReturnMethodLinesRandom
     class VerificationRunner
     {
         private readonly VerificationConfig config;
-        private int iteration = 0;
-
         public VerificationRunner(VerificationConfig config)
         {
             this.config = config;
@@ -51,10 +117,15 @@ namespace ReturnMethodLinesRandom
 
         public async Task Run()
         {
-            string currentFile = config.ProgramFile;
+            Queue<VerificationConfig> VerifConfToDo = new Queue<VerificationConfig>();
+            VerifConfToDo.Enqueue(config);
 
-            while (true)
+            while (VerifConfToDo.Count > 0)
             {
+
+                var currentConfig = VerifConfToDo.Dequeue();
+                var currentFile = currentConfig.ProgramFile;
+
                 var options = DafnyOptionsFactory.Create(currentFile);
                 var compilation = CliCompilation.Create(options);
                 compilation.Start();
@@ -74,34 +145,22 @@ namespace ReturnMethodLinesRandom
 
                 if (failedResults.Count == 0)
                 {
-                    Console.WriteLine("Verification succeeded.");
                     break;
                 }
-
-                bool anyChange = false;
 
                 // Process all failures sequentially
                 foreach (var fail in failedResults)
                 {
                     var handler = new VerificationFailureHandler(
                         config,
-                        resolvedProgram,
-                        iteration);
+                        resolvedProgram);
 
-                    string? nextFile = await handler.Handle(fail, currentFile, options);
+                    List<VerificationConfig> nextFiles = await handler.Handle(fail, currentConfig, options);
 
-                    if (nextFile != null)
+                    foreach (var file in nextFiles)
                     {
-                        iteration++;
-                        currentFile = nextFile;
-                        anyChange = true;
+                        VerifConfToDo.Enqueue(file);
                     }
-                }
-
-                if (!anyChange)
-                {
-                    Console.WriteLine("No changes possible from verification failures. Stopping.");
-                    break;
                 }
             }
         }
@@ -111,26 +170,25 @@ namespace ReturnMethodLinesRandom
     {
         private readonly VerificationConfig config;
         private readonly Microsoft.Dafny.Program program;
-        private readonly int iteration;
 
         public VerificationFailureHandler(
             VerificationConfig config,
-            Microsoft.Dafny.Program program,
-            int iteration)
+            Microsoft.Dafny.Program program)
         {
             this.config = config;
             this.program = program;
-            this.iteration = iteration;
         }
 
-        public async Task<string?> Handle(CanVerifyResult fail, string programFile, DafnyOptions options)
+        public async Task<List<VerificationConfig>> Handle(CanVerifyResult fail, VerificationConfig programConfig, DafnyOptions options)
         {
+            List<VerificationConfig> next_files = new();
+
             if (fail.CanVerify is not Method method || method.Body == null)
-                return null;
+                return next_files;
 
             if (!string.IsNullOrEmpty(config.MethodName) &&
                 method.Name != config.MethodName)
-                return null;
+                return next_files;
 
             foreach (var taskResult in fail.Results)
             {
@@ -143,22 +201,30 @@ namespace ReturnMethodLinesRandom
                         continue;
 
                     var mutator = new ProgramMutator();
-                    return await mutator.InjectAssumeFalse(
+
+                    var postcondition = ce.FailingAssert.ToString();
+                    var postconditionLine = ce.FailingAssert.Line;
+
+                    if (programConfig.PostCondition != "" && programConfig.PostCondition != postcondition)
+                    {
+                        continue; // We only want to expand the same type of error (same failed postcondition)
+                    }
+
+                    next_files.Add(await mutator.InjectAssumeFalse(
                         program,
                         analysis,
-                        programFile,
-                        iteration,
-                        config.PostCondition);
+                        postcondition,
+                        postconditionLine));
                 }
             }
 
-            return null;
+            return next_files;
         }
     }
 
     class CounterexampleAnalyzer
     {
-        public AnalysisResult Analyze(Counterexample ce, BlockStmt body,  DafnyOptions options)
+        public AnalysisResult Analyze(Counterexample ce, BlockStmt body, DafnyOptions options)
         {
             if (ce.Model == null)
                 return AnalysisResult.Empty;
@@ -225,42 +291,61 @@ namespace ReturnMethodLinesRandom
 
     class ProgramMutator
     {
-        public async Task<string> InjectAssumeFalse(
+        private static readonly string TempWorkDir = Path.Combine(Path.GetTempPath(), "DafnyFaultLocalization");
+        public async Task<VerificationConfig> InjectAssumeFalse(
             Microsoft.Dafny.Program program,
             AnalysisResult analysis,
-            string programFile,
-            int iteration,
-            string postcondition)
+            string postcondition,
+            int postconditionLine)
         {
+            if (!Directory.Exists(TempWorkDir))
+            {
+                Directory.CreateDirectory(TempWorkDir);
+            }
+            //Console.WriteLine($"[Storage] Working Directory: {TempWorkDir}");
+
             var block = analysis.TargetBlock!;
+            // Origin relates source code with position of the token (in this case)
+            // We will ignore it shortly afterwards so will just put the block.Origin
             var falseExpr = new Microsoft.Dafny.LiteralExpr(block.Origin, false);
-            var assumeStmt = new AssumeStmt(block.Origin, falseExpr, block.Attributes);
+            var assumeStmt = new AssumeStmt(block.Origin, falseExpr, null);
 
             if (block.Body is not List<Statement> body)
                 throw new InvalidOperationException("Block body not mutable");
 
-            var newFile = programFile.Replace(".dfy", $"_{iteration}_iter.dfy");
+            var solutionFile = Path.Combine(TempWorkDir, $"postLine_{postconditionLine}_iter_{StaticCounter.GlobalIteration}_solution.dfy");
+            StaticCounter.GlobalIteration += 1;
 
-            ProgramWriter.Write(program, newFile, analysis.SuspiciousNodes);
+            ProgramWriter.Write(program, solutionFile, analysis.SuspiciousNodes, postcondition, postconditionLine);
 
             body.Insert(0, assumeStmt);
 
-            if (!string.IsNullOrEmpty(postcondition))
-                Console.WriteLine($"// POSTCONDITION: {postcondition}");
+            var nextFile = Path.Combine(TempWorkDir, $"postLine_{postconditionLine}_iter_{StaticCounter.GlobalIteration}_next.dfy");
+            StaticCounter.GlobalIteration += 1;
 
-            Console.WriteLine($"Injected assume false. Program modified -> {newFile}");
+            var config = new VerificationConfig
+            {
+                ProgramFile = nextFile,
+                MethodName = "",
+                PostCondition = postcondition,
+            };
 
-            var nextFile = programFile.Replace(".dfy", $"_{iteration + 1}_iter.dfy");
+            // Program used in the recursive call!
+            ProgramWriter.Write(program, nextFile, new(), postcondition, postconditionLine);
 
-            ProgramWriter.Write(program, nextFile, new());
+            // Need to remove the mutation to have the program as it was for any other postcondiiotn that failed
+            // on other coutnerexample
+            body.RemoveAt(0);
 
-            return nextFile;
+
+
+            return config;
         }
     }
 
     static class ProgramWriter
     {
-        public static void Write(Microsoft.Dafny.Program program, string path, List<INode> suspicious)
+        public static void Write(Microsoft.Dafny.Program program, string path, List<INode> suspicious, string postcondition, int postconditionLine)
         {
             using var writer = new StreamWriter(path);
             var printer = new Printer(writer, program.Options, PrintModes.Everything, null);
@@ -270,6 +355,10 @@ namespace ReturnMethodLinesRandom
 
             foreach (var node in suspicious)
                 writer.WriteLine($"// line {node.StartToken.line}");
+
+
+            writer.WriteLine($"// Postcondition {postcondition}");
+            writer.WriteLine($"// Postcondition Line {postconditionLine}");
         }
     }
 
