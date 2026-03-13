@@ -4,7 +4,7 @@
         {
             "label": "build CounterExampleIfReassume",
             "type": "shell",
-            "command": "dotnet build ${workspaceFolder}/strategies/CounterExampleIfReassume/CounterExampleIfReassume.csproj",
+            "command": "dotnet build ${workspaceFolder}/strategies/CounterExampleIfReassume/CounterExampleIfReassume.csproj -c Release -o ${workspaceFolder}/build_output/CounterExampleIfReassume",
             "group": {
                 "kind": "build",
                 "isDefault": true

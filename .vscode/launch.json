@@ -5,7 +5,7 @@
             "name": "Debug CounterExampleIfReassume",
             "type": "coreclr",
             "request": "launch",
-            "program": "${workspaceFolder}/strategies/CounterExampleIfReassume/bin/Debug/net8.0/CounterExampleIfReassume.dll",
+            "program": "${workspaceFolder}/build_output/CounterExampleIfReassume/CounterExampleIfReassume.dll",
             "args": [
                 "${workspaceFolder}/strategies/CounterExampleIfReassume/example_to_test.dfy"
             ],
@@ -13,6 +13,19 @@
             "stopAtEntry": false,
             "console": "integratedTerminal",
             "preLaunchTask": "build CounterExampleIfReassume"
+        },
+        {
+         "name": "Python Debug with Args",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/run_1_model.py",
+            "console": "integratedTerminal",
+            "args": [
+                "counterExampleIfReassume",
+                "${workspaceFolder}/src/pos_test",
+                "--clean-cache"
+            ]
         }
     ]
 }
+
