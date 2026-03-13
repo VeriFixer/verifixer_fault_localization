@@ -65,20 +65,27 @@ RUN pip install --upgrade pip && \
 
 ARG DAFNY_VERSION=v4.11.0
 
-RUN git clone --depth 1 --branch ${DAFNY_VERSION} \
-    https://github.com/dafny-lang/dafny.git dafny &&\
-    cd dafny && \
+RUN cd dafny && \
+    git fetch --depth 1 origin ${DAFNY_VERSION} && \
+    git checkout ${DAFNY_VERSION} && \
     make && \
-    ln -s dafny/Binaries/Dafny /usr/local/bin/dafny
+    ln -sf /app/dafny/Binaries/Dafny /usr/local/bin/dafny
+
+# For now i am using a submodule but can change ideas
+#RUN git clone --depth 1 --branch ${DAFNY_VERSION} \
+#    https://github.com/dafny-lang/dafny.git dafny &&\
+#    cd dafny && \
+#    make && \
+#    ln -s dafny/Binaries/Dafny /usr/local/bin/dafny
 
 
 
 # --- Build all dotnet strategies ---
-#RUN for dir in strategies/*/; do \
-#        if [ -d "$dir" ]; then \
-#            dotnet build "$dir" -c Release -o /app/build_output/$(basename "$dir"); \
-#        fi; \
-#    done
+RUN for dir in strategies/*/; do \
+        if [ -d "$dir" ]; then \
+            dotnet build "$dir" -c Release -o /app/build_output/$(basename "$dir"); \
+        fi; \
+    done
 
 CMD ["bash"]
 
