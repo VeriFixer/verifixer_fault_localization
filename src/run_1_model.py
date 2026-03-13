@@ -13,10 +13,12 @@ from fl_eval.strategies.counter_example_base_ranker import CounterExampleBaseRan
 from fl_eval.strategies.empty_ranker import EmptyRanker
 from fl_eval.strategies.random_line_of_method_that_fails import RandomLineOfMethodThatFails
 from fl_eval.strategies.counter_example_if import CounterExampleIf
+from fl_eval.strategies.counter_example_if_reassume import CounterExampleIfReassume
 
 
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import compute_exam_score
+from fl_eval.metrics.scoring import ExamOutput
 
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
 from fl_eval.util.globals import *
@@ -28,7 +30,8 @@ TECHNIQUE_MAP: Dict[str, Type[FLTechnique]] = {
     "counterBase": CounterExampleBaseRanker,
     "empty": EmptyRanker,
     "randomOnFailingMethod" : RandomLineOfMethodThatFails,
-    "counterExampleIf": CounterExampleIf    # TODO: Add other FL techniques here as they are implemented
+    "counterExampleIf": CounterExampleIf,
+    "counterExampleIfReassume" : CounterExampleIfReassume
 }
 
 def _setup_evaluation(flt_name: str, base_path: Path) -> Optional[Tuple[FLTechnique, Path, Path]]:
@@ -61,7 +64,7 @@ def _process_mutation(
     fl_technique: FLTechnique, 
     killed_dir: Path, 
     original_dir: Path
-) -> Optional[tuple[bool,float]]:
+) -> Optional[ExamOutput]:
     """
     Processes a single mutation file pair, computes the EXAM score, and returns it.
     Returns None if any error occurs.
@@ -89,11 +92,8 @@ def _process_mutation(
             difffile=diff_path
         )
         # Note: compute_exam_score handles calling the FL technique
-        (found, exam_score) = compute_exam_score(fl_technique, gtruth_finder)
-
-
-        
-        return (found, exam_score)
+        exam_output = compute_exam_score(fl_technique, gtruth_finder)
+        return exam_output
 
     except ValueError as e:
         print(f"Error processing {mutation_name} (Value Error): {e}. Skipping.")
@@ -106,21 +106,30 @@ def _process_mutation(
 
 # --- Helper 3: Reporting ---
 
-def _generate_report(flt_name: str, all_scores: List[tuple[bool,float]]) -> None:
+def _generate_report(flt_name: str, all_scores: List[ExamOutput]) -> None:
     """
-    Computes the final average and prints the evaluation summary.
+    Computes the final average and prints the evaluation summary in a neat table.
     """
-    if all_scores:
-        found_score = sum([x[0] for x in all_scores])/len(all_scores)
-        average_score = sum([x[1] for x in all_scores])/ len(all_scores)
-        print("\n" + "="*50)
-        print(f"| Evaluation Summary for: {flt_name.upper():<27}")
-        print(f"| Total Mutations Evaluated: {len(all_scores):<27}")
-        print(f"| Average EXAM Score: {average_score:.6f}{'':<20}")
-        print(f"| Fault found in predictions (%): {found_score:.6f}{'':<20}")
-        print("="*50)
-    else:
+    if not all_scores:
         print("\nNo mutations were successfully evaluated.")
+        return
+
+    # Compute metrics
+    total = len(all_scores)
+    average_score = sum(x.score for x in all_scores) / total
+    found_score = sum(x.found for x in all_scores) / total
+    empty_score = sum(x.empty for x in all_scores) / total
+
+    # Table formatting
+    print("\n" + "="*60)
+    print(f"{'EVALUATION SUMMARY':^60}")
+    print("="*60)
+    print(f"{'Filter Name':30}: {flt_name.upper():<27}")
+    print(f"{'Total Mutations':30}: {total:<27}")
+    print(f"{'Average EXAM Score':30}: {average_score:.6f}")
+    print(f"{'Fault Found (%)':30}: {found_score:.6f}")
+    print(f"{'Empty Predictions (%)':30}: {empty_score:.6f}")
+    print("="*60 + "\n")
 
 # --- Orchestrator Function ---
 def compute_metrics(flt_name: str, base_path: Path) -> None:
@@ -133,13 +142,13 @@ def compute_metrics(flt_name: str, base_path: Path) -> None:
         return
         
     fl_technique, killed_dir, original_dir = setup_result
-    all_scores: list[tuple[bool,float] | None] = []
+    all_scores: list[ExamOutput | None] = []
 
     diff_paths = list(killed_dir.glob("*.txt"))
 
     all_scores = run_parallel_or_seq(diff_paths, _process_mutation, f"Get metrics for {flt_name}",
                                      fl_technique, killed_dir, original_dir, parallel=True)
-    all_scores_clean : list[tuple[bool,float]] = list(filter(lambda x: x is not None, all_scores))
+    all_scores_clean : list[ExamOutput] = list(filter(lambda x: x is not None, all_scores))
     _generate_report(flt_name, all_scores_clean)
 
 

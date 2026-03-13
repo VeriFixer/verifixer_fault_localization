@@ -83,7 +83,8 @@ class TestFLCore(unittest.TestCase):
         valid_scores = {0.0, 0.2, 0.4, 0.6, 0.8} # Ranks 0-4 out of 5 total lines
 
         for _ in range(num_runs):
-            found, score = compute_exam_score(self.ranker, mock_gtruth)
+            examp_out = compute_exam_score(self.ranker, mock_gtruth)
+            found, score, empty = examp_out.found, examp_out.score, examp_out.empty 
             
             # Since RandomRanker covers all lines, the bug should always be found 
             # within the completed ranking list, and thus, within the full set of lines (1-5).

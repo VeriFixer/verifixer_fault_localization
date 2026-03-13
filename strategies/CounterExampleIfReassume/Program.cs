@@ -2,11 +2,16 @@
 using DafnyDriver.Commands;
 using Microsoft.Boogie;
 using System.Text.RegularExpressions;
+using System.Text.Json;
+
 
 namespace ReturnMethodLinesRandom
 {
     class Program
     {
+        private static readonly string TempWorkDir = Path.Combine(
+            Path.GetTempPath(), "DafnyFaultLocalization_" + Guid.NewGuid());
+
         static async Task<int> Main(string[] args)
         {
             if (args.Length == 0)
@@ -22,19 +27,11 @@ namespace ReturnMethodLinesRandom
                 PostCondition = args.Length > 2 ? args[2] : ""
             };
 
-            var runner = new VerificationRunner(config);
+            var runner = new VerificationRunner(config, TempWorkDir);
             await runner.Run();
 
-            // --- Parse all solution files ---
-            string tempDir = Path.Combine(Path.GetTempPath(), "DafnyFaultLocalization");
-            if (!Directory.Exists(tempDir))
-            {
-                Console.WriteLine("No solution files found.");
-                return 0;
-            }
-
             var allSuspiciousLines = new List<List<int>>();
-            var solutionFiles = Directory.GetFiles(tempDir, "*_solution.dfy");
+            var solutionFiles = Directory.GetFiles(TempWorkDir, "*_solution.dfy");
 
             foreach (var file in solutionFiles)
             {
@@ -82,21 +79,15 @@ namespace ReturnMethodLinesRandom
                 }
                 allSuspiciousLines.Add(fileLinesShifter);
             }
-            Console.WriteLine("[");
-            foreach (var list in allSuspiciousLines)
-            {
-                Console.WriteLine("  [" + string.Join(", ", list) + "],");
-            }
-            Console.WriteLine("]");
 
-            Directory.Delete(tempDir, true); 
+            var json = JsonSerializer.Serialize(allSuspiciousLines);
+            Console.WriteLine("JSON_OUTPUT_START");
+            Console.WriteLine(json);
+            Console.WriteLine("JSON_OUTPUT_END");
+            
+            Directory.Delete(TempWorkDir, true); 
             return 0;
         }
-    }
-
-    class StaticCounter
-    {
-        public static int GlobalIteration = 0;
     }
 
     class VerificationConfig
@@ -110,9 +101,11 @@ namespace ReturnMethodLinesRandom
     class VerificationRunner
     {
         private readonly VerificationConfig config;
-        public VerificationRunner(VerificationConfig config)
+        private readonly string TempWorkDir;
+        public VerificationRunner(VerificationConfig config, string tempdir)
         {
             this.config = config;
+            TempWorkDir = tempdir;
         }
 
         public async Task Run()
@@ -155,7 +148,7 @@ namespace ReturnMethodLinesRandom
                         config,
                         resolvedProgram);
 
-                    List<VerificationConfig> nextFiles = await handler.Handle(fail, currentConfig, options);
+                    List<VerificationConfig> nextFiles = await handler.Handle(fail, currentConfig, options, TempWorkDir);
 
                     foreach (var file in nextFiles)
                     {
@@ -170,6 +163,7 @@ namespace ReturnMethodLinesRandom
     {
         private readonly VerificationConfig config;
         private readonly Microsoft.Dafny.Program program;
+        private readonly Microsoft.Dafny.Program TempFolder;
 
         public VerificationFailureHandler(
             VerificationConfig config,
@@ -179,7 +173,7 @@ namespace ReturnMethodLinesRandom
             this.program = program;
         }
 
-        public async Task<List<VerificationConfig>> Handle(CanVerifyResult fail, VerificationConfig programConfig, DafnyOptions options)
+        public async Task<List<VerificationConfig>> Handle(CanVerifyResult fail, VerificationConfig programConfig, DafnyOptions options, string TempWorkDir)
         {
             List<VerificationConfig> next_files = new();
 
@@ -200,7 +194,7 @@ namespace ReturnMethodLinesRandom
                     if (!analysis.ShouldInject)
                         continue;
 
-                    var mutator = new ProgramMutator();
+                    var mutator = new ProgramMutator(TempWorkDir);
 
                     var postcondition = ce.FailingAssert.ToString();
                     var postconditionLine = ce.FailingAssert.Line;
@@ -291,18 +285,21 @@ namespace ReturnMethodLinesRandom
 
     class ProgramMutator
     {
-        private static readonly string TempWorkDir = Path.Combine(Path.GetTempPath(), "DafnyFaultLocalization");
+        private readonly string TempWorkDir;
+        public ProgramMutator(string tempFolder)
+        {
+            TempWorkDir = tempFolder;
+            if (!Directory.Exists(TempWorkDir))
+                Directory.CreateDirectory(TempWorkDir);
+        }
+
+
         public async Task<VerificationConfig> InjectAssumeFalse(
             Microsoft.Dafny.Program program,
             AnalysisResult analysis,
             string postcondition,
             int postconditionLine)
         {
-            if (!Directory.Exists(TempWorkDir))
-            {
-                Directory.CreateDirectory(TempWorkDir);
-            }
-            //Console.WriteLine($"[Storage] Working Directory: {TempWorkDir}");
 
             var block = analysis.TargetBlock!;
             // Origin relates source code with position of the token (in this case)
@@ -313,15 +310,13 @@ namespace ReturnMethodLinesRandom
             if (block.Body is not List<Statement> body)
                 throw new InvalidOperationException("Block body not mutable");
 
-            var solutionFile = Path.Combine(TempWorkDir, $"postLine_{postconditionLine}_iter_{StaticCounter.GlobalIteration}_solution.dfy");
-            StaticCounter.GlobalIteration += 1;
+            var solutionFile = Path.Combine(TempWorkDir, $"postLine_{postconditionLine}_iter_{Guid.NewGuid()}_solution.dfy");
 
             ProgramWriter.Write(program, solutionFile, analysis.SuspiciousNodes, postcondition, postconditionLine);
 
             body.Insert(0, assumeStmt);
 
-            var nextFile = Path.Combine(TempWorkDir, $"postLine_{postconditionLine}_iter_{StaticCounter.GlobalIteration}_next.dfy");
-            StaticCounter.GlobalIteration += 1;
+            var nextFile = Path.Combine(TempWorkDir, $"postLine_{postconditionLine}_iter_{Guid.NewGuid()}_next.dfy");
 
             var config = new VerificationConfig
             {

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import gaussian_kde
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
+from fl_eval.metrics.scoring import ExamOutput
 from fl_eval.util.globals import RUN_PARALLEL
 from run_1_model import (
         TECHNIQUE_MAP, 
@@ -19,13 +20,15 @@ def _print_ascii_table(stats: Dict[str, dict]):
     h_count = "Evaluated"
     h_avg = "Avg EXAM"
     h_found = "Fault Found %"
+    h_exist = "Empty Answer %"
     
-    w_tech = 20
+    w_tech = 30
     w_count = 12
     w_avg = 15
     w_found = 15
+    w_exist = 16
     
-    header = f"| {h_tech:<{w_tech}} | {h_count:<{w_count}} | {h_avg:<{w_avg}} | {h_found:<{w_found}} |"
+    header = f"| {h_tech:<{w_tech}} | {h_count:<{w_count}} | {h_avg:<{w_avg}} | {h_found:<{w_found}} | {h_exist:<{w_exist}}"
     separator = "-" * len(header)
     print("\n" + separator)
     print(header)
@@ -35,7 +38,8 @@ def _print_ascii_table(stats: Dict[str, dict]):
         count = str(data['count'])
         avg = f"{data['avg_exam']:.4f}"
         found = f"{data['found_rate']:.2f}"
-        print(f"| {name:<{w_tech}} | {count:<{w_count}} | {avg:<{w_avg}} | {found:<{w_found}} |")
+        exist = f"{data['exist_rate']:.2f}"
+        print(f"| {name:<{w_tech}} | {count:<{w_count}} | {avg:<{w_avg}} | {found:<{w_found}} | {exist:<{w_exist}}")
     print(separator + "\n")
 
 def _print_latex_table(stats: Dict[str, dict]):
@@ -70,7 +74,7 @@ from scipy.stats import gaussian_kde
 from pathlib import Path
 from matplotlib.patches import Patch
 
-def _generate_plots(raw_results: Dict[str, List[tuple[bool, float]]], output_path: Path): 
+def _generate_plots(raw_results: Dict[str, List[ExamOutput]], output_path: Path): 
     techniques = list(raw_results.keys())
     labels = [t for t in techniques if raw_results[t]]
     
@@ -82,9 +86,9 @@ def _generate_plots(raw_results: Dict[str, List[tuple[bool, float]]], output_pat
 
     for i, tech in enumerate(labels):
         data = raw_results[tech]
-        all_scores = np.array([x[1] for x in data])
-        found_scores = np.array([x[1] for x in data if x[0]])
-        not_found_scores = np.array([x[1] for x in data if not x[0]])
+        all_scores = np.array([x.score for x in data])
+        found_scores = np.array([x.found for x in data if x[0]])
+        not_found_scores = np.array([x.found for x in data if not x[0]])
         total_count = len(data)
 
         # --- 1. Draw Density Background ---
@@ -211,15 +215,18 @@ def run_benchmark(base_path: Path):
         scores_clean = [s for s in scores_dirty if s is not None]
         raw_results[tech_name] = scores_clean
         if scores_clean:
-            avg = sum([s[1] for s in scores_clean]) / len(scores_clean)
-            found_pct = (sum([1 for s in scores_clean if s[0]]) / len(scores_clean)) * 100
+            avg = sum([s.score for s in scores_clean]) / len(scores_clean)
+            found_pct = (sum([s.found for s in scores_clean]) / len(scores_clean)) * 100
+            exist = sum([s.empty for s in scores_clean]) / len(scores_clean)
         else:
             avg = 0.0
             found_pct = 0.0
+            exist = 0,0
         stats_summary[tech_name] = {
             'count': len(scores_clean),
             'avg_exam': avg,
-            'found_rate': found_pct
+            'found_rate': found_pct,
+            'exist_rate' : exist
         }
     if not stats_summary:
         print("No results collected.")

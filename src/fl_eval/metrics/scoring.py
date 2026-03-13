@@ -2,13 +2,22 @@ from fl_eval.core.abstract import FLTechnique
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from pathlib import Path
 import json
+import traceback
+from dataclasses import dataclass
+import sys
+
+@dataclass
+class ExamOutput:
+    score : float # it is the exam score
+    found : bool  # defines if the line of the oracle is inside any line predicted
+    empty : bool  # Defines that the predicter did not predict anything
 
 def compute_exam_score_one_file(
     predictions: list[int], 
     ground_truth: int, 
     total_line_start: int, 
     total_line_end: int
-) -> tuple[bool, float]:
+) -> ExamOutput:
     """
     Evaluates the effectiveness of a fault localization technique by calculating the EXAM score.
 
@@ -50,8 +59,9 @@ def compute_exam_score_one_file(
     if  len(list(filter(lambda x: (x < total_line_start) or (x > total_line_end), predictions))) != 0:
         raise ValueError(f"Some predictions are outside the bounds of the line start {total_line_start} line end {total_line_end}")
 
+    is_empty = predictions == []
     if(total_lines == 1): # If one line it is found and exam is always 0 as no effort is wasted
-        return(predictions != [], 0)
+        return  ExamOutput(score = 0, found = predictions != [], empty = is_empty) 
 
     try:
         rank = predictions.index(ground_truth)
@@ -70,7 +80,7 @@ def compute_exam_score_one_file(
         rank = lines_inspected_so_far + expected_position_in_unranked
 
     exam_score = rank / (total_lines-1)
-    return (found_in_predictions, exam_score)
+    return ExamOutput( score = exam_score, found = found_in_predictions, empty = is_empty)
 
 def _results_file_path(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> Path:
     top_folder = Gtruth.mutantfile.parent.parent.parent
@@ -95,13 +105,20 @@ def load_from_file_output(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> 
     return data
 
 
-def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthAndLineLimit) -> tuple[bool, float]:
+def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthAndLineLimit) -> ExamOutput:
     try : 
         # Try loading from cached results
         predictions = load_from_file_output(flt, Gtruth)
     except FileNotFoundError:
         # Compute predictions localization
-        predictions = flt.get_fault_localization(Gtruth.mutantfile) 
+        try:
+            predictions = flt.get_fault_localization(Gtruth.mutantfile) 
+        except Exception as e:
+            predictions = []
+            print("Exception occurred while running fault localization:", file=sys.stderr)
+            print(str(e), file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
+            predictions = []
         save_to_file_output( flt, Gtruth ,  predictions)
     
     ground_truth = Gtruth.ground_truth
