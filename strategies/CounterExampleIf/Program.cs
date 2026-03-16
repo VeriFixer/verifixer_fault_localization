@@ -128,6 +128,7 @@ namespace returnMethodLinesRandom
                     foundNodes.Add(stmt);
                 }
             }
+
             // Save the counterexamples with the if brnaching lines
             var report = new CounterExampleData();
             foreach (var node in foundNodes)
@@ -137,6 +138,18 @@ namespace returnMethodLinesRandom
                     Type = node is IfStmt ? "IfStmt" : "Stmt",
                     Line = node.StartToken.line,
                     Content = node.ToString() // Converts AST node back to source string
+                });
+            }
+
+            if(foundNodes.Count == 0)
+            {
+                // This means that the counterexample are only found the method beginning without any node related to it
+                // So will add the method beggining line as fall back
+                report.Nodes.Add(new NodeInfo
+                {
+                    Type = "Stmt",
+                    Line = methodBody.StartToken.line,
+                    Content = "//No node found counterexample only affected start state"
                 });
             }
             var jsonOptions = new JsonSerializerOptions { WriteIndented = true };

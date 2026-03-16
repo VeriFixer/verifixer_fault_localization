@@ -1,125 +1,181 @@
 # Fault Localization for Dafny Programs
 
-This repository explores multiple strategies for **fault localization in Dafny programs**, focusing on identifying missing or incorrect assertion locations using heuristic, randomized, and model-based techniques.
+This repository implements and evaluates **fault localization techniques for Dafny programs**. The core evaluation framework computes the **EXAM score** for different ranking strategies, using datasets built from Dafny programs and their mutated variants.
 
 ---
 
-## Getting Started
+## Quick Start with Docker
 
-If you are **not using the datasets already included in the repository**, and you want to generate datasets such as `pos_mutation` or `pos_test`, run:
+For the easiest setup, use the provided Docker environment. This includes Dafny, Python dependencies, and all tools pre-installed.
+
+### Option 1: Use Pre-built Image (Recommended for Reviewers)
+
+If you have the `dafny_research_latest.tar` image:
+
+```bash
+docker load -i dafny_research_latest.tar
+docker run --rm -it -w /app dafny_research:latest bash
+```
+
+### Option 2: Build from Dockerfile
+
+```bash
+docker build -t dafny_research:latest .
+docker run --rm -it -w /app dafny_research:latest bash
+```
+
+### Option 3: Run with Volume Mounts (for Development)
+
+```bash
+docker run --rm -it \
+  -u $(id -u):$(id -g) \
+  -v "$(pwd)/src:/app/src:delegated" \
+  -v "$(pwd)/mutdafny:/app/mutdafny:delegated" \
+  -v "$(pwd)/datasets:/app/datasets:delegated" \
+  -w /app \
+  dafny_research:latest bash
+```
+
+Once inside the container, follow the instructions below.
+
+---
+
+## Project Layout (Quick Overview)
+
+- `src/` — Main Python evaluation framework.
+  - `run_1_model.py` — Run one technique and compute EXAM score.
+  - `run_all_models.py` — Run all implemented techniques and generate summary tables + plots.
+  - `fl_eval/` — Core evaluation library (strategies, metrics, ground truth parsing, utilities).
+  - `pos_mutation/` — Example dataset: contains `killed/` and `original/` subfolders.
+  - `pos_test/` — Small dataset for quick experiments.
+- `strategies/` — (Optional) C# helper projects used by some strategies.
+- `datasets/` — Generated dataset outputs (e.g., filtered subsets).
+- `mutdafny/` — Mutation tool integration.
+- `dafny/` — Dafny source code and tools.
+
+---
+
+## Prerequisites (Non-Docker Setup)
+
+If not using Docker:
+
+1. **Python 3.11+** (recommended)
+2. **Dafny** (for dataset generation / verification) (provided as a git submodule)
+3. **.NET SDK** (for building C# strategies) (version 8)
+4. Optional: **mutdafny** (if generating the full mutation dataset) (provided as a git submodule)
+
+### Install Python dependencies
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r src/requirements.txt
+```
+### More installation guidelines
+
+For the rest of all installation steps follow the Dockerfile
+
+---
+
+## Dataset Structure
+
+The evaluation scripts expect a dataset directory containing **two subfolders**:
+
+- `original/` — the original (passing) Dafny programs
+- `killed/` — mutated versions of the originals that contain failing assertions
+
+Example paths in this repo:
+
+- `src/pos_mutation/` (larger dataset)
+- `src/pos_test/` (smaller test dataset)
+
+Each mutation entry is represented as a `.txt` diff file (`killed/*.txt`) and a corresponding `.dfy` mutant (`killed/*.dfy`).
+
+### Generating Datasets (Optional)
+
+If you need to generate datasets:
 
 ```bash
 ./src/generate_mutdafny_dataset.sh
 ./src/clean_mutdafny_datset.sh
-./src/get_pos.sh  
+./src/get_pos.sh
 ```
 
-these creat the diff files and create two datasets 
-the complete from mutdafny will all the files under 
-"datasets/dafnybench_all_mutants"
-and the one where the orignial runs with the versions of the tools
-"datasets/dafnybench_original_can_run"
+This creates datasets in `datasets/dafnybench_all_mutants` and `datasets/dafnybench_original_can_run`.
 
-For both of them on killed in writes the diff from the initial original file
-
-> Skip this step if you plan to use the datasets already provided.
+> Skip if using provided datasets.
 
 ---
 
-## Running a Single Model
+## Running the Evaluation
 
-To run a specific fault localization technique on a dataset:
+### Run a single technique
 
 ```bash
-cd src
-python run_1_model.py [model_name] dataset_path
+python src/run_1_model.py <technique> <dataset_path>
 ```
 
-To list all available models:
+Example:
 
 ```bash
-python run_1_model.py
+python src/run_1_model.py random src/pos_mutation
 ```
 
-### Example
-
-Run the random strategy on the full mutation dataset:
+### Run all implemented techniques and generate results
 
 ```bash
-python run_1_model.py random pos_mutation
+python src/run_all_models.py src/pos_mutation
 ```
 
-* `pos_mutation`: ~1800 test cases
-* `pos_test`: 30 test cases
+This produces:
 
-Choose the dataset based on your experimental goals.
+- Console summary tables (ASCII + LaTeX)
+- A `benchmark_hybrid_analysis.png` plot (saved next to the dataset directory)
 
----
+### Cache behavior
 
-## Running All Models and Generating Results
+Results are cached in `src/cached_results/`.
 
-To execute **all available models** on a dataset and generate result tables and plots:
-
-```bash
-python run_all_models.py dataset_path
-```
-
-This will:
-
-* Run every strategy on the given dataset
-* Generate result tables
-* Produce summary graphs with overall scores
-
-> Currently, the best-performing strategy is `counterExampleIf`, with a mean exam score of approximately **0.08**.
-
----
-
-## Caching
-
-Results are cached across runs to avoid recomputation.
-
-To delete cached results for a specific model:
+To clean the cache (for a specific technique):
 
 ```bash
-rm -rf cached_results/{model_name}
+rm -rf src/cached_results/<technique_name>
 ```
 
 ---
 
-## Creating New Models
+## Available Fault Localization Techniques
 
-To add a new fault localization strategy:
+The following techniques are implemented and available out-of-the-box (see `src/run_1_model.py`):
 
-1. Navigate to:
+- `random` — randomly ranks all lines in the failing program.
+- `randomOnFailingMethod` — randomly ranks lines from the failing method.
+- `counterBase` — uses Dafny counterexample output to rank suspicious lines.
+- `counterExampleIf` — extends counterexample parsing to include `if` decision points.
+- `counterExampleIfReassume` — extends counterexample parsing to include `if` decision points and that gets extra counterexaples by assuming false on branches to find more paths where postconditions were failing.
+- `empty` — baseline that returns no predictions.
 
-   ```text
-   src/fl_eval/strategies
-   ```
+> To see the current list at runtime, run `python src/run_1_model.py --help`.
 
-2. Create a new strategy file implementing the `FLTechnique` class.
+---
 
-3. Implement the method:
+## Adding a New Technique
 
-   ```python
-   get_fault_localization(dafny_file) -> list[int]
-   ```
+1. Create a new Python file in `src/fl_eval/strategies/`.
+2. Implement a class derived from `fl_eval.core.abstract.FLTechnique`.
+3. Implement:
 
-   This method should return a list of line numbers (ordered by importance) where faults are suspected.
+```python
+def get_fault_localization(dafny_file: Path) -> list[int]:
+    ...
+```
 
-### Examples
+4. Register the strategy in `src/run_1_model.py` by adding it to `TECHNIQUE_MAP`.
 
-* See `random_line_of_method_that_fails.py` for a simple strategy.
-* This example also demonstrates how to invoke an **external program** (e.g., a C# executable).
+---
 
-### External C# Strategies
+## 📌 Notes & Recommendations
 
-If your strategy relies on a new C# executable:
-
-* Place the corresponding project under the top-level `strategies/` directory.
-* Example:
-
-  ```text
-  strategies/ReturnAtRandomAllLinesOfFailingMethod
-  ```
-
-> Docker support is planned; once available, these projects will be built automatically.
+- The evaluation measures **EXAM score**, which corresponds to the effort required to find the fault (lower is better).
+- The pipeline expects a consistent `killed/` / `original/` pairing. Missing pairs will be skipped.
+- Dataset generation scripts depend on a working `mutdafny` and Dafny installation.

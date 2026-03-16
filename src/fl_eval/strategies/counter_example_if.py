@@ -58,5 +58,12 @@ class CounterExampleIf(FLTechnique):
             nodes = result["Nodes"]
             for node in nodes:
                 lines.append(node["Line"])
+
+        if(len(lines) == 0):
+            print("No lines found in the output, returning empty prediction.")
+            print(command)
+            print(file)
+            print("---------------------")
+
         return lines
         

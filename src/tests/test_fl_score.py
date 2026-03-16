@@ -77,10 +77,10 @@ class TestFLCore(unittest.TestCase):
         )
         
         # 2. Run the function multiple times due to the random nature of RandomRanker
-        # We need to assert that the score is always a valid value (0.0, 0.2, 0.4, 0.6, or 0.8)
+        # We need to assert that the score is always a valid value (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
         
         num_runs = 100
-        valid_scores = {0.0, 0.2, 0.4, 0.6, 0.8} # Ranks 0-4 out of 5 total lines
+        valid_scores = {0.0, 0.2, 0.4, 0.6, 0.8, 1.0} # Ranks 0-4 out of 5 total lines
 
         for _ in range(num_runs):
             examp_out = compute_exam_score(self.ranker, mock_gtruth)

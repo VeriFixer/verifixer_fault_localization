@@ -3,9 +3,10 @@ using DafnyDriver.Commands;
 using Microsoft.Boogie;
 using System.Text.RegularExpressions;
 using System.Text.Json;
+using System.Linq;
 
 
-namespace ReturnMethodLinesRandom
+namespace CounterExampleIfReassume
 {
     class Program
     {
@@ -19,6 +20,9 @@ namespace ReturnMethodLinesRandom
                 Console.WriteLine("Usage: program <file.dfy> [method] [postcondition]");
                 return 1;
             }
+
+            // Ensure the temporary directory exists
+            Directory.CreateDirectory(TempWorkDir);
 
             var config = new VerificationConfig
             {
@@ -111,6 +115,8 @@ namespace ReturnMethodLinesRandom
         public async Task Run()
         {
             Queue<VerificationConfig> VerifConfToDo = new Queue<VerificationConfig>();
+            Queue<VerificationConfig> TotalVerified = new Queue<VerificationConfig>();
+
             VerifConfToDo.Enqueue(config);
 
             while (VerifConfToDo.Count > 0)
@@ -155,6 +161,32 @@ namespace ReturnMethodLinesRandom
                         VerifConfToDo.Enqueue(file);
                     }
                 }
+
+                if(VerifConfToDo.Count == 0 && TotalVerified.Count == 0)
+                {
+                    // This means that the counterexample is not useful, the strategy only has state on the beginning of the method at all 
+                    // With that we will create a solution file with one line indicating the first line on the method in question as suspicious 
+
+                    foreach (var fail in failedResults)
+                    {
+                        if (fail.CanVerify is Method method && method.Body != null)
+                        {
+                            int failingMethodStartLine = method.Body.StartToken.line;
+                            var solutionFile = Path.Combine(TempWorkDir, $"postLine_{failingMethodStartLine}_iter_{Guid.NewGuid()}_solution.dfy");
+
+                            using var writer = new StreamWriter(solutionFile);
+                            var printer = new Printer(writer, options, PrintModes.Everything, null);
+                            printer.PrintProgram(resolvedProgram, false);
+
+                            writer.WriteLine("// ---- Suspicious nodes ----");
+                            writer.WriteLine($"// line {failingMethodStartLine}");
+                            writer.WriteLine($"// Postcondition ");
+                            writer.WriteLine($"// Postcondition Line {failingMethodStartLine}");
+                        }
+                    }
+                }
+                TotalVerified.Enqueue(config);
+
             }
         }
     }

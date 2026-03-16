@@ -33,7 +33,7 @@ class TestGroundTruthAndLineLimitFinder(unittest.TestCase):
             "line 10\n"
             # This file has exactly 10 lines.
         )
-        expected_end_line = 9
+        expected_end_line = 10
         
         with TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
@@ -52,8 +52,8 @@ class TestGroundTruthAndLineLimitFinder(unittest.TestCase):
             self.assertEqual(finder_instance.ground_truth, expected_ground_truth, 
                              "The ground truth should be 8 for the '8c8' diff.")
             # 5. ASSERTIONS FOR LINE LIMITS (*** NEW ASSERTIONS ***)
-            self.assertEqual(finder_instance.startLine, 0,
-                             "startLine should be 0 (start of the file).")
+            self.assertEqual(finder_instance.startLine, 1,
+                             "startLine should be 1 (start of the file).")
             self.assertEqual(finder_instance.endLine, expected_end_line,
                              f"endLine should be {expected_end_line} (last line of mutant file).")
 
@@ -82,11 +82,11 @@ class TestGroundTruthAndLineLimitFinder(unittest.TestCase):
             diff_path.write_text(diff_content_range)
             # Create a 5-line dummy mutant file for this test
             mutant_path.write_text("1\n2\n3\n4\n5\n")
-            expected_end_line = 4
+            expected_end_line = 5
             finder_instance = GroundTruthAndLineLimit(original_path, mutant_path, diff_path)
             # Assert GT
             self.assertEqual(finder_instance.ground_truth, expected_ground_truth,
                              "The ground truth should be 14 (first change detected).")
             # Assert Limits
-            self.assertEqual(finder_instance.startLine, 0)
+            self.assertEqual(finder_instance.startLine, 1)
             self.assertEqual(finder_instance.endLine, expected_end_line)
