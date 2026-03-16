@@ -11,14 +11,14 @@ def test_compare_two_methods_basic():
     """Test basic comparison with normal data"""
     raw_results = {
         'tech1': [
-            ExamOutput(0.1, True, False),
-            ExamOutput(0.2, True, False),
-            ExamOutput(0.3, False, False),
+            ExamOutput(0.1, True, False, "file1.dfy"),
+            ExamOutput(0.2, True, False, "file2.dfy"),
+            ExamOutput(0.3, False, False, "file3.dfy"),
         ],
         'tech2': [
-            ExamOutput(0.4, False, False),
-            ExamOutput(0.5, False, False),
-            ExamOutput(0.6, True, False),
+            ExamOutput(0.4, False, False, "file1.dfy"),
+            ExamOutput(0.5, False, False, "file2.dfy"),
+            ExamOutput(0.6, True, False, "file3.dfy"),
         ]
     }
     
@@ -58,14 +58,14 @@ def test_compare_two_methods_different_success_rates():
     """Test with different success patterns"""
     raw_results = {
         'tech1': [
-            ExamOutput(0.1, True, False),  # found
-            ExamOutput(0.2, False, False), # not found
-            ExamOutput(0.3, True, False),  # found
+            ExamOutput(0.1, True, False, "file1.dfy"),  # found
+            ExamOutput(0.2, False, False, "file2.dfy"), # not found
+            ExamOutput(0.3, True, False, "file3.dfy"),  # found
         ],
         'tech2': [
-            ExamOutput(0.4, False, False), # not found
-            ExamOutput(0.5, True, False),  # found
-            ExamOutput(0.6, False, False), # not found
+            ExamOutput(0.4, False, False, "file1.dfy"), # not found
+            ExamOutput(0.5, True, False, "file2.dfy"),  # found
+            ExamOutput(0.6, False, False, "file3.dfy"), # not found
         ]
     }
     
@@ -74,8 +74,8 @@ def test_compare_two_methods_different_success_rates():
         
         calls = [call.args[0] for call in mock_print.call_args_list]
         # Should show 2 cases where tech1 only found, 1 where tech2 only found
-        assert any("tech1 found fault but tech2 did not: 2 cases" in call for call in calls)
-        assert any("tech2 found fault but tech1 did not: 1 cases" in call for call in calls)
+        assert any("tech1 found fault but tech2 did not: 2 files" in call for call in calls)
+        assert any("tech2 found fault but tech1 did not: 1 files" in call for call in calls)
 
 if __name__ == "__main__":
     pytest.main([__file__])

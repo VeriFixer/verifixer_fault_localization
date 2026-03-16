@@ -11,12 +11,14 @@ class ExamOutput:
     score : float # it is the exam score
     found : bool  # defines if the line of the oracle is inside any line predicted
     empty : bool  # Defines that the predicter did not predict anything
+    filename : str  # the filename where the score refers to
 
 def compute_exam_score_one_file(
     predictions: list[int], 
     ground_truth: int, 
     total_line_start: int, 
-    total_line_end: int
+    total_line_end: int,
+    filename: str
 ) -> ExamOutput:
     """
     Evaluates the effectiveness of a fault localization technique by calculating the EXAM score.
@@ -39,11 +41,10 @@ def compute_exam_score_one_file(
         ground_truth (int): The actual line number where the fault is located.
         total_line_start (int): The starting line number of the valid code range.
         total_line_end (int): The ending line number of the valid code range.
+        filename (str): The filename associated with the score.
 
     Returns:
-        tuple[bool, float]: A tuple containing:
-            - found_in_predictions (bool): True if the fault was in the original provided list.
-            - exam_score (float): The EXAM score (rank / total_lines).
+        ExamOutput: The computed exam score with metadata.
 
     Raises:
         ValueError: If the ground_truth is not within the specified line range.
@@ -61,7 +62,7 @@ def compute_exam_score_one_file(
 
     is_empty = predictions == []
     if(total_lines == 1): # If one line it is found and exam is always 0 as no effort is wasted
-        return  ExamOutput(score = 0, found = predictions != [], empty = is_empty) 
+        return  ExamOutput(score = 0, found = predictions != [], empty = is_empty, filename=filename) 
 
     try:
         rank = predictions.index(ground_truth)
@@ -80,7 +81,7 @@ def compute_exam_score_one_file(
         rank = lines_inspected_so_far + expected_position_in_unranked
 
     exam_score = rank / (total_lines-1)
-    return ExamOutput( score = exam_score, found = found_in_predictions, empty = is_empty)
+    return ExamOutput( score = exam_score, found = found_in_predictions, empty = is_empty, filename=filename)
 
 def _results_file_path(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> Path:
     top_folder = Gtruth.mutantfile.parent.parent.parent
@@ -129,5 +130,6 @@ def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthAndLineLimit) -> E
         predictions, 
         ground_truth, 
         total_line_start, 
-        total_line_end
+        total_line_end,
+        str(Gtruth.mutantfile)
     )

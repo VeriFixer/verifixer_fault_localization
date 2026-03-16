@@ -8,7 +8,7 @@ class TestExamMetric(unittest.TestCase):
         """Test when the bug is the very first prediction (best case)."""
         preds = [10, 12, 14]
         truth = 10
-        exam_out = compute_exam_score_one_file(preds, truth, 10, 14)
+        exam_out = compute_exam_score_one_file(preds, truth, 10, 14, "test.dfy")
         found, score = exam_out.found, exam_out.score
         
         self.assertTrue(found)
@@ -23,7 +23,7 @@ class TestExamMetric(unittest.TestCase):
         # 0 , 0.25, 0.5, 0.75, 1 for the ranks 10, 12, 11, 13, 14 
         # So the score is n_tested_lines_before_gt/ total_lines -1 
         # If reuslt truth was ten exam would
-        exam_out = compute_exam_score_one_file(preds, truth, 10, 14)
+        exam_out = compute_exam_score_one_file(preds, truth, 10, 14, "test.dfy")
         found, score = exam_out.found, exam_out.score
 
         self.assertTrue(found)
@@ -34,7 +34,7 @@ class TestExamMetric(unittest.TestCase):
         preds = [10, 12]
         truth = 12
         # Must give exactly same score as previout test 
-        exam_out = compute_exam_score_one_file(preds, truth, 10, 14)
+        exam_out = compute_exam_score_one_file(preds, truth, 10, 14, "test.dfy")
         found, score = exam_out.found, exam_out.score
 
         self.assertTrue(found)
@@ -58,7 +58,7 @@ class TestExamMetric(unittest.TestCase):
         # Full list becomes: [10, 12] + [i, g, 13] score 4/4 = 1 
         # Average score = 0.75 + 0.5 + 1 / 3 = 0.75
         # 13 is at index 3 (4th item).
-        exam_out = compute_exam_score_one_file(preds, truth, 10, 14)
+        exam_out = compute_exam_score_one_file(preds, truth, 10, 14, "test.dfy")
         found, score = exam_out.found, exam_out.score
         self.assertFalse(found)
         self.assertAlmostEqual(score, 3/4)
@@ -76,7 +76,7 @@ class TestExamMetric(unittest.TestCase):
 
         # (1 + (4-1)/2) /4 = (1 + 1.5) /4 = 2.5/4 = 0.625
 
-        exam_out = compute_exam_score_one_file(preds, truth, 10, 14)
+        exam_out = compute_exam_score_one_file(preds, truth, 10, 14, "test.dfy")
         found, score = exam_out.found, exam_out.score
         self.assertFalse(found)
         self.assertAlmostEqual(score, 0.625)
@@ -85,7 +85,7 @@ class TestExamMetric(unittest.TestCase):
         preds: list[int] = []
         truth = 2
         # Range 1-3. List becomes [1, 2, 3]. Truth at index 1 (2nd item).
-        exam_out = compute_exam_score_one_file(preds, truth, 1, 3)
+        exam_out = compute_exam_score_one_file(preds, truth, 1, 3, "test.dfy")
         found, score = exam_out.found, exam_out.score
         
         self.assertFalse(found)
@@ -94,63 +94,63 @@ class TestExamMetric(unittest.TestCase):
     def test_out_of_bounds_error(self):
         """Ensure error is raised if ground truth is outside file lines."""
         with self.assertRaises(ValueError):
-            compute_exam_score_one_file([1, 2], 99, 1, 10)
+            compute_exam_score_one_file([1, 2], 99, 1, 10, "test.dfy")
     def test_exam_score_lots_of_cases(self):
         # Prediction Inside ranks
-        exam_out = compute_exam_score_one_file([1], 1, 1, 1)
+        exam_out = compute_exam_score_one_file([1], 1, 1, 1, "test.dfy")
         self.assertEqual(exam_out.found, True)
         self.assertAlmostEqual(exam_out.score, 0)
 
         # Other extreme cases
-        exam_out = compute_exam_score_one_file([1, 3, 2], 1, 1, 3)
+        exam_out = compute_exam_score_one_file([1, 3, 2], 1, 1, 3, "test.dfy")
         self.assertEqual(exam_out.found, True)
         self.assertAlmostEqual(exam_out.score, 0)
 
-        exam_out = compute_exam_score_one_file([1, 3, 2], 2, 1, 3)
+        exam_out = compute_exam_score_one_file([1, 3, 2], 2, 1, 3, "test.dfy")
         self.assertEqual(exam_out.found, True)
         self.assertAlmostEqual(exam_out.score, 1)
 
-        exam_out = compute_exam_score_one_file([1, 3, 2], 3, 1, 3)
+        exam_out = compute_exam_score_one_file([1, 3, 2], 3, 1, 3, "test.dfy")
         self.assertEqual(exam_out.found, True)
         self.assertAlmostEqual(exam_out.score, 0.5)
 
         # Predictions not inside ranks
-        exam_out = compute_exam_score_one_file([], 1, 1, 1)
+        exam_out = compute_exam_score_one_file([], 1, 1, 1, "test.dfy")
         self.assertEqual(exam_out.found, False)
         self.assertAlmostEqual(exam_out.score, 0)
 
         # When there are multiple equally-likely ranks the expected average is 0.5
-        exam_out = compute_exam_score_one_file([], 1, 1, 2)
+        exam_out = compute_exam_score_one_file([], 1, 1, 2, "test.dfy")
         self.assertEqual(exam_out.found, False)
         self.assertAlmostEqual(exam_out.score, 0.5)
 
-        exam_out = compute_exam_score_one_file([], 1, 1, 3)
+        exam_out = compute_exam_score_one_file([], 1, 1, 3, "test.dfy")
         self.assertEqual(exam_out.found, False)
         self.assertAlmostEqual(exam_out.score, 0.5)
 
-        exam_out = compute_exam_score_one_file([], 1, 1, 4)
+        exam_out = compute_exam_score_one_file([], 1, 1, 4, "test.dfy")
         self.assertEqual(exam_out.found, False)
         self.assertAlmostEqual(exam_out.score, 0.5)
 
         # Complex scenarios that mix both (here should be 0 or -1 depending on case)
-        exam_out = compute_exam_score_one_file([1], 1, 1, 3)
+        exam_out = compute_exam_score_one_file([1], 1, 1, 3, "test.dfy")
         self.assertEqual(exam_out.found, True)
         self.assertAlmostEqual(exam_out.score, 0)
 
-        exam_out = compute_exam_score_one_file([1, 2], 1, 1, 3)
+        exam_out = compute_exam_score_one_file([1, 2], 1, 1, 3, "test.dfy")
         self.assertEqual(exam_out.found, True)
         self.assertAlmostEqual(exam_out.score, 0)
 
-        exam_out = compute_exam_score_one_file([1, 2], 3, 1, 3)
+        exam_out = compute_exam_score_one_file([1, 2], 3, 1, 3, "test.dfy")
         self.assertEqual(exam_out.found, False)
         self.assertAlmostEqual(exam_out.score, 1)
 
         # Possibilities [1,2,3] gives 0.5 and [1,3,2] gives 1 => mean 0.75
-        exam_out = compute_exam_score_one_file([1], 2, 1, 3)
+        exam_out = compute_exam_score_one_file([1], 2, 1, 3, "test.dfy")
         self.assertEqual(exam_out.found, False)
         self.assertAlmostEqual(exam_out.score, 0.75)
 
         # Possibilities [1,2,3,4,5] and [1,2,3,5,4] both score 1/(5-1) = 0.25
-        exam_out = compute_exam_score_one_file([1, 2, 3], 2, 1, 5)
+        exam_out = compute_exam_score_one_file([1, 2, 3], 2, 1, 5, "test.dfy")
         self.assertEqual(exam_out.found, True)
         self.assertAlmostEqual(exam_out.score, 0.25) 

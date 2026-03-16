@@ -178,6 +178,7 @@ def generate_plots(raw_results: Dict[str, List[ExamOutput]], output_path: Path):
 def compare_two_methods(raw_results: Dict[str, List[ExamOutput]], tech1: str, tech2: str):
     """
     Compare two fault localization techniques statistically and provide debugging insights.
+    Compares only files that both techniques have evaluated.
     """
     if tech1 not in raw_results or tech2 not in raw_results:
         print(f"Error: One or both techniques ({tech1}, {tech2}) not found in results.")
@@ -190,10 +191,23 @@ def compare_two_methods(raw_results: Dict[str, List[ExamOutput]], tech1: str, te
         print(f"Error: No data for {tech1} or {tech2}.")
         return
     
-    scores1 = np.array([x.score for x in data1])
-    scores2 = np.array([x.score for x in data2])
+    # Create dictionaries keyed by filename
+    dict1 = {x.filename: x for x in data1}
+    dict2 = {x.filename: x for x in data2}
+    
+    # Find common filenames
+    common_files = set(dict1.keys()) & set(dict2.keys())
+    
+    if not common_files:
+        print(f"No common files between {tech1} and {tech2}.")
+        return
+    
+    # Extract scores for common files
+    scores1 = np.array([dict1[f].score for f in common_files])
+    scores2 = np.array([dict2[f].score for f in common_files])
     
     print(f"\n--- Statistical Comparison between {tech1} and {tech2} ---")
+    print(f"Comparing {len(common_files)} common files.")
     
     # Check normality
     _, p1 = shapiro(scores1)
@@ -228,25 +242,25 @@ def compare_two_methods(raw_results: Dict[str, List[ExamOutput]], tech1: str, te
     
     # Debugging overview
     print(f"\n--- Debugging Overview ---")
-    found1 = [x.found for x in data1]
-    found2 = [x.found for x in data2]
+    found1 = [dict1[f].found for f in common_files]
+    found2 = [dict2[f].found for f in common_files]
     
-    only1 = [i for i, (f1, f2) in enumerate(zip(found1, found2)) if f1 and not f2]
-    only2 = [i for i, (f1, f2) in enumerate(zip(found1, found2)) if not f1 and f2]
-    both = [i for i, (f1, f2) in enumerate(zip(found1, found2)) if f1 and f2]
-    neither = [i for i, (f1, f2) in enumerate(zip(found1, found2)) if not f1 and not f2]
+    only1 = [f for f, (f1, f2) in zip(common_files, zip(found1, found2)) if f1 and not f2]
+    only2 = [f for f, (f1, f2) in zip(common_files, zip(found1, found2)) if not f1 and f2]
+    both = [f for f, (f1, f2) in zip(common_files, zip(found1, found2)) if f1 and f2]
+    neither = [f for f, (f1, f2) in zip(common_files, zip(found1, found2)) if not f1 and not f2]
     
-    print(f"Test cases where {tech1} found fault but {tech2} did not: {len(only1)} cases (indices: {only1[:10]}{'...' if len(only1) > 10 else ''})")
-    print(f"Test cases where {tech2} found fault but {tech1} did not: {len(only2)} cases (indices: {only2[:10]}{'...' if len(only2) > 10 else ''})")
-    print(f"Test cases where both found: {len(both)}")
-    print(f"Test cases where neither found: {len(neither)}")
+    print(f"Files where {tech1} found fault but {tech2} did not: {len(only1)} files")
+    print(f"Files where {tech2} found fault but {tech1} did not: {len(only2)} files")
+    print(f"Files where both found: {len(both)}")
+    print(f"Files where neither found: {len(neither)}")
     
     if only1:
         print(f"\nSample {tech1}-only successes:")
-        for i in only1[:5]:
-            print(f"  Case {i}: {tech1} score={data1[i].score:.4f}, {tech2} score={data2[i].score:.4f}")
+        for f in only1[:5]:
+            print(f"  {f}: {tech1} score={dict1[f].score:.4f}, {tech2} score={dict2[f].score:.4f}")
     
     if only2:
         print(f"\nSample {tech2}-only successes:")
-        for i in only2[:5]:
-            print(f"  Case {i}: {tech1} score={data1[i].score:.4f}, {tech2} score={data2[i].score:.4f}")
+        for f in only2[:5]:
+            print(f"  {f}: {tech1} score={dict1[f].score:.4f}, {tech2} score={dict2[f].score:.4f}")
