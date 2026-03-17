@@ -52,7 +52,7 @@ namespace returnMethodLinesRandom
             var failedResults = new List<CanVerifyResult>();
             await foreach (var result in compilation.VerifyAllLazily())
             {
-                if (result.Results.Any(r => r.Result.Outcome == SolverOutcome.Invalid))
+                if (result.Results.Any(r => r.Result.Outcome != SolverOutcome.Valid))
                 {
                     failedResults.Add(result);
                 }
@@ -72,6 +72,7 @@ namespace returnMethodLinesRandom
             var options = new DafnyOptions(Console.In, Console.Out, Console.Error);
             options.ApplyDefaultOptions();
 
+            options.ProverLogFilePath = "solver_debug.smt2";
             options.Verify = true;
             options.DafnyVerify = true;
             options.EmitDebugInformation = true;
@@ -82,7 +83,6 @@ namespace returnMethodLinesRandom
             options.TimeLimit = (uint)maxTime;
             options.ProverOptions.Add($"O:memory_max_size={maxRam*1000}");
 
-            // Counterexample Configuration
             options.ModelViewFile = "-";
             options.ProverOptions.Add("O:model.completion=true");
             options.ProverOptions.Add("O:model.compact=false");
@@ -178,7 +178,7 @@ namespace returnMethodLinesRandom
                 {
                     Type = "Stmt",
                     Line = methodBody.StartToken.line,
-                    Content = "//No node found counterexample only affected start state"
+                    Content = "//No node found counterexample only affected start state "
                 });
             }
             var jsonOptions = new JsonSerializerOptions { WriteIndented = true };

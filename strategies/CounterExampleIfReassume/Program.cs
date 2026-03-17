@@ -161,6 +161,7 @@ namespace CounterExampleIfReassume
             while (VerifConfToDo.Count > 0)
             {
 
+                var workDone = false;
                 var currentConfig = VerifConfToDo.Dequeue();
                 var currentFile = currentConfig.ProgramFile;
 
@@ -193,7 +194,12 @@ namespace CounterExampleIfReassume
                         config,
                         resolvedProgram);
 
-                    List<VerificationConfig> nextFiles = await handler.Handle(fail, currentConfig, options, TempWorkDir);
+                    var (nextFiles, workdonethiscycle) = await handler.Handle(fail, currentConfig, options, TempWorkDir);
+
+                    if (workdonethiscycle)
+                    {
+                        workDone = true;
+                    }
 
                     foreach (var file in nextFiles)
                     {
@@ -201,7 +207,7 @@ namespace CounterExampleIfReassume
                     }
                 }
 
-                if(VerifConfToDo.Count == 0 && TotalVerified.Count == 0)
+                if (!workDone)
                 {
                     // This means that the counterexample is not useful, the strategy only has state on the beginning of the method at all 
                     // With that we will create a solution file with one line indicating the first line on the method in question as suspicious 
@@ -244,16 +250,17 @@ namespace CounterExampleIfReassume
             this.program = program;
         }
 
-        public async Task<List<VerificationConfig>> Handle(CanVerifyResult fail, VerificationConfig programConfig, DafnyOptions options, string TempWorkDir)
+        public async Task<(List<VerificationConfig>, Boolean)> Handle(CanVerifyResult fail, VerificationConfig programConfig, DafnyOptions options, string TempWorkDir)
         {
             List<VerificationConfig> next_files = new();
+            Boolean createdWrites = false;
 
             if (fail.CanVerify is not Method method || method.Body == null)
-                return next_files;
+                return (next_files, createdWrites);
 
             if (!string.IsNullOrEmpty(config.MethodName) &&
                 method.Name != config.MethodName)
-                return next_files;
+                return (next_files, createdWrites);
 
             foreach (var taskResult in fail.Results)
             {
@@ -262,10 +269,10 @@ namespace CounterExampleIfReassume
                     var analyzer = new CounterexampleAnalyzer();
                     var analysis = analyzer.Analyze(ce, method.Body, options);
 
-                    if (!analysis.ShouldInject)
-                        continue;
-
-                    var mutator = new ProgramMutator(TempWorkDir);
+                    if(analysis.SuspiciousNodes.Count == 0)
+                    {
+                        continue; // If we cannot find any suspicious node we cannot do much with this counterexample
+                    }
 
                     var postcondition = ce.FailingAssert.ToString();
                     var postconditionLine = ce.FailingAssert.Line;
@@ -275,7 +282,20 @@ namespace CounterExampleIfReassume
                         continue; // We only want to expand the same type of error (same failed postcondition)
                     }
 
-                    next_files.Add(await mutator.InjectAssumeFalse(
+                    var mutator = new ProgramMutator(TempWorkDir);
+
+                    mutator.writeSolutionNode(
+                        program,
+                        analysis,
+                        postcondition,
+                        postconditionLine);
+                    createdWrites = true;
+                    
+                    if (!analysis.ShouldInject)
+                        continue;
+
+
+                    next_files.Add(await mutator.WriteAssumeFalse(
                         program,
                         analysis,
                         postcondition,
@@ -283,7 +303,7 @@ namespace CounterExampleIfReassume
                 }
             }
 
-            return next_files;
+            return (next_files, createdWrites);
         }
     }
 
@@ -318,17 +338,16 @@ namespace CounterExampleIfReassume
                 {
                     var parent = parents.Pop();
 
-                    if (parent is BlockStmt block)
-                        firstBlockStmt = block;
-
                     if (parent is IfStmt ifStmt)
                     {
-                        insideIf = true;
                         if (!suspiciousNodes.Contains(ifStmt))
+                        {
+                            insideIf = true;
                             suspiciousNodes.Add(ifStmt);
+                        }
+                        break;
                     }
                 }
-
                 suspiciousNodes.Add(stmt);
             }
 
@@ -365,7 +384,19 @@ namespace CounterExampleIfReassume
         }
 
 
-        public async Task<VerificationConfig> InjectAssumeFalse(
+        public async void writeSolutionNode(
+            Microsoft.Dafny.Program program,
+            AnalysisResult analysis,
+            string postcondition,
+            int postconditionLine)
+        {
+            var solutionFile = Path.Combine(TempWorkDir, $"postLine_{postconditionLine}_iter_{Guid.NewGuid()}_solution.dfy");
+            ProgramWriter.Write(program, solutionFile, analysis.SuspiciousNodes, postcondition, postconditionLine);
+        }
+
+
+
+        public async Task<VerificationConfig> WriteAssumeFalse(
             Microsoft.Dafny.Program program,
             AnalysisResult analysis,
             string postcondition,
@@ -380,10 +411,6 @@ namespace CounterExampleIfReassume
 
             if (block.Body is not List<Statement> body)
                 throw new InvalidOperationException("Block body not mutable");
-
-            var solutionFile = Path.Combine(TempWorkDir, $"postLine_{postconditionLine}_iter_{Guid.NewGuid()}_solution.dfy");
-
-            ProgramWriter.Write(program, solutionFile, analysis.SuspiciousNodes, postcondition, postconditionLine);
 
             body.Insert(0, assumeStmt);
 
@@ -402,8 +429,6 @@ namespace CounterExampleIfReassume
             // Need to remove the mutation to have the program as it was for any other postcondiiotn that failed
             // on other coutnerexample
             body.RemoveAt(0);
-
-
 
             return config;
         }
