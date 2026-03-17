@@ -1,9 +1,9 @@
 import argparse
+import shutil
 from pathlib import Path
 from typing import Dict, List, Any
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
 from fl_eval.metrics.scoring import ExamOutput
-from fl_eval.util.globals import RUN_PARALLEL
 from run_1_model import (
         TECHNIQUE_MAP, 
         _setup_evaluation,  # type: ignore
@@ -11,7 +11,7 @@ from run_1_model import (
     )
 from analysis.data_analysis import print_ascii_table, print_latex_table, generate_plots
 
-def run_benchmark(base_path: Path):
+def run_benchmark(base_path: Path, sequential: bool = False) -> None:
     print(f"Starting Benchmark on: {base_path}")
     print(f"Techniques to run: {list(TECHNIQUE_MAP.keys())}")
     raw_results: Dict[str, List[ExamOutput]] = {}
@@ -32,7 +32,7 @@ def run_benchmark(base_path: Path):
             fl_technique, 
             killed_dir, 
             original_dir,
-            parallel= RUN_PARALLEL
+            parallel= not sequential
         )
         scores_clean = [s for s in scores_dirty if s is not None]
         raw_results[tech_name] = scores_clean
@@ -67,9 +67,32 @@ if __name__ == "__main__":
         type=Path,
         help="Path to the directory containing 'killed' and 'original' folders."
     )
+
+    parser.add_argument(
+      "--clean-cache",
+      action="store_true",
+      help="Clean cached results before running"
+    )
+
+    parser.add_argument(
+      "--sequential",
+      action="store_true",
+      help="Run evaluations sequentially"
+    )
     
     args = parser.parse_args()
-    if args.data_path.exists():
-        run_benchmark(args.data_path)
-    else:
+    if not args.data_path.exists():
         print(f"Path not found: {args.data_path}")
+
+    cache_dir = args.data_path.parent / "cached_results"
+    if args.clean_cache:
+        print("Cleaning: Results Cache")
+        if cache_dir.exists():
+            shutil.rmtree(cache_dir)
+            print(f"Removed cache directory: {cache_dir}")
+        else:
+            print(f"No cache directory found at: {cache_dir}")
+    else:
+        print(f"Using cached Results if any at {cache_dir}")
+  
+    run_benchmark(args.data_path, args.sequential)

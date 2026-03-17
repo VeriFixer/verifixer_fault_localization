@@ -132,7 +132,7 @@ def _generate_report(flt_name: str, all_scores: List[ExamOutput]) -> None:
     print("="*60 + "\n")
 
 # --- Orchestrator Function ---
-def compute_metrics(flt_name: str, base_path: Path) -> None:
+def compute_metrics(flt_name: str, base_path: Path, sequential: bool = False) -> None:
     """
     Receives a technique name and directory, iterates through mutation files, 
     computes EXAM scores, and reports the average.
@@ -147,7 +147,7 @@ def compute_metrics(flt_name: str, base_path: Path) -> None:
     diff_paths = list(killed_dir.glob("*.txt"))
 
     all_scores = run_parallel_or_seq(diff_paths, _process_mutation, f"Get metrics for {flt_name}",
-                                     fl_technique, killed_dir, original_dir, parallel=True)
+                                     fl_technique, killed_dir, original_dir, parallel=not sequential)
     all_scores_clean : list[ExamOutput] = list(filter(lambda x: x is not None, all_scores))
     _generate_report(flt_name, all_scores_clean)
 
@@ -190,6 +190,12 @@ How to use:
       action="store_true",
       help="Clean cached results before running"
     )
+
+    parser.add_argument(
+      "--sequential",
+      action="store_true",
+      help="Run evaluations sequentially"
+    )
      
     args = parser.parse_args()
     
@@ -209,4 +215,4 @@ How to use:
                 print(f"No cache directory found at: {cache_dir}")
         else:
             print(f"Using cached Results if any at {cache_dir}")
-        compute_metrics(args.technique_name, args.data_path)
+        compute_metrics(args.technique_name, args.data_path, args.sequential)

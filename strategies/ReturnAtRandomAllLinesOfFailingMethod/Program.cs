@@ -11,13 +11,38 @@ namespace returnMethodLinesRandom
     {
         static async Task<int> Main(string[] args)
         {
-            if (args.Length == 0)
+            string filePath = null;
+            int maxTime = 60;
+            int maxRam = 24;
+            for (int i = 0; i < args.Length; i++)
             {
-                Console.WriteLine("Usage: program <file.dfy>");
+                if (args[i] == "--max-time" && i + 1 < args.Length)
+                {
+                    maxTime = int.Parse(args[i + 1]);
+                    i++;
+                }
+                else if (args[i] == "--max-ram" && i + 1 < args.Length)
+                {
+                    maxRam = int.Parse(args[i + 1]);
+                    i++;
+                }
+                else if (filePath == null)
+                {
+                    filePath = args[i];
+                }
+                else
+                {
+                    Console.WriteLine("Usage: program <file.dfy> [--max-time <seconds>] [--max-ram <MB>]");
+                    return 1;
+                }
+            }
+            if (filePath == null)
+            {
+                Console.WriteLine("Usage: program <file.dfy> [--max-time <seconds>] [--max-ram <MB>]");
                 return 1;
             }
 
-            var filename = Path.GetFullPath(args[0]);
+            var filename = Path.GetFullPath(filePath);
 
             var options = new DafnyOptions(Console.In, Console.Out, Console.Error);
             options.ApplyDefaultOptions();
@@ -26,6 +51,10 @@ namespace returnMethodLinesRandom
             options.EmitDebugInformation = true;
             options.Compile = false;
             options.DafnyVerify = true;
+
+            // Set time and memory limits
+            options.TimeLimit = (uint)maxTime;
+            options.ProverOptions.Add($"O:memory_max_size={maxRam*1000}");
 
             string repoRoot = PathHelper.FindRepoRoot();
             options.DafnyPrelude = Path.Combine(repoRoot, "dafny", "Binaries", "DafnyPrelude.bpl");

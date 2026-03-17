@@ -17,11 +17,15 @@ def run_external_cmd(cmd: list[str]) -> tuple[Status, str, str]:
             systemd_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
+            timeout=gl.MAX_TIME_EXTERNAL_PROGRAMS + 10
         )
+    except subprocess.TimeoutExpired as e:
+        return Status.TIMEOUT, "", f"\nCommand timed out: {e}"
+    
     except Exception as e:
         # This is for *real* execution failures (systemd-run not found, etc.)
-        return Status.SYSTEMD_LAUNCH_ERROR, "", str(e)
+        return Status.SYSTEMD_LAUNCH_ERROR, "", f"\nCommand failed to launch: {e}"
 
     stdout = result.stdout
     stderr = result.stderr

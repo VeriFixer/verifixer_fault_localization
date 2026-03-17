@@ -14,12 +14,37 @@ namespace returnMethodLinesRandom
     {
         static async Task<int> Main(string[] args)
         {
-            if (args.Length == 0)
+            string filePath = null;
+            int maxTime = 60;
+            int maxRam = 24; // GB
+            for (int i = 0; i < args.Length; i++)
             {
-                Console.WriteLine("Usage: program <file.dfy>");
+                if (args[i] == "--max-time" && i + 1 < args.Length)
+                {
+                    maxTime = int.Parse(args[i + 1]);
+                    i++;
+                }
+                else if (args[i] == "--max-ram" && i + 1 < args.Length)
+                {
+                    maxRam = int.Parse(args[i + 1]);
+                    i++;
+                }
+                else if (filePath == null)
+                {
+                    filePath = args[i];
+                }
+                else
+                {
+                    Console.WriteLine("Usage: program <file.dfy> [--max-time <seconds>] [--max-ram <MB>]");
+                    return 1;
+                }
+            }
+            if (filePath == null)
+            {
+                Console.WriteLine("Usage: program <file.dfy> [--max-time <seconds>] [--max-ram <MB>]");
                 return 1;
             }
-            var options = SetupDafnyOptions(args[0]);
+            var options = SetupDafnyOptions(filePath, maxTime, maxRam);
             var compilation = CliCompilation.Create(options);
             compilation.Start();
 
@@ -40,7 +65,7 @@ namespace returnMethodLinesRandom
             return await compilation.GetAndReportExitCode();
         }
 
-        private static DafnyOptions SetupDafnyOptions(string filePath)
+        private static DafnyOptions SetupDafnyOptions(string filePath, int maxTime, int maxRam)
         {
             string repoRoot = PathHelper.FindRepoRoot();
 
@@ -52,6 +77,10 @@ namespace returnMethodLinesRandom
             options.EmitDebugInformation = true;
             options.Compile = false;
             options.DafnyPrelude = Path.Combine(repoRoot, "dafny", "Binaries", "DafnyPrelude.bpl");
+
+            // Set time and memory limits
+            options.TimeLimit = (uint)maxTime;
+            options.ProverOptions.Add($"O:memory_max_size={maxRam*1000}");
 
             // Counterexample Configuration
             options.ModelViewFile = "-";

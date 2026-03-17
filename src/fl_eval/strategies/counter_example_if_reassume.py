@@ -27,6 +27,8 @@ class CounterExampleIfReassume(FLTechnique):
         command = [
              exec,
             str(file),
+            "--max-time", str(gl.MAX_TIME_EXTERNAL_PROGRAMS),
+            "--max-ram", str(gl.MAX_RAM_EXTERNAL_PROGRAMS)
         ]
 
         (status, stdout, stderr) = run_cmd.run_external_cmd(command)

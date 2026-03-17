@@ -15,9 +15,44 @@ namespace CounterExampleIfReassume
 
         static async Task<int> Main(string[] args)
         {
-            if (args.Length == 0)
+            string programFile = null;
+            string methodName = "";
+            string postCondition = "";
+            int maxTime = 60;
+            int maxRam = 24;
+            for (int i = 0; i < args.Length; i++)
             {
-                Console.WriteLine("Usage: program <file.dfy> [method] [postcondition]");
+                if (args[i] == "--max-time" && i + 1 < args.Length)
+                {
+                    maxTime = int.Parse(args[i + 1]);
+                    i++;
+                }
+                else if (args[i] == "--max-ram" && i + 1 < args.Length)
+                {
+                    maxRam = int.Parse(args[i + 1]);
+                    i++;
+                }
+                else if (programFile == null)
+                {
+                    programFile = args[i];
+                }
+                else if (methodName == "")
+                {
+                    methodName = args[i];
+                }
+                else if (postCondition == "")
+                {
+                    postCondition = args[i];
+                }
+                else
+                {
+                    Console.WriteLine("Usage: program <file.dfy> [method] [postcondition] [--max-time <seconds>] [--max-ram <MB>]");
+                    return 1;
+                }
+            }
+            if (programFile == null)
+            {
+                Console.WriteLine("Usage: program <file.dfy> [method] [postcondition] [--max-time <seconds>] [--max-ram <MB>]");
                 return 1;
             }
 
@@ -26,12 +61,12 @@ namespace CounterExampleIfReassume
 
             var config = new VerificationConfig
             {
-                ProgramFile = args[0],
-                MethodName = args.Length > 1 ? args[1] : "",
-                PostCondition = args.Length > 2 ? args[2] : ""
+                ProgramFile = programFile,
+                MethodName = methodName,
+                PostCondition = postCondition
             };
 
-            var runner = new VerificationRunner(config, TempWorkDir);
+            var runner = new VerificationRunner(config, TempWorkDir, maxTime, maxRam);
             await runner.Run();
 
             var allSuspiciousLines = new List<List<int>>();
@@ -106,10 +141,14 @@ namespace CounterExampleIfReassume
     {
         private readonly VerificationConfig config;
         private readonly string TempWorkDir;
-        public VerificationRunner(VerificationConfig config, string tempdir)
+        private readonly int maxTime;
+        private readonly int maxRam;
+        public VerificationRunner(VerificationConfig config, string tempdir, int maxTime, int maxRam)
         {
             this.config = config;
             TempWorkDir = tempdir;
+            this.maxTime = maxTime;
+            this.maxRam = maxRam;
         }
 
         public async Task Run()
@@ -125,7 +164,7 @@ namespace CounterExampleIfReassume
                 var currentConfig = VerifConfToDo.Dequeue();
                 var currentFile = currentConfig.ProgramFile;
 
-                var options = DafnyOptionsFactory.Create(currentFile);
+                var options = DafnyOptionsFactory.Create(currentFile, maxTime, maxRam);
                 var compilation = CliCompilation.Create(options);
                 compilation.Start();
 
@@ -448,7 +487,7 @@ namespace CounterExampleIfReassume
 
     static class DafnyOptionsFactory
     {
-        public static DafnyOptions Create(string filePath)
+        public static DafnyOptions Create(string filePath, int maxTime, int maxRam)
         {
             string repoRoot = PathHelper.FindRepoRoot();
 
@@ -460,6 +499,10 @@ namespace CounterExampleIfReassume
             options.EmitDebugInformation = true;
             options.Compile = false;
             options.DafnyPrelude = Path.Combine(repoRoot, "dafny", "Binaries", "DafnyPrelude.bpl");
+
+            // Set time and memory limits
+            options.TimeLimit = (uint)maxTime;
+            options.ProverOptions.Add($"O:memory_max_size={maxRam*1000}");
 
             options.ModelViewFile = "-";
             options.ProverOptions.Add("O:model.completion=true");

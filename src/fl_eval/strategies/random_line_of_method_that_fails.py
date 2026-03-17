@@ -26,11 +26,14 @@ class RandomLineOfMethodThatFails(FLTechnique):
         command = [
              str(exec),
             str(file),
+            "--max-time", str(gl.MAX_TIME_EXTERNAL_PROGRAMS),
+            "--max-ram", str(gl.MAX_RAM_EXTERNAL_PROGRAMS)
         ]
 
         (status, stdout, stderr) = run_cmd.run_external_cmd(command)
         if(status != run_cmd.Status.OK):
             # If run cmd finished by any reason with error send empty prediction
+            print("Sending empty prediciton because of error in execution")
             print(command)
             print(status)
             print(stdout)

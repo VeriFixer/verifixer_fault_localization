@@ -10,7 +10,6 @@ def find_repo_root(marker : str =".repo_verifixer_fault_localizaion_marker"):
         current = current.parent
     raise FileNotFoundError("Could not find repository root. Make sure you're running inside a valid repo.")
 
-RUN_PARALLEL : bool = True
 BASE_PATH: Path = find_repo_root() 
 
 MAX_RAM_EXTERNAL_PROGRAMS : int = 24  # GBytes

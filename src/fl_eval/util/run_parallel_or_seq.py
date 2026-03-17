@@ -41,7 +41,7 @@ def run_parallel_or_seq(items: Iterable[Any], task_fn: Callable[..., R], desc: s
             except Exception as e:
                 print(f"[Warning] Error processing {item}: {e}")
     else:
-        for item in tqdm(items, desc=f"{cdesc} (seq)"):
+        for item in tqdm(items, desc=f"{cdesc} (seq)", miniters=1, smoothing=0):
             try:
                 with CPU_LIMITER:
                     results.append(task_fn(item, *task_args))
