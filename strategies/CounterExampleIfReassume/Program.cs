@@ -529,6 +529,8 @@ namespace CounterExampleIfReassume
             options.TimeLimit = (uint)maxTime;
             options.ProverOptions.Add($"O:memory_max_size={maxRam*1000}");
 
+            options.DefiniteAssignmentLevel = 2 ;
+
             options.ModelViewFile = "-";
             options.ProverOptions.Add("O:model.completion=true");
             options.ProverOptions.Add("O:model.compact=false");

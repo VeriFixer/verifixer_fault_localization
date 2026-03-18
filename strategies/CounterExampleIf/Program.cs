@@ -48,6 +48,8 @@ namespace returnMethodLinesRandom
             var compilation = CliCompilation.Create(options);
             compilation.Start();
 
+    
+
             // 1. Collect only the failed results
             var failedResults = new List<CanVerifyResult>();
             await foreach (var result in compilation.VerifyAllLazily())
@@ -79,7 +81,9 @@ namespace returnMethodLinesRandom
             options.Compile = false;
             options.DafnyPrelude = Path.Combine(repoRoot, "dafny", "Binaries", "DafnyPrelude.bpl");
 
+            //options.Define = 2;
             // Set time and memory limits
+            options.DefiniteAssignmentLevel = 2;
             options.TimeLimit = (uint)maxTime;
             options.ProverOptions.Add($"O:memory_max_size={maxRam*1000}");
 

@@ -51,7 +51,7 @@ ENV PATH="$JAVA_HOME/bin:$PATH"
 
 ENV DAFNY_VERSION=v4.11.0
 
-COPY . /app
+COPY src /app/src 
 
 # --- Python virtual environment ---
 RUN python3 -m venv /opt/venv
@@ -63,7 +63,15 @@ RUN pip install --upgrade pip && \
 
 # --- Build Dafny version v4.11.0 (it is not a fork)
 
+
+COPY dafnybench /app/dafnybench/
+COPY mutdafny /app/mutdafny/
+COPY datasets /app/datasets/
+
 ARG DAFNY_VERSION=v4.11.0
+
+COPY .git /app/.git
+COPY dafny /app/dafny/
 
 RUN cd dafny && \
     git fetch --depth 1 origin ${DAFNY_VERSION} && \
@@ -78,8 +86,8 @@ RUN cd dafny && \
 #    make && \
 #    ln -s dafny/Binaries/Dafny /usr/local/bin/dafny
 
-
-
+COPY .repo_verifixer_fault_localizaion_marker /app/
+COPY strategies /app/strategies
 # --- Build all dotnet strategies ---
 RUN for dir in strategies/*/; do \
         if [ -d "$dir" ]; then \
