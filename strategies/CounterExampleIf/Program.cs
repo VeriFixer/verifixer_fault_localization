@@ -74,7 +74,6 @@ namespace returnMethodLinesRandom
             var options = new DafnyOptions(Console.In, Console.Out, Console.Error);
             options.ApplyDefaultOptions();
 
-            options.ProverLogFilePath = "solver_debug.smt2";
             options.Verify = true;
             options.DafnyVerify = true;
             options.EmitDebugInformation = true;
@@ -143,20 +142,17 @@ namespace returnMethodLinesRandom
                 if (visitor.MatchingStatementWithAllParent.Count > 0)
                 {
                     var (stmt, parents) = visitor.MatchingStatementWithAllParent[0];
-
                     while (parents.Count > 0)
                     {
                         var currentParent = parents.Pop();
-                        if (currentParent is IfStmt ifStmt)
-                        {
-                            int ifLine = ifStmt.StartToken.line;
-                            if (!foundNodes.Contains(ifStmt))
-                            {
-                                foundNodes.Add(ifStmt);
-                            }
+                        if (foundNodes.Contains(currentParent))
+                        { continue; }
+
+                        if (currentParent is IfStmt ifStmt || 
+                            currentParent is WhileStmt whileStmt){
+                            foundNodes.Add(currentParent);
                             break;
                         }
-
                     }
                     foundNodes.Add(stmt);
                 }
@@ -168,7 +164,11 @@ namespace returnMethodLinesRandom
             {
                 report.Nodes.Add(new NodeInfo
                 {
-                    Type = node is IfStmt ? "IfStmt" : "Stmt",
+                    Type = node switch {
+                        IfStmt => "IfStmt",
+                        WhileStmt => "WhileStmt",
+                        _ => "Stmt"
+                    }, 
                     Line = node.StartToken.line,
                     Content = node.ToString() // Converts AST node back to source string
                 });

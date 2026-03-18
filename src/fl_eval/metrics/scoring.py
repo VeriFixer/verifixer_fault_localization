@@ -57,8 +57,10 @@ def compute_exam_score_one_file(
     if not (total_line_start <= ground_truth <= total_line_end):
         raise ValueError(f"Ground truth {ground_truth} is out of bounds ({total_line_start}-{total_line_end})")
     
-    if  len(list(filter(lambda x: (x < total_line_start) or (x > total_line_end), predictions))) != 0:
-        raise ValueError(f"Some predictions are outside the bounds of the line start {total_line_start} line end {total_line_end}")
+    pred = list(filter(lambda x: (x < total_line_start) or (x > total_line_end), predictions))
+       
+    if  len(pred) != 0:
+        raise ValueError(f"Some predictions are outside the bounds of the line start {total_line_start} line end {total_line_end} prediction {pred}")
 
     is_empty = predictions == []
     if(total_lines == 1): # If one line it is found and exam is always 0 as no effort is wasted

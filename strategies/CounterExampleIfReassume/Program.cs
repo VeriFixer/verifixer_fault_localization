@@ -337,14 +337,16 @@ namespace CounterExampleIfReassume
                 while (parents.Count > 0)
                 {
                     var parent = parents.Pop();
-
-                    if (parent is IfStmt ifStmt)
+                    if (suspiciousNodes.Contains(parent))
                     {
-                        if (!suspiciousNodes.Contains(ifStmt))
-                        {
-                            insideIf = true;
-                            suspiciousNodes.Add(ifStmt);
-                        }
+                        continue;
+                    }
+
+                    if (parent is IfStmt ifStmt ||
+                        parent is WhileStmt whileStmt)
+                    {
+                        insideIf = true;
+                        suspiciousNodes.Add(parent);
                         break;
                     }
                 }

@@ -24,12 +24,14 @@ class CounterExampleBaseRanker(FLTechnique):
         counter_message = diagnostic["value"]["defaultFormatMessage"]
         counterexample_must_have_string = "DafnyRef#sec-counterexamples"
         was_found_counter_example = False
-        line_column_pattern = re.compile(r"\((\d+),\s*\d+\)")
+        line_column_pattern = re.compile(r"dfy\((\d+),\s*\d+\)")
         lines_on_counterexamples = []
         for line in counter_message.split("\n"):
             if(counterexample_must_have_string in line):
                 was_found_counter_example = True
             if(was_found_counter_example):
+               if("Related location" in line): # Related location point to postcondition
+                   continue
                matches = line_column_pattern.findall(line)
                if matches:
                     for line_str in matches:

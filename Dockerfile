@@ -51,14 +51,7 @@ ENV PATH="$JAVA_HOME/bin:$PATH"
 
 ENV DAFNY_VERSION=v4.11.0
 
-COPY src /app/src 
 
-# --- Python virtual environment ---
-RUN python3 -m venv /opt/venv
-ENV PATH="/opt/venv/bin:$PATH"
-
-RUN pip install --upgrade pip && \
-    pip install -r /app/src/requirements.txt
 
 
 # --- Build Dafny version v4.11.0 (it is not a fork)
@@ -85,6 +78,15 @@ RUN cd dafny && \
 #    cd dafny && \
 #    make && \
 #    ln -s dafny/Binaries/Dafny /usr/local/bin/dafny
+
+COPY src /app/src 
+
+# --- Python virtual environment ---
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+RUN pip install --upgrade pip && \
+    pip install -r /app/src/requirements.txt
 
 COPY .repo_verifixer_fault_localizaion_marker /app/
 COPY strategies /app/strategies
