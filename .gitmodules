@@ -7,3 +7,6 @@
 [submodule "dafnybench"]
 	path = dafnybench
 	url = https://github.com/sun-wendy/DafnyBench.git
+[submodule "SpecTestGenerator"]
+	path = SpecTestGenerator
+	url = git@github.com:VeriFixer/SpecTestGenerator.git

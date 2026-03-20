@@ -49,18 +49,8 @@ RUN apt-get update && apt-get install -y openjdk-17-jdk && \
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH="$JAVA_HOME/bin:$PATH"
 
-ENV DAFNY_VERSION=v4.11.0
-
-
-
 
 # --- Build Dafny version v4.11.0 (it is not a fork)
-
-
-COPY dafnybench /app/dafnybench/
-COPY mutdafny /app/mutdafny/
-COPY datasets /app/datasets/
-
 ARG DAFNY_VERSION=v4.11.0
 
 COPY .git /app/.git
@@ -71,6 +61,19 @@ RUN cd dafny && \
     git checkout ${DAFNY_VERSION} && \
     make && \
     ln -sf /app/dafny/Binaries/Dafny /usr/local/bin/dafny
+
+# --- Build modified Dafny that generates tests (once it goes by the version v4.11.0 we can use that soleny)
+COPY SpecTestGenerator /app/SpecTestGenerator 
+
+RUN cd SpecTestGenerator && \
+    make 
+# --------------------------------------------------------------------------
+
+
+
+COPY dafnybench /app/dafnybench/
+COPY mutdafny /app/mutdafny/
+COPY datasets /app/datasets/
 
 # For now i am using a submodule but can change ideas
 #RUN git clone --depth 1 --branch ${DAFNY_VERSION} \
@@ -88,7 +91,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --upgrade pip && \
     pip install -r /app/src/requirements.txt
 
-COPY .repo_verifixer_fault_localizaion_marker /app/
+COPY .repo_verifixer_fault_localization_marker /app/
 COPY strategies /app/strategies
 # --- Build all dotnet strategies ---
 RUN for dir in strategies/*/; do \

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-def find_repo_root(marker : str =".repo_verifixer_fault_localizaion_marker"):
+def find_repo_root(marker : str =".repo_verifixer_fault_localization_marker"):
     """Finds the root of the repository by looking for a marker (default: .git)."""
     print(marker)
     current: Path = Path(__file__).resolve().parent

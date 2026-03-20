@@ -1,8 +1,11 @@
 # --- Configuration ---
+#!/usr/bin/env bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/find_repo_root.sh"
 
 # 1. Determine the absolute path of the directory where the script is run
 # This is the project root (e.g., /home/ricostynha/Desktop/verifixer_fault_localization)
-SCRIPT_BASE_DIR="$(pwd)"
+SCRIPT_BASE_DIR="$(find_repo_root)" || exit 1
 
 # The relative paths provided by the user:
 RELATIVE_DATASET_DIR="dafnybench/DafnyBench/dataset/ground_truth"
