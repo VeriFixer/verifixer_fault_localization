@@ -1,0 +1,4 @@
+12c12
+<   var sumi := x.Length + y.Length;
+---
+>   var sumi := x.Length - y.Length;
