@@ -5,7 +5,8 @@ src/cached_results/*
 datasets/*
 !datasets/dafnybench_all_mutants.tar.gz
 !datasets/dafnybench_original_can_run.tar.gz
-
+!datasets/sample_original_can_run.tar.gz
+!datasets/dafnytestgen_tests_can_run.tar.gz
 
 
 # Byte-compiled / optimized / DLL files
