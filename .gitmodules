@@ -10,3 +10,6 @@
 [submodule "SpecTestGenerator"]
 	path = SpecTestGenerator
 	url = git@github.com:VeriFixer/SpecTestGenerator.git
+[submodule "DafnyTestGen"]
+	path = DafnyTestGen
+	url = git@github.com:ricostynha1/DafnyTestGen.git

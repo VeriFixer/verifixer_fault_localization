@@ -92,11 +92,20 @@ RUN pip install --upgrade pip && \
     pip install -r /app/src/requirements.txt
 
 COPY .repo_verifixer_fault_localization_marker /app/
+
+# --- Build DafnyTestGen ---
+COPY DafnyTestGen /app/DafnyTestGen/
+
+RUN cd /app/DafnyTestGen/DafnyTestGen && \
+    dotnet build DafnyTestGen.csproj -c Release -o /app/build_output/DafnyTestGen
+
 COPY strategies /app/strategies
 # --- Build all dotnet strategies ---
-RUN for dir in strategies/*/; do \
+RUN for dir in /app/strategies/*/; do \
         if [ -d "$dir" ]; then \
-            dotnet build "$dir" -c Release -o /app/build_output/$(basename "$dir"); \
+            if [ -f "$dir"/*.csproj ]; then \
+                dotnet build "$dir" -c Release -o /app/build_output/$(basename "$dir"); \
+            fi; \
         fi; \
     done
 
