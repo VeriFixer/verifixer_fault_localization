@@ -136,6 +136,9 @@ namespace returnMethodLinesRandom
                 int line = state.GetLineId();
                 int col = state.GetCharId();
 
+                // The visitor does not fill that is working for some examples
+                // Need to debug lets go
+
                 var visitor = new FindExpressionAndParentByTokenVisitor(line, col);
                 visitor.VisitManual(methodBody);
 
@@ -237,7 +240,7 @@ namespace returnMethodLinesRandom
 
 public static class PathHelper
 {
-    public static string FindRepoRoot(string marker = ".repo_verifixer_fault_localizaion_marker")
+    public static string FindRepoRoot(string marker = ".repo_verifixer_fault_localization_marker")
     {
         // Start from the current running assembly directory
         var current = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);

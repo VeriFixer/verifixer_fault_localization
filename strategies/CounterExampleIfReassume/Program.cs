@@ -494,7 +494,7 @@ namespace CounterExampleIfReassume
 
     static class PathHelper
     {
-        public static string FindRepoRoot(string marker = ".repo_verifixer_fault_localizaion_marker")
+        public static string FindRepoRoot(string marker = ".repo_verifixer_fault_localization_marker")
         {
             var current = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
 

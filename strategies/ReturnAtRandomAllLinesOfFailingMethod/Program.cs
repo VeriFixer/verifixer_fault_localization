@@ -182,7 +182,7 @@ namespace returnMethodLinesRandom
 
 public static class PathHelper
 {
-    public static string FindRepoRoot(string marker = ".repo_verifixer_fault_localizaion_marker")
+    public static string FindRepoRoot(string marker = ".repo_verifixer_fault_localization_marker")
     {
         // Start from the current running assembly directory
         var current = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);
