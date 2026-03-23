@@ -109,5 +109,22 @@ RUN for dir in /app/strategies/*/; do \
         fi; \
     done
 
+ENV DAIKONDIR="/opt/daikon"
+RUN apt-get update && apt-get install -y ant git curl make rsync && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    git clone --depth 1 --branch master https://github.com/codespecs/daikon.git /tmp/daikon-src; \
+    cd /tmp/daikon-src; \
+    make daikon.jar; \
+    mkdir -p ${DAIKONDIR}; \
+    cp daikon.jar ${DAIKONDIR}/; \
+    cp -r scripts ${DAIKONDIR}/; \
+    rm -rf /tmp/daikon-src
+
+ENV PATH="${DAIKONDIR}:${PATH}"
+
+COPY Dafny-AutoFix /app/Dafny-AutoFix
+RUN cd /app/Dafny-AutoFix/autofix && \
+    dotnet build  -c Release -o /app/build_output/Autofix
+
 CMD ["bash"]
 

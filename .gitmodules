@@ -13,3 +13,6 @@
 [submodule "DafnyTestGen"]
 	path = DafnyTestGen
 	url = git@github.com:ricostynha1/DafnyTestGen.git
+[submodule "Dafny-AutoFix"]
+	path = Dafny-AutoFix
+	url = git@github.com:VeriFixer/Dafny-AutoFix.git
