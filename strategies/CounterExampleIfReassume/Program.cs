@@ -455,7 +455,7 @@ namespace CounterExampleIfReassume
         }
     }
 
-    class FindExpressionAndParentByTokenVisitor : ASTVisitor<IASTVisitorContext>
+class FindExpressionAndParentByTokenVisitor : ASTVisitor<IASTVisitorContext>
     {
         public readonly List<(Statement Stmt, Stack<INode> Parents)> MatchingStatementWithAllParent = new();
         private readonly int targetLine;
@@ -464,8 +464,8 @@ namespace CounterExampleIfReassume
 
         public FindExpressionAndParentByTokenVisitor(int line, int col)
         {
-            targetLine = line;
-            targetCol = col;
+            this.targetLine = line;
+            this.targetCol = col;
         }
 
         public override IASTVisitorContext GetContext(IASTVisitorContext context, bool inFunctionPostcondition) => context;
@@ -474,24 +474,64 @@ namespace CounterExampleIfReassume
 
         protected override void VisitStatement(Statement stmt, IASTVisitorContext context)
         {
-            if (IsTargetInStatement(stmt))
+            if (IsTargetInStatement(stmt.StartToken, stmt.EndToken))
             {
-                MatchingStatementWithAllParent.Add((stmt, new Stack<INode>(parents)));
+                if(IsTargetStatement(stmt.StartToken, stmt.EndToken)) {
+                    var parentsCopy = new Stack<INode>(parents.Reverse());
+                    MatchingStatementWithAllParent.Add((stmt, parentsCopy));
+                }
+
+                if(stmt is WhileStmt whilestmt)
+                {
+                   if(IsTargetInLine(whilestmt.Guard.StartToken, whilestmt.Guard.EndToken))
+                    {
+                       // Guard want Expressions, but i am working with statements, this breaks things
+                       // Woraround will add two times the smtm expresion (and postprocess afterwoards) 
+                        var parentsCopy = new Stack<INode>(parents.Reverse());
+                        MatchingStatementWithAllParent.Add((stmt, parentsCopy));
+                    }
+                }
+                parents.Push(stmt);
+                base.VisitStatement(stmt, context);
+                parents.Pop();
             }
 
-            parents.Push(stmt);
-            base.VisitStatement(stmt, context);
-            parents.Pop();
         }
-
-        private bool IsTargetInStatement(Statement stmt)
+        private bool IsTargetInLine(Microsoft.Dafny.Token startToken, Microsoft.Dafny.Token endToken)
         {
-            bool lineMatch = stmt.StartToken.line <= targetLine && targetLine <= stmt.EndToken.line;
-            bool colMatch = stmt.StartToken.col <= targetCol && targetCol <= stmt.EndToken.col;
-            return lineMatch && colMatch;
+            bool lineMatch = startToken.line <= targetLine && targetLine <= endToken.line;
+            return lineMatch;
+        }
+        private bool IsTargetInStatement(Microsoft.Dafny.Token startToken, Microsoft.Dafny.Token endToken)
+        {
+            bool lineMatch = startToken.line <= targetLine && targetLine <= endToken.line;
+            if (!lineMatch)
+            {
+                return false;
+            }
+
+            if(startToken.line == endToken.line)
+            {
+                bool colMatch = startToken.col <= targetCol && targetCol <= endToken.col;
+                return colMatch;
+            }
+            return true;
+        }
+        private bool IsTargetStatement(Microsoft.Dafny.Token startToken, Microsoft.Dafny.Token endToken)
+        {
+            bool lineMatch = startToken.line <= targetLine && targetLine <= endToken.line;
+            if (!lineMatch)
+            {
+                return false;
+            }
+            if(startToken.line == endToken.line)
+            {
+                bool colMatch = startToken.col <= targetCol && targetCol <= endToken.col;
+                return colMatch;
+            }
+            return false;
         }
     }
-
     static class PathHelper
     {
         public static string FindRepoRoot(string marker = ".repo_verifixer_fault_localization_marker")
@@ -538,6 +578,8 @@ namespace CounterExampleIfReassume
             options.ProverOptions.Add("O:model.compact=false");
             options.Set(CommonOptionBag.AllowWarnings, true);
             options.Set(CommonOptionBag.ExtractCounterexample, true);
+            options.Set(BoogieOptionBag.IsolateAssertions, true);
+            options.Set(BoogieOptionBag.VerificationErrorLimit, 0);
 
             options.CliRootSourceUris.Add(new Uri("file://" + Path.GetFullPath(filePath)));
             return options;

@@ -6,6 +6,7 @@ using Microsoft.Boogie;
 using System.Text.Json;
 using Std.Wrappers;
 using System.Diagnostics.Metrics;
+using System.Security.Principal;
 
 
 namespace returnMethodLinesRandom
@@ -89,8 +90,12 @@ namespace returnMethodLinesRandom
             options.ModelViewFile = "-";
             options.ProverOptions.Add("O:model.completion=true");
             options.ProverOptions.Add("O:model.compact=false");
+
+
             options.Set(CommonOptionBag.AllowWarnings, true);
             options.Set(CommonOptionBag.ExtractCounterexample, true);
+            options.Set(BoogieOptionBag.IsolateAssertions, true);
+            options.Set(BoogieOptionBag.VerificationErrorLimit, 0);
 
             options.CliRootSourceUris.Add(new Uri("file://" + Path.GetFullPath(filePath)));
             return options;
@@ -217,23 +222,62 @@ namespace returnMethodLinesRandom
 
         protected override void VisitStatement(Statement stmt, IASTVisitorContext context)
         {
-            if (IsTargetInStatement(stmt))
+            if (IsTargetInStatement(stmt.StartToken, stmt.EndToken))
             {
-                var parentsCopy = new Stack<INode>(parents);
-                MatchingStatementWithAllParent.Add((stmt, parentsCopy));
+                if(IsTargetStatement(stmt.StartToken, stmt.EndToken)) {
+                    var parentsCopy = new Stack<INode>(parents.Reverse());
+                    MatchingStatementWithAllParent.Add((stmt, parentsCopy));
+                }
+
+                if(stmt is WhileStmt whilestmt)
+                {
+                   if(IsTargetInLine(whilestmt.Guard.StartToken, whilestmt.Guard.EndToken))
+                    {
+                       // Guard want Expressions, but i am working with statements, this breaks things
+                       // Woraround will add two times the smtm expresion (and postprocess afterwoards) 
+                        var parentsCopy = new Stack<INode>(parents.Reverse());
+                        MatchingStatementWithAllParent.Add((stmt, parentsCopy));
+                    }
+                }
+                parents.Push(stmt);
+                base.VisitStatement(stmt, context);
+                parents.Pop();
             }
 
-            parents.Push(stmt);
-            base.VisitStatement(stmt, context);
-            parents.Pop();
         }
-
-        private bool IsTargetInStatement(Statement stmt)
+        private bool IsTargetInLine(Microsoft.Dafny.Token startToken, Microsoft.Dafny.Token endToken)
         {
-            // Simple range check
-            bool lineMatch = stmt.StartToken.line <= targetLine && targetLine <= stmt.EndToken.line;
-            bool colMatch = stmt.StartToken.col <= targetCol && targetCol <= stmt.EndToken.col;
-            return lineMatch && colMatch;
+            bool lineMatch = startToken.line <= targetLine && targetLine <= endToken.line;
+            return lineMatch;
+        }
+        private bool IsTargetInStatement(Microsoft.Dafny.Token startToken, Microsoft.Dafny.Token endToken)
+        {
+            bool lineMatch = startToken.line <= targetLine && targetLine <= endToken.line;
+            if (!lineMatch)
+            {
+                return false;
+            }
+
+            if(startToken.line == endToken.line)
+            {
+                bool colMatch = startToken.col <= targetCol && targetCol <= endToken.col;
+                return colMatch;
+            }
+            return true;
+        }
+        private bool IsTargetStatement(Microsoft.Dafny.Token startToken, Microsoft.Dafny.Token endToken)
+        {
+            bool lineMatch = startToken.line <= targetLine && targetLine <= endToken.line;
+            if (!lineMatch)
+            {
+                return false;
+            }
+            if(startToken.line == endToken.line)
+            {
+                bool colMatch = startToken.col <= targetCol && targetCol <= endToken.col;
+                return colMatch;
+            }
+            return false;
         }
     }
 }
