@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Dict, Type, List, Tuple
 import shutil
 
+import fl_eval.util.globals as gl
 # --- Import Core Components from fl_eval package ---
 from fl_eval.core.abstract import FLTechnique
 
@@ -205,7 +206,7 @@ How to use:
         print(f"Error: Data path not found: {args.data_path}")
         parser.print_help()
     else:
-        cache_dir = args.data_path.parent / "cached_results"
+        cache_dir = gl.BASE_PATH / "cached_results"
         if args.clean_cache:
             print("Cleaning: Results Cache")
             if cache_dir.exists():

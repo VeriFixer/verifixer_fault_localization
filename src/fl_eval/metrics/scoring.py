@@ -1,5 +1,6 @@
 from fl_eval.core.abstract import FLTechnique 
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
+import fl_eval.util.globals as gl
 from pathlib import Path
 import json
 import traceback
@@ -86,8 +87,7 @@ def compute_exam_score_one_file(
     return ExamOutput( score = exam_score, found = found_in_predictions, empty = is_empty, filename=filename)
 
 def _results_file_path(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> Path:
-    top_folder = Gtruth.mutantfile.parent.parent.parent
-    return  top_folder / "cached_results" / flt.name / f"{Gtruth.mutantfile.name}.json"
+    return  gl.BASE_PATH / "cached_results" / flt.name / f"{Gtruth.mutantfile.name}.json"
 
 
 def save_to_file_output( flt: FLTechnique, Gtruth: GroundTruthAndLineLimit,  predictions: list[int]):

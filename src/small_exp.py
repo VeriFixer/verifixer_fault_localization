@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Dict, List, Any
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
 from fl_eval.metrics.scoring import ExamOutput
+import fl_eval.util.globals as gl
+
 from run_1_model import (
         TECHNIQUE_MAP, 
         _setup_evaluation,  # type: ignore
@@ -85,7 +87,7 @@ if __name__ == "__main__":
     if not args.data_path.exists():
         print(f"Path not found: {args.data_path}")
 
-    cache_dir = args.data_path.parent / "cached_results"
+    cache_dir = gl.BASE_PATH / "cached_results"
     if args.clean_cache:
         print("Cleaning: Results Cache")
         if cache_dir.exists():
