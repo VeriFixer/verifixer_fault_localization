@@ -23,7 +23,7 @@ process_file() {
     filename=$(basename "$killed_file")
 
     # Capture DafnyTestGen output
-    command="dotnet ${BASE_PATH}/build_output/DafnyTestGen/DafnyTestGen.dll \"$killed_file\" -o \"$OUT_DIR/killed/$filename.test\" -a -b -r 5"
+    command="dotnet ${BASE_PATH}/build_output/DafnyTestGen/DafnyTestGen.dll \"$killed_file\" -o \"$OUT_DIR/killed/$filename.test\" -a -c -b -r 5"
     output=$(eval "$command" 2>&1)
     status=$?
 
