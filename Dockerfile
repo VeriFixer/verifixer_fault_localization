@@ -22,9 +22,15 @@ RUN --mount=type=cache,target=/var/cache/apt \
       git openssh-client openjdk-17-jdk ant rsync \
     && rm -rf /var/lib/apt/lists/*
 
-# Z3
+# Z3 – pick the right binary for the build architecture
 RUN set -eux; \
-    url="https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/z3-${Z3_VERSION}-x64-glibc-2.35.zip"; \
+    ARCH=$(uname -m); \
+    case "$ARCH" in \
+        x86_64)  Z3_ARCH="x64" ;; \
+        aarch64) Z3_ARCH="arm64" ;; \
+        *)       echo "Unsupported architecture: $ARCH"; exit 1 ;; \
+    esac; \
+    url="https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/z3-${Z3_VERSION}-${Z3_ARCH}-glibc-2.35.zip"; \
     curl -fsSL -o /tmp/z3.zip "$url"; \
     unzip /tmp/z3.zip -d /tmp/z3; \
     dir="$(find /tmp/z3 -maxdepth 1 -mindepth 1 -type d | head -n1)"; \
@@ -39,8 +45,10 @@ RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh &&
     ln -sfn /usr/share/dotnet/dotnet /usr/local/bin/dotnet && \
     rm -f /tmp/dotnet-install.sh
 
-ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64 \
-    PATH="/usr/share/dotnet:${PATH}"
+# Make JAVA_HOME architecture‑independent
+RUN JAVA_ARCH=$(dpkg --print-architecture) && \
+    ln -s "/usr/lib/jvm/java-17-openjdk-${JAVA_ARCH}" /usr/lib/jvm/default-java
+ENV JAVA_HOME=/usr/lib/jvm/default-java
 
 # Build Dafny from the repo you point at
 RUN git clone --depth 1 --branch "${DAFNY_VERSION}" "${DAFNY_REPO}" /app/dafny && \
