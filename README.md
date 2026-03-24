@@ -4,6 +4,37 @@ This repository implements and evaluates **fault localization techniques for Daf
 
 ---
 
+## Getting the Repository
+
+To properly set up this repository, you need to clone it with submodules and (optionally) download large dataset files via Git LFS.
+
+### Clone with Submodules
+
+This repository uses submodules, so you must clone it recursively:
+
+```shell
+git clone --recurse-submodules git@github.com:VeriFixer/verifixer_fault_localization.git
+cd verifixer_fault_localization
+```
+If you already cloned without submodules, run:
+```shell
+git submodule update --init --recursive
+```
+### (Optional) Download Prebuilt Datasets with Git LFS
+
+Some large files (e.g., prebuilt datasets) are stored using Git LFS.
+
+First, install Git LFS:
+```shell
+git lfs install
+```
+Then pull the LFS files:
+```shell
+git lfs pull
+```
+If you skip this step, the repository will still work, but you may need to regenerate datasets manually.
+
+
 ## Quick Start with Docker
 
 For the easiest setup, use the provided Docker environment. This includes Dafny, Python dependencies, and all tools pre-installed.
