@@ -16,3 +16,4 @@
 [submodule "Dafny-AutoFix"]
 	path = Dafny-AutoFix
 	url = git@github.com:VeriFixer/Dafny-AutoFix.git
+	branch = integration_all_repos
