@@ -87,17 +87,14 @@ def compute_exam_score_one_file(
     return ExamOutput( score = exam_score, found = found_in_predictions, empty = is_empty, filename=filename)
 
 def _results_file_path(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> Path:
-    return  gl.BASE_PATH / "cached_results" / flt.name / f"{Gtruth.mutantfile.name}.json"
+    return gl.CACHE_DIR / flt.name / f"{Gtruth.mutantfile.name}.json"
 
 
 def save_to_file_output( flt: FLTechnique, Gtruth: GroundTruthAndLineLimit,  predictions: list[int]):
-    # Top-level folder (e.g., project root)
     results_file = _results_file_path(flt, Gtruth)
     results_file.parent.mkdir(parents=True, exist_ok=True)
-
     with results_file.open("w", encoding="utf-8") as f:
-         json.dump(predictions, f)
-
+            json.dump(predictions, f)
 
 def load_from_file_output(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> list[int]:
     results_file = _results_file_path(flt, Gtruth)
@@ -109,10 +106,10 @@ def load_from_file_output(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> 
 
 
 def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthAndLineLimit) -> ExamOutput:
-    try : 
+    try:
         # Try loading from cached results
         predictions = load_from_file_output(flt, Gtruth)
-    except FileNotFoundError:
+    except (FileNotFoundError, PermissionError, OSError, json.JSONDecodeError):
         # Compute predictions localization
         try:
             predictions = flt.get_fault_localization(Gtruth.mutantfile) 

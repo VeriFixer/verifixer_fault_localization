@@ -36,9 +36,12 @@ docker run --rm -it -w /app  dafny_research:latest bash
 docker run --rm -it \
   -u $(id -u):$(id -g) \
   -v "$(pwd)/src:/app/src:delegated" \
+  -v "$(pwd)/Dafny-AutoFix:/app/Dafny-AutoFix:delegated" \
+  -v "$(pwd)/run_artifacts:/app/run_artifacts:delegated" \
   -v "$(pwd)/DafnyTestGen:/app/DafnyTestGen:delegated" \
   -v "$(pwd)/mutdafny:/app/mutdafny:delegated" \
   -v "$(pwd)/datasets:/app/datasets:delegated" \
+  -v "$(pwd)/Dafny-AutoFix:/app/Dafny-AutoFix:delegated" \
   -v "$(pwd)/strategies:/app/strategies:delegated" \
   -w /app \
   dafny_research:latest bash

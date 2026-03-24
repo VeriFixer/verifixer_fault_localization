@@ -85,12 +85,15 @@ if __name__ == "__main__":
     if not args.data_path.exists():
         print(f"Path not found: {args.data_path}")
 
-    cache_dir = gl.BASE_PATH / "cached_results"
+    cache_dir = gl.CACHE_DIR
     if args.clean_cache:
         print("Cleaning: Results Cache")
         if cache_dir.exists():
-            shutil.rmtree(cache_dir)
-            print(f"Removed cache directory: {cache_dir}")
+            try:
+                shutil.rmtree(cache_dir)
+                print(f"Removed cache directory: {cache_dir}")
+            except OSError as e:
+                print(f"Could not remove cache directory {cache_dir}: {e}")
         else:
             print(f"No cache directory found at: {cache_dir}")
     else:

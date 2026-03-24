@@ -34,10 +34,14 @@ RUN set -eux; \
     curl -fsSL -o /tmp/z3.zip "$url"; \
     unzip /tmp/z3.zip -d /tmp/z3; \
     dir="$(find /tmp/z3 -maxdepth 1 -mindepth 1 -type d | head -n1)"; \
-    cp -a "$dir"/bin/* /usr/local/bin/; \
+    cp -a "$dir"/bin/z3 /usr/local/bin/; \
+    cp -a "$dir"/bin/libz3.so* /usr/local/lib/; \
     cp -a "$dir"/include/* /usr/local/include/ 2>/dev/null || true; \
+    chmod 755 /usr/local/bin/z3; \
     ldconfig; \
     rm -rf /tmp/z3 /tmp/z3.zip
+
+ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
 
 # .NET SDK 8
 RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh && \

@@ -15,6 +15,7 @@ from fl_eval.strategies.empty_ranker import EmptyRanker
 from fl_eval.strategies.random_line_of_method_that_fails import RandomLineOfMethodThatFails
 from fl_eval.strategies.counter_example_if import CounterExampleIf
 from fl_eval.strategies.counter_example_if_reassume import CounterExampleIfReassume
+from fl_eval.strategies.autofix_ranker import AutoFixRanker
 
 
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
@@ -32,7 +33,8 @@ TECHNIQUE_MAP: Dict[str, Type[FLTechnique]] = {
     "empty": EmptyRanker,
     "randomOnFailingMethod" : RandomLineOfMethodThatFails,
     "counterExampleIf": CounterExampleIf,
-    "counterExampleIfReassume" : CounterExampleIfReassume
+    "counterExampleIfReassume" : CounterExampleIfReassume,
+    "autofix": AutoFixRanker
 }
 
 def _setup_evaluation(flt_name: str, base_path: Path) -> Optional[Tuple[FLTechnique, Path, Path]]:
@@ -149,7 +151,7 @@ def compute_metrics(flt_name: str, base_path: Path, sequential: bool = False) ->
 
     all_scores = run_parallel_or_seq(diff_paths, _process_mutation, f"Get metrics for {flt_name}",
                                      fl_technique, killed_dir, original_dir, parallel=not sequential)
-    all_scores_clean : list[ExamOutput] = list(filter(lambda x: x is not None, all_scores))
+    all_scores_clean: list[ExamOutput] = [x for x in all_scores if x is not None]
     _generate_report(flt_name, all_scores_clean)
 
 
@@ -206,12 +208,15 @@ How to use:
         print(f"Error: Data path not found: {args.data_path}")
         parser.print_help()
     else:
-        cache_dir = gl.BASE_PATH / "cached_results"
+        cache_dir = gl.CACHE_DIR
         if args.clean_cache:
             print("Cleaning: Results Cache")
             if cache_dir.exists():
-                shutil.rmtree(cache_dir)
-                print(f"Removed cache directory: {cache_dir}")
+                try:
+                    shutil.rmtree(cache_dir)
+                    print(f"Removed cache directory: {cache_dir}")
+                except OSError as e:
+                    print(f"Could not remove cache directory {cache_dir}: {e}")
             else:
                 print(f"No cache directory found at: {cache_dir}")
         else:

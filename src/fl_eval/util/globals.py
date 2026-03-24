@@ -1,4 +1,6 @@
 from pathlib import Path
+import os
+import tempfile
 
 def find_repo_root(marker : str =".repo_verifixer_fault_localization_marker"):
     """Finds the root of the repository by looking for a marker (default: .git)."""
@@ -12,7 +14,25 @@ def find_repo_root(marker : str =".repo_verifixer_fault_localization_marker"):
 
 BASE_PATH: Path = find_repo_root() 
 
+
+def _can_write_dir(path: Path) -> bool:
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        probe = path / ".write_probe"
+        with probe.open("w", encoding="utf-8") as f:
+            f.write("ok")
+        probe.unlink(missing_ok=True)
+        return True
+    except OSError:
+        return False
+
+CACHE_DIR: Path = BASE_PATH / "run_artifacts" / "cached_results"
+
+AUTOFIX_RUNS_DIR: Path =  BASE_PATH / "run_artifacts" / "autofix_fl_runs"
+
 MAX_RAM_EXTERNAL_PROGRAMS : int = 24  # GBytes
 MAX_TIME_EXTERNAL_PROGRAMS : int = 60 # Seconds
 
 print(f"BASE_PATH is: {BASE_PATH}")
+print(f"CACHE_DIR is: {CACHE_DIR}")
+print(f"AUTOFIX_RUNS_DIR is: {AUTOFIX_RUNS_DIR}")

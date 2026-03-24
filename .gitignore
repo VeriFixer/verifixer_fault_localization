@@ -1,4 +1,6 @@
 src/cached_results/*
+run_artifacts/*
+!run_artifacts/.empty_marker
 
 
 # Setting the datasets
