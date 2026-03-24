@@ -26,11 +26,11 @@ RUN --mount=type=cache,target=/var/cache/apt \
 RUN set -eux; \
     ARCH=$(uname -m); \
     case "$ARCH" in \
-        x86_64)  Z3_ARCH="x64" ;; \
-        aarch64) Z3_ARCH="arm64" ;; \
+        x86_64)  Z3_ARCH="x64-glibc-2.35" ;; \
+        aarch64) Z3_ARCH="arm64-osx-11.0" ;; \
         *)       echo "Unsupported architecture: $ARCH"; exit 1 ;; \
     esac; \
-    url="https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/z3-${Z3_VERSION}-${Z3_ARCH}-glibc-2.35.zip"; \
+    url="https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/z3-${Z3_VERSION}-${Z3_ARCH}.zip"; \
     curl -fsSL -o /tmp/z3.zip "$url"; \
     unzip /tmp/z3.zip -d /tmp/z3; \
     dir="$(find /tmp/z3 -maxdepth 1 -mindepth 1 -type d | head -n1)"; \
