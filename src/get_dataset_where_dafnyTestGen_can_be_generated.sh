@@ -6,6 +6,7 @@ BASE_PATH="$(find_repo_root)" || exit 1
 OUT_DIR="${BASE_PATH}/datasets/dafnytestgen_tests_can_run"
 mkdir -p "$OUT_DIR/killed"
 mkdir -p "$OUT_DIR/original"
+mkdir -p "$OUT_DIR/not_supported"
 
 FULL_DATASET_DIR="${BASE_PATH}/datasets/sample_original_can_run"
 #FULL_DATASET_DIR="${BASE_PATH}/src/pos_test"
@@ -21,16 +22,22 @@ PROGRESS_TMP="${BASE_PATH}/src/progress.tmp"
 process_file() {
     killed_file="$1"
     filename=$(basename "$killed_file")
+    filename_without_extension="${filename%.dfy}"
 
+    out_file="$OUT_DIR/killed/${filename_without_extension}.test.dfy"
     # Capture DafnyTestGen output
-    command="dotnet ${BASE_PATH}/build_output/DafnyTestGen/DafnyTestGen.dll \"$killed_file\" -o \"$OUT_DIR/killed/$filename.test\" -a -c -b -r 5"
+    command="dotnet ${BASE_PATH}/build_output/DafnyTestGen/DafnyTestGen.dll \"$killed_file\" -o \"$out_file\" -a -c -b -r 5"
     output=$(eval "$command" 2>&1)
+
     status=$?
+
+    if [ ! -f "$out_file" ] || [ ! -s "$out_file" ]; then
+        # No tests were generated, making the output file empty or missing
+        status=1
+    fi
 
     # real success condition
     if [ $status -eq 0 ]; then
-        filename_without_extension="${filename%.dfy}"
-
         cp "$killed_file" "$OUT_DIR/killed/"
 
         killed_txt="${killed_file%.dfy}.txt"
@@ -47,14 +54,20 @@ process_file() {
         else
             echo "Warning: original .dfy not found for $killed_file (expected $original_file)"
         fi
-
     else
         echo "|-------------------------------------|"
         echo "Error processing $killed_file"
         echo "Command: $command"
         echo "Exit Status: $status"
-        echo "$output"
+
+        # Save input file for inspection
+        cp "$killed_file" "$OUT_DIR/not_supported/"
+
+        # Save metadata for debugging
+        echo "Command: $command" >> "$OUT_DIR/not_supported/${filename_without_extension}.debug.log"
+        echo "Output: $output" >> "$OUT_DIR/not_supported/${filename_without_extension}.debug.log"
     fi
+
 
 
     # thread-safe progress update
