@@ -37,39 +37,9 @@ If you skip this step, the repository will still work, but you may need to regen
 
 ## Quick Start with Docker
 
-For the easiest setup, use the provided Docker environment. This includes Dafny, Python dependencies, and all tools pre-installed.
+For the easiest setup, use the provided Docker environment. This includes Dafny, Python dependencies, and all tools pre-installed. See README_DOCKER.md for how to set up.
 
-### Option 1: Use Pre-built Image (Recommended for Reviewers)
-
-If you have the `dafny_research_latest.tar` image:
-
-```bash
-docker load -i dafny_research_latest.tar
-docker run --rm -it -w /app dafny_research:latest bash
-```
-
-### Option 2: Build from Dockerfile
-
-```bash
-docker build -t dafny_research:latest .
-docker run --rm -it -w /app dafny_research:latest bash
-```
-
-### Option 3: Run with Volume Mounts (for Development)
-
-```bash
-docker run --rm -it \
-  -u $(id -u):$(id -g) \
-  -v "$(pwd)/src:/app/src:delegated" \
-  -v "$(pwd)/mutdafny:/app/mutdafny:delegated" \
-  -v "$(pwd)/datasets:/app/datasets:delegated" \
-  -w /app \
-  dafny_research:latest bash
-```
-
-Once inside the container, follow the instructions below.
-
----
+If there is a necessity to not use Docker, all dependencies can be seen also in README_DOCKER.md
 
 ## Project Layout (Quick Overview)
 
@@ -83,28 +53,6 @@ Once inside the container, follow the instructions below.
 - `datasets/` — Generated dataset outputs (e.g., filtered subsets).
 - `mutdafny/` — Mutation tool integration.
 - `dafny/` — Dafny source code and tools.
-
----
-
-## Prerequisites (Non-Docker Setup)
-
-If not using Docker:
-
-1. **Python 3.11+** (recommended)
-2. **Dafny** (for dataset generation / verification) (provided as a git submodule)
-3. **.NET SDK** (for building C# strategies) (version 8)
-4. Optional: **mutdafny** (if generating the full mutation dataset) (provided as a git submodule)
-
-### Install Python dependencies
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r src/requirements.txt
-```
-### More installation guidelines
-
-For the rest of all installation steps follow the Dockerfile
 
 ---
 
