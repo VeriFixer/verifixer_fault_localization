@@ -1,0 +1,20 @@
+# Ignore git history
+.git
+.gitignore
+
+# Ignore local python envs and caches
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+.env
+
+# Ignore .NET build artifacts
+bin/
+obj/
+/app/build_output/
+
+# Ignore large datasets if you don't want them in the build context immediately
+# (Only include them if they are strictly required for the build phase)
+# datasets/
