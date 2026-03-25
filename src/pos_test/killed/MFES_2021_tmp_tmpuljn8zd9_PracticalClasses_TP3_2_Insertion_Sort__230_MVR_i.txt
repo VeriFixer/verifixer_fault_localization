@@ -1,4 +1,0 @@
-10c10
-<   while i < a.Length
----
->   while i < i

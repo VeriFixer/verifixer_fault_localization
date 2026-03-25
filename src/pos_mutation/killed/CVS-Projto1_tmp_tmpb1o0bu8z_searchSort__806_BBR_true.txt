@@ -1,6 +1,0 @@
-43,45c43
-<       while i < b.Length
-<         decreases b.Length - i
-<       {
----
->       while true {

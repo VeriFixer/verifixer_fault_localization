@@ -1,4 +1,0 @@
-25c25
-<   set_memebrship_implies_cardinality(s, s2);
----
->   set_memebrship_implies_cardinality({}, s2);

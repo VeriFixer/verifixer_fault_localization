@@ -1,4 +1,0 @@
-105c105
-<     center := center + 1;
----
->     center := -(center + 1);

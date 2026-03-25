@@ -1,4 +1,0 @@
-24c24
-<       best := a[i];
----
->       best := a[best];

@@ -1,8 +1,0 @@
-13c13
-<   while p < c
----
->   while k < c
-15c15
-<     decreases c - p
----
->     decreases c - k

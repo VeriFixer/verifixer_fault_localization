@@ -1,6 +1,0 @@
-19,20c19,20
-<   var high := a.Length - 1;
-<   var mid := 0;
----
->   var high := 0;
->   var mid := a.Length - 1;

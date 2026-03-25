@@ -1,4 +1,0 @@
-123c123
-<         center := center + 1;
----
->         center := center * 1;

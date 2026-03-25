@@ -1,6 +1,0 @@
-10c10
-<   while i > 0
----
->   while !(i > 0)
-16d15
-<     decreases i - 0

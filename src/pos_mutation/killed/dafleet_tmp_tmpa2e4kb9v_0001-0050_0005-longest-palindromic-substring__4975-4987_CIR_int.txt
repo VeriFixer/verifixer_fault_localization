@@ -1,4 +1,0 @@
-81c81
-<   var radii := new int[|s'|];
----
->   var radii := new int[3] [1, 2, 3];

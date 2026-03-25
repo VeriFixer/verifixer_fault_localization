@@ -1,4 +1,0 @@
-177c177
-<   if Less(x, y) {
----
->   if Less(x, x) {

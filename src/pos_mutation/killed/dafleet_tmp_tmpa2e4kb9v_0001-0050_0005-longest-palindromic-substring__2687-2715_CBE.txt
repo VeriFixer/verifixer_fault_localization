@@ -1,6 +1,0 @@
-61,63c61
-<     if b - a > hi - lo {
-<       lo, hi := a, b;
-<     }
----
->     lo, hi := a, b;

@@ -1,4 +1,0 @@
-130c130
-<   for i: int := 0 to limit
----
->   for i: int := 1 to limit

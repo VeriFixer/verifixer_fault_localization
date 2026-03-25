@@ -1,4 +1,0 @@
-115c115
-<       var mirrored_center := old_center - (center - old_center);
----
->       var mirrored_center := 0;

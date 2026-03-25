@@ -1,4 +1,0 @@
-31c31
-<   while lo - 1 >= 0 && hi < |s| && s[lo - 1] == s[hi]
----
->   while lo - 1 >= 0 && hi < |s| && s[lo - 1] == s[-hi]

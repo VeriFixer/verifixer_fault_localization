@@ -1,6 +1,0 @@
-65,67c65
-<     if d - c > hi - lo {
-<       lo, hi := c, d;
-<     }
----
->     lo, hi := c, d;

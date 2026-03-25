@@ -1,4 +1,0 @@
-14c14
-<     return dest;
----
->     return src;

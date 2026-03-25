@@ -1,4 +1,0 @@
-41c41
-<     if palindromic(s, i, j) {
----
->     if palindromic(s, i, 0) {

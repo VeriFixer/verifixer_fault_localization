@@ -1,4 +1,0 @@
-55c55
-<   for k: int := 0 to |s|
----
->   for k: int := 0 to 0

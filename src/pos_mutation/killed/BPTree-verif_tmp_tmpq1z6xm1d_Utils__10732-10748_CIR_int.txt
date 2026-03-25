@@ -1,4 +1,0 @@
-251c251
-<   b := new int[a.Length];
----
->   b := new int[3] [1, 2, 3];

@@ -1,5 +1,0 @@
-35,38d34
-<     if a[i] > best {
-<       p := i;
-<       return;
-<     }

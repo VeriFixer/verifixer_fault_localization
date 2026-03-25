@@ -1,8 +1,0 @@
-18c18
-<   while i < r.Length
----
->   while sStart < r.Length
-21c21
-<     decreases r.Length - i
----
->     decreases r.Length - sStart

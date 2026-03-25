@@ -1,4 +1,0 @@
-283c283
-<   DistributiveGreater(a[..limit], b[..limit + 1], k, key);
----
->   DistributiveGreater(a[..limit], b[..limit + 1], k, limit);

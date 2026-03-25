@@ -1,2 +1,0 @@
-102d101
-<     lemma_end_of_expansion(s', center, radius);

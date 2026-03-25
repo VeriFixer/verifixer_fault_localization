@@ -1,8 +1,0 @@
-34c34
-<   while p < a.Length
----
->   while 0 < a.Length
-36c36
-<     decreases a.Length - p
----
->     decreases a.Length - 0

@@ -1,8 +1,0 @@
-18c18
-<   while i < nums.Length
----
->   while i > nums.Length
-24c24
-<     decreases nums.Length - i
----
->     decreases i - nums.Length

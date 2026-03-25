@@ -1,4 +1,0 @@
-121c121
-<       } else if radii[mirrored_center] > max_mirrored_radius {
----
->       } else if radii[mirrored_center] == max_mirrored_radius {

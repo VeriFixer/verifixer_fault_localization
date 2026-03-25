@@ -1,4 +1,0 @@
-432c432
-<   var U3 := Suc(Suc(Suc(Zero)));
----
->   var U3 := Suc(Suc(Zero));

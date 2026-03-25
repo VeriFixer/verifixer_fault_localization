@@ -1,2 +1,0 @@
-125d124
-<         radius := max_mirrored_radius;

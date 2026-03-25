@@ -1,4 +1,0 @@
-27c27
-<     if a[mid] < x {
----
->     if a[mid] < mid {

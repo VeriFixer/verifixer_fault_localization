@@ -1,8 +1,0 @@
-161c161
-<   forall i: int, j: int {:trigger a[j], a[i]} :: 
----
->   forall i: int, j: int :: 
-163c163
-<       a[i] <= a[j]
----
->       a[-i] <= a[j]

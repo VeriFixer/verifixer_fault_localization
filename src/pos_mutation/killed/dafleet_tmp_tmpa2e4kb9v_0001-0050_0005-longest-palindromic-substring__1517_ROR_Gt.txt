@@ -1,8 +1,0 @@
-31c31
-<   while lo - 1 >= 0 && hi < |s| && s[lo - 1] == s[hi]
----
->   while lo - 1 >= 0 && hi < |s| && s[lo - 1] > s[hi]
-34c34
-<     decreases lo - 1 - 0, if lo - 1 >= 0 then |s| - hi else 0 - 1
----
->     decreases lo - 1 - 0, if lo - 1 >= 0 then |s| - hi else 0 - 1, if lo - 1 >= 0 && hi < |s| then s[lo - 1] as int - s[hi] as int else 0 - 1

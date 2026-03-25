@@ -1,4 +1,0 @@
-26c26
-<     mid := (high + low) / 2;
----
->     mid := (high + low) % 2;

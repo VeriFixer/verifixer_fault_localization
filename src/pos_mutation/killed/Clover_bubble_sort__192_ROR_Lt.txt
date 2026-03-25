@@ -1,8 +1,0 @@
-10c10
-<   while i > 0
----
->   while i < 0
-16c16
-<     decreases i - 0
----
->     decreases 0 - i

@@ -1,6 +1,0 @@
-18c18
-<   while i < r.Length
----
->   while false
-21d20
-<     decreases r.Length - i

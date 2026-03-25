@@ -1,8 +1,0 @@
-32,35c32,33
-<     if t < 0 {
-<       result := true;
-<       return;
-<     }
----
->     result := true;
->     return;

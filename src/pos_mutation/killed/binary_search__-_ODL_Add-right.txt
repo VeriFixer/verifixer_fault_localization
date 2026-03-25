@@ -1,8 +1,0 @@
-26c26
-<     mid := (high + low) / 2;
----
->     mid := high / 2;
-28c28
-<       low := mid + 1;
----
->       low := mid;

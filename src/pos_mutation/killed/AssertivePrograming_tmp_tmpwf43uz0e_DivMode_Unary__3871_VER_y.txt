@@ -1,4 +1,0 @@
-191c191
-<     var x0: Unary := x;
----
->     var x0: Unary := y;

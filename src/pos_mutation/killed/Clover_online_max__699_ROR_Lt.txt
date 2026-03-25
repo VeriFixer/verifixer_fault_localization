@@ -1,4 +1,0 @@
-35c35
-<     if a[i] > best {
----
->     if a[i] < best {

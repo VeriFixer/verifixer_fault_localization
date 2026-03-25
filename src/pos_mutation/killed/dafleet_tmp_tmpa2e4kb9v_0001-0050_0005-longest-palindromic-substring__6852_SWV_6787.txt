@@ -1,6 +1,0 @@
-115,116c115,116
-<       var mirrored_center := old_center - (center - old_center);
-<       var max_mirrored_radius := old_center + old_radius - center;
----
->       var mirrored_center := old_center + old_radius - center;
->       var max_mirrored_radius := old_center - (center - old_center);

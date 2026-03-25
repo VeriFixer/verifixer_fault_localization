@@ -1,4 +1,0 @@
-13c13
-<   while p < c
----
->   while p <= c

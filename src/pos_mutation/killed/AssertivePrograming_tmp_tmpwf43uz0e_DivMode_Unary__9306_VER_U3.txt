@@ -1,4 +1,0 @@
-436c436
-<   var d, m := IterativeDivMod(U7, U3);
----
->   var d, m := IterativeDivMod(U3, U3);

@@ -1,4 +1,0 @@
-17c17
-<   while i < x
----
->   while i <= x

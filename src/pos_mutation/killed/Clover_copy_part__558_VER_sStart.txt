@@ -1,4 +1,0 @@
-23c23
-<     r[i] := dest[i];
----
->     r[i] := dest[sStart];

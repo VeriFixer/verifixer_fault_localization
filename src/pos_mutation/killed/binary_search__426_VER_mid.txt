@@ -1,8 +1,0 @@
-21c21
-<   while low <= high
----
->   while low <= mid
-24c24
-<     decreases high - low
----
->     decreases mid - low

@@ -1,4 +1,0 @@
-24c24
-<   result := false;
----
->   result := !false;

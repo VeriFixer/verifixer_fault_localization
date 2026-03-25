@@ -1,6 +1,0 @@
-286c286
-<   while i < b.Length
----
->   while i == b.Length
-291d290
-<     decreases b.Length - i

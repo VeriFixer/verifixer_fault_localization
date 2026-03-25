@@ -1,6 +1,0 @@
-19c19
-<     while j < i
----
->     while true
-25d24
-<       decreases i - j

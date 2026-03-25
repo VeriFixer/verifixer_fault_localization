@@ -1,4 +1,0 @@
-64c64
-<     var c, d := expand_from_center(s, k, k + 1);
----
->     var c, d := expand_from_center(s, k, k * 1);

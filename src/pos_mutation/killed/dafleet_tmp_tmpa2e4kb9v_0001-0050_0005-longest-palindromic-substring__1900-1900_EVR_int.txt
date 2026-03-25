@@ -1,4 +1,0 @@
-42c42
-<       lemma_palindromic_contains(s, i, j, lo - 1, hi + 1);
----
->       lemma_palindromic_contains(s, i, 0, lo - 1, hi + 1);

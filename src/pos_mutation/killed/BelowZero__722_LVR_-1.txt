@@ -1,4 +1,0 @@
-26c26
-<   for i: int := 0 to |ops|
----
->   for i: int := -1 to |ops|

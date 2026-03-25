@@ -1,4 +1,0 @@
-31c31
-<     sum_plus(ops, i);
----
->     sum_plus(ops, t);

@@ -1,4 +1,0 @@
-29c29
-<     } else if a[mid] > x {
----
->     } else if a[high] > x {

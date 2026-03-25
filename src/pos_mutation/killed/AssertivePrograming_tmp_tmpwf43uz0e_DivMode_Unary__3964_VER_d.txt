@@ -1,4 +1,0 @@
-195c195
-<     AddZero(x);
----
->     AddZero(d);
