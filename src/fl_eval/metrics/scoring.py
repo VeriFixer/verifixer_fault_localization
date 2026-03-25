@@ -6,6 +6,8 @@ import json
 import traceback
 from dataclasses import dataclass
 import sys
+from typing import Any
+import fl_eval.util.run_external_cmd as run_cmd
 
 @dataclass
 class ExamOutput:
@@ -90,11 +92,23 @@ def _results_file_path(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> Pat
     return gl.CACHE_DIR / flt.name / f"{Gtruth.mutantfile.name}.json"
 
 
-def save_to_file_output( flt: FLTechnique, Gtruth: GroundTruthAndLineLimit,  predictions: list[int]):
+def save_to_file_output(
+    flt: FLTechnique,
+    Gtruth: GroundTruthAndLineLimit,
+    predictions: list[int],
+    execution_metadata: dict[str, Any] | None = None,
+) -> None:
     results_file = _results_file_path(flt, Gtruth)
     results_file.parent.mkdir(parents=True, exist_ok=True)
+
+    payload: dict[str, Any] = {
+        "schema_version": 2,
+        "predictions": predictions,
+        "execution_metadata": execution_metadata,
+    }
+
     with results_file.open("w", encoding="utf-8") as f:
-            json.dump(predictions, f)
+            json.dump(payload, f, default=str)
 
 def load_from_file_output(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> list[int]:
     results_file = _results_file_path(flt, Gtruth)
@@ -102,24 +116,39 @@ def load_from_file_output(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> 
         raise FileNotFoundError(f"Cached results not found: {results_file}")
     with results_file.open("r", encoding="utf-8") as f:
         data = json.load(f)
-    return data
+
+    # Backward compatibility with v1 cache files (plain list[int])
+    if isinstance(data, list):
+        return data
+
+    if not isinstance(data, dict):
+        raise ValueError(f"Invalid cache format in {results_file}")
+
+    predictions = data.get("predictions")
+    if not isinstance(predictions, list):
+        raise ValueError(f"Invalid predictions payload in {results_file}")
+
+    return predictions
 
 
 def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthAndLineLimit) -> ExamOutput:
     try:
         # Try loading from cached results
         predictions = load_from_file_output(flt, Gtruth)
-    except (FileNotFoundError, PermissionError, OSError, json.JSONDecodeError):
+    except (FileNotFoundError, PermissionError, OSError, json.JSONDecodeError, ValueError):
         # Compute predictions localization
+        execution_metadata: dict[str, Any] | None = None
         try:
             predictions = flt.get_fault_localization(Gtruth.mutantfile) 
+            execution_metadata = run_cmd.get_last_execution_metadata()
         except Exception as e:
             predictions = []
             print("Exception occurred while running fault localization:", file=sys.stderr)
             print(str(e), file=sys.stderr)
             traceback.print_exc(file=sys.stderr)
             predictions = []
-        save_to_file_output( flt, Gtruth ,  predictions)
+            execution_metadata = run_cmd.get_last_execution_metadata()
+        save_to_file_output(flt, Gtruth, predictions, execution_metadata)
     
     ground_truth = Gtruth.ground_truth
     total_line_start = Gtruth.startLine
