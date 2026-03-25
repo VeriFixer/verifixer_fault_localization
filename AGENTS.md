@@ -88,6 +88,20 @@ Expected structure:
 
 Mutant/original pairing failures should be handled gracefully (skip with logs).
 
+## 7b) Dataset Validation
+
+The pipeline validates dataset structure and consistency at the start of each technique evaluation:
+- Checks directory structure (original/, killed/ exist and contain .dfy files)
+- Validates file pairings (diff files ↔ mutants)
+- Checks original file associations
+- Reports detailed diagnostics for data quality issues
+
+**Important:** Validation errors are **non-blocking**. They are logged as errors but do not prevent
+evaluation. This allows partial processing of datasets with minor structural issues. Individual
+mutations handle their own robustness during processing.
+
+Validation runs once per technique in `_setup_evaluation()` before mutation processing begins.
+
 ## 8) Common pitfalls (recently observed)
 
 1. **Docker permissions for tests**

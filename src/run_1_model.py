@@ -7,6 +7,7 @@ import sys
 
 import config as gl
 from logging_config import get_logger
+from fl_eval.util.dataset_validation import validate_dataset, log_validation_result
 # --- Import Core Components from fl_eval package ---
 from fl_eval.core.abstract import FLTechnique
 
@@ -26,7 +27,7 @@ from fl_eval.metrics.scoring import ExamOutput
 
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
 
-from typing import Type, Optional
+from typing import Optional
 
 logger = get_logger(__name__)
 
@@ -45,6 +46,10 @@ def _setup_evaluation(flt_name: str, base_path: Path) -> tuple[FLTechnique, Path
     """
     Handles validation, FL Technique instantiation, and directory setup.
     Returns the FLT instance and paths if successful, otherwise None.
+    
+    Note: Dataset validation errors are logged but non-blocking. Processing continues
+    with individual mutations handling their own robustness. This allows partial
+    evaluation of datasets with minor structural issues.
     """
     # 1. Technique Validation
     if flt_name not in TECHNIQUE_MAP:
@@ -55,13 +60,22 @@ def _setup_evaluation(flt_name: str, base_path: Path) -> tuple[FLTechnique, Path
     FLT_Class = TECHNIQUE_MAP[flt_name]
     fl_technique = FLT_Class(name=flt_name)
     
-    # 2. Directory Validation
+    # 2. Dataset Structure and Consistency Validation
+    # Note: Validation errors are logged but do not block evaluation.
+    # Individual mutations will handle their own validation during processing.
+    validation_result = validate_dataset(base_path)
+    log_validation_result(validation_result, base_path)
+    
+    if not validation_result.is_valid:
+        logger.error(
+            f"Dataset validation detected issues for {base_path}. "
+            f"Continuing with evaluation but some mutations may be skipped. "
+            f"Issues: {len([m for m in validation_result.messages if 'validation' not in m.lower()])} errors detected."
+        )
+    
+    # 3. Directory Setup
     killed_dir = base_path / "killed"
     original_dir = base_path / "original"
-    
-    if not killed_dir.is_dir() or not original_dir.is_dir():
-        logger.error(f"Required 'killed' or 'original' directories not found in {base_path}")
-        return None
         
     return fl_technique, killed_dir, original_dir
 
