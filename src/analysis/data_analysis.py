@@ -264,3 +264,9 @@ def compare_two_methods(raw_results: Dict[str, List[ExamOutput]], tech1: str, te
         print(f"\nSample {tech2}-only successes:")
         for f in only2[:5]:
             print(f"  {f}: {tech1} score={dict1[f].score:.4f}, {tech2} score={dict2[f].score:.4f}")
+
+    
+    if neither:
+        print(f"\nSample {tech2} {tech1} - bot insucesses:")
+        for f in neither[:5]:
+            print(f"  {f}: {tech1} score={dict1[f].score:.4f}, {tech2} score={dict2[f].score:.4f}")
