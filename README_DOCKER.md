@@ -48,3 +48,18 @@ docker run --rm -it \
 ```
 # Inside the container 
 Once inside the contaner follow the main README, README.md
+
+# Non-interactive test pipeline commands (inside container)
+
+Install test dependency and run Python unit tests:
+
+```shell
+python -m pip install pytest
+pytest -q
+```
+
+Run infrastructure safeguard with full `pos_test`:
+
+```shell
+python src/run_pos_test_guard.py --dataset-tar datasets/pos_test.tar.gz --clean-cache
+```

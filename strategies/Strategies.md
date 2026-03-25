@@ -116,3 +116,29 @@ method abs(x : int) returns (y:int)
 // What I can is if fails assume the postcondition on the failing branch before return 
 // And rerun it
 
+# Limitations of counterexample untill now 
+
+datasets/dafnytestgen_tests_can_run/killed/formal_verication_dafny_tmp_tmpwgl2qz28_Challenges_ex2__867_BBR_true.dfy
+
+tracing ignores the first line 
+
+if the error is on the first line of like an if 
+if(cenas){
+  error
+}
+
+the error line is not traced on the counterexample! (this is a issue to address)
+
+2) This seems really a problem on the conterexample itself 
+
+  /app/datasets/dafnytestgen_tests_can_run/killed/dafleet_tmp_tmpa2e4kb9v_0001-0050_0005-longest-palindromic-substring__1733_COR_Imp.dfy
+
+  (But botht these were not related to ensures so maybe thats the catch)
+
+3) This will just not work 
+/app/datasets/dafnytestgen_tests_can_run/killed/dafleet_tmp_tmpa2e4kb9v_0001-0050_0005-longest-palindromic-substring__6949_SAR_6961.dfy
+
+
+Ok will change strategy: If no line es flagge will not send a default line at the beginning on the counterexample (probably that is jeopardizing my changes.)
+
+And will classify also not the full file but on the method probably is better

@@ -22,21 +22,24 @@ RUN --mount=type=cache,target=/var/cache/apt \
       git openssh-client openjdk-17-jdk ant rsync \
     && rm -rf /var/lib/apt/lists/*
 
+# Python dependencies: copy only requirements first
+COPY src/requirements.txt /app/src/requirements.txt
+RUN python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --upgrade pip && \
+    /opt/venv/bin/pip install -r /app/src/requirements.txt && \
+    /opt/venv/bin/pip install pytest
+ENV PATH="/opt/venv/bin:${PATH}"
+
 # Z3 – pick the right binary for the build architecture
-RUN set -eux; \
-    ARCH=$(uname -m); \
-    case "$ARCH" in \
-        x86_64)  Z3_ARCH="x64-glibc-2.35" ;; \
-        aarch64) Z3_ARCH="arm64-osx-11.0" ;; \
-        *)       echo "Unsupported architecture: $ARCH"; exit 1 ;; \
-    esac; \
-    url="https://github.com/Z3Prover/z3/releases/download/z3-${Z3_VERSION}/z3-${Z3_VERSION}-${Z3_ARCH}.zip"; \
-    curl -fsSL -o /tmp/z3.zip "$url"; \
-    unzip /tmp/z3.zip -d /tmp/z3; \
-    dir="$(find /tmp/z3 -maxdepth 1 -mindepth 1 -type d | head -n1)"; \
-    cp -a "$dir"/bin/z3 /usr/local/bin/; \
-    cp -a "$dir"/bin/libz3.so* /usr/local/lib/; \
-    cp -a "$dir"/include/* /usr/local/include/ 2>/dev/null || true; \
+RUN git clone --depth 1 --branch z3-4.12.1 https://github.com/Z3Prover/z3.git /tmp/z3 && \
+    cd /tmp/z3 && \
+    python scripts/mk_make.py && \
+    cd build && \
+    make -j"$(nproc)" && \
+    make install && \
+    cp -a /opt/venv/bin/z3 /usr/local/bin/ && \
+    cp -a /opt/venv/lib/libz3.so* /usr/local/lib/ && \
+    cp -a /opt/venv/include/* /usr/local/include/ 2>/dev/null || true; \
     chmod 755 /usr/local/bin/z3; \
     ldconfig; \
     rm -rf /tmp/z3 /tmp/z3.zip
@@ -70,12 +73,7 @@ RUN git clone --depth 1 --branch master https://github.com/codespecs/daikon.git 
     rm -rf /tmp/daikon-src
 ENV PATH="${DAIKONDIR}:${PATH}"
 
-# Python dependencies: copy only requirements first
-COPY src/requirements.txt /app/src/requirements.txt
-RUN python3 -m venv /opt/venv && \
-    /opt/venv/bin/pip install --upgrade pip && \
-    /opt/venv/bin/pip install -r /app/src/requirements.txt
-ENV PATH="/opt/venv/bin:${PATH}"
+
 
 # Now copy the rest of src
 COPY src/ /app/src/

@@ -1,0 +1,301 @@
+#!/usr/bin/env python3
+"""Run a full pos_test safeguard benchmark and verify expected artifacts.
+
+This script is intended for CI and local smoke checks to detect infrastructure
+breakage. It performs the following steps:
+1) Extract `datasets/pos_test.tar.gz` to `datasets/pos_test`.
+2) Execute `src/run_all_models.py` on that dataset.
+3) Validate key outputs (plot + cache files per technique).
+"""
+
+from __future__ import annotations
+
+import argparse
+import shutil
+import subprocess
+import sys
+import tarfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from fl_eval.core.gt_parser import GroundTruthAndLineLimit
+from fl_eval.metrics.scoring import compute_exam_score_one_file, load_from_file_output
+from run_1_model import TECHNIQUE_MAP
+
+REPO_MARKER = ".repo_verifixer_fault_localization_marker"
+
+
+@dataclass(frozen=True)
+class TechniqueGuard:
+    max_avg_exam: float
+    min_found_count: int
+    allow_all_empty_predictions: bool = False
+
+
+# Manual quality gates for reuse across runs.
+TECHNIQUE_GUARDS: dict[str, TechniqueGuard] = {
+    "random": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
+    "counterBase": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
+    "empty": TechniqueGuard(max_avg_exam=1.0, min_found_count=0, allow_all_empty_predictions=True),
+    "randomOnFailingMethod": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
+    "counterExampleIf": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
+    "counterExampleIfReassume": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
+    "autofix": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
+}
+
+
+def find_repo_root(start: Path) -> Path:
+    current = start.resolve()
+    if current.is_file():
+        current = current.parent
+
+    while True:
+        if (current / REPO_MARKER).exists():
+            return current
+        if current.parent == current:
+            raise FileNotFoundError(
+                f"Could not locate repository root marker '{REPO_MARKER}' from {start}."
+            )
+        current = current.parent
+
+
+def extract_dataset(dataset_tar: Path, datasets_dir: Path, extracted_name: str) -> Path:
+    extracted_dataset = datasets_dir / extracted_name
+
+    if extracted_dataset.exists():
+        shutil.rmtree(extracted_dataset)
+
+    datasets_dir.mkdir(parents=True, exist_ok=True)
+
+    with tarfile.open(dataset_tar, "r:gz") as tar:
+        tar.extractall(path=datasets_dir)
+
+    if not extracted_dataset.exists():
+        raise RuntimeError(
+            f"Expected extracted dataset at {extracted_dataset}, but it was not found."
+        )
+
+    return extracted_dataset
+
+
+def validate_dataset_layout(dataset_dir: Path) -> int:
+    killed_dir = dataset_dir / "killed"
+    original_dir = dataset_dir / "original"
+
+    if not killed_dir.is_dir() or not original_dir.is_dir():
+        raise RuntimeError(
+            f"Dataset must contain 'killed' and 'original' directories: {dataset_dir}"
+        )
+
+    mutation_count = len(list(killed_dir.glob("*.txt")))
+    if mutation_count == 0:
+        raise RuntimeError(f"No mutation diff files (*.txt) found in {killed_dir}")
+
+    return mutation_count
+
+
+def run_benchmark(run_all_models: Path, dataset_dir: Path, clean_cache: bool, sequential: bool) -> None:
+    cmd = [sys.executable, str(run_all_models), str(dataset_dir)]
+    if clean_cache:
+        cmd.append("--clean-cache")
+    if sequential:
+        cmd.append("--sequential")
+
+    result = subprocess.run(cmd, cwd=run_all_models.parent.parent)
+    if result.returncode != 0:
+        raise RuntimeError(f"Benchmark command failed with code {result.returncode}: {' '.join(cmd)}")
+
+
+def validate_outputs(repo_root: Path, dataset_dir: Path, expected_mutation_count: int) -> None:
+    errors: list[str] = []
+
+    plot_path = dataset_dir.parent / "benchmark_hybrid_analysis.png"
+    if not plot_path.exists() or plot_path.stat().st_size == 0:
+        errors.append(f"Missing or empty benchmark plot output: {plot_path}")
+
+    if set(TECHNIQUE_GUARDS.keys()) != set(TECHNIQUE_MAP.keys()):
+        missing_cfg = sorted(set(TECHNIQUE_MAP.keys()) - set(TECHNIQUE_GUARDS.keys()))
+        extra_cfg = sorted(set(TECHNIQUE_GUARDS.keys()) - set(TECHNIQUE_MAP.keys()))
+        errors.append(
+            "Technique guard config mismatch. "
+            f"Missing: {missing_cfg if missing_cfg else '[]'}; "
+            f"Extra: {extra_cfg if extra_cfg else '[]'}"
+        )
+
+    killed_dir = dataset_dir / "killed"
+    original_dir = dataset_dir / "original"
+    diff_paths = sorted(killed_dir.glob("*.txt"))
+    if len(diff_paths) != expected_mutation_count:
+        errors.append(
+            f"Found {len(diff_paths)} diffs in dataset, expected {expected_mutation_count}."
+        )
+
+    cache_root = repo_root / "run_artifacts" / "cached_results"
+    summary: dict[str, dict[str, Any]] = {}
+
+    for technique_name, technique_cls in TECHNIQUE_MAP.items():
+        technique_dir = cache_root / technique_name
+        if not technique_dir.is_dir():
+            errors.append(f"Missing cache folder for technique: {technique_name}")
+            continue
+
+        flt = technique_cls(name=technique_name)
+        guard = TECHNIQUE_GUARDS.get(technique_name, TechniqueGuard(1.0, 0, False))
+
+        evaluated = 0
+        found_count = 0
+        empty_predictions = 0
+        exam_sum = 0.0
+        failed_mutations = 0
+
+        for diff_path in diff_paths:
+            mutation_name = diff_path.stem
+            mutant_dfy_path = killed_dir / f"{mutation_name}.dfy"
+            if not mutant_dfy_path.is_file():
+                errors.append(f"[{technique_name}] Missing mutant file for diff {diff_path.name}: {mutant_dfy_path}")
+                failed_mutations += 1
+                continue
+
+            base_name_raw = "__".join(mutation_name.split("__")[:-1])
+            original_file = original_dir / f"{base_name_raw}.dfy"
+            if not original_file.is_file():
+                errors.append(f"[{technique_name}] Missing original file for mutation {mutation_name}: {original_file}")
+                failed_mutations += 1
+                continue
+
+            try:
+                gtruth = GroundTruthAndLineLimit(
+                    originalfile=original_file,
+                    mutantfile=mutant_dfy_path,
+                    difffile=diff_path,
+                )
+
+                # Reuse cached-results loading logic from fl_eval.metrics.scoring.
+                predictions = load_from_file_output(flt, gtruth)
+                if not predictions:
+                    empty_predictions += 1
+
+                exam_output = compute_exam_score_one_file(
+                    predictions=predictions,
+                    ground_truth=gtruth.ground_truth,
+                    total_line_start=gtruth.startLine,
+                    total_line_end=gtruth.endLine,
+                    filename=str(mutant_dfy_path),
+                )
+            except Exception as exc:
+                errors.append(f"[{technique_name}] Mutation '{mutation_name}' failed: {exc}")
+                failed_mutations += 1
+                continue
+
+            exam_sum += exam_output.score
+            found_count += 1 if exam_output.found else 0
+            evaluated += 1
+
+        if evaluated != len(diff_paths):
+            errors.append(
+                f"Technique '{technique_name}' evaluated {evaluated}/{len(diff_paths)} mutations (failed={failed_mutations})."
+            )
+
+        if evaluated > 0 and empty_predictions == evaluated and not guard.allow_all_empty_predictions:
+            errors.append(
+                f"Technique '{technique_name}' produced only empty predictions across all evaluated mutations."
+            )
+
+        avg_exam = exam_sum / evaluated if evaluated else 0.0
+
+        if avg_exam > guard.max_avg_exam:
+            errors.append(
+                f"Technique '{technique_name}' avg EXAM {avg_exam:.4f} exceeds limit {guard.max_avg_exam:.4f}."
+            )
+
+        if found_count < guard.min_found_count:
+            errors.append(
+                f"Technique '{technique_name}' found_count {found_count} is below limit {guard.min_found_count}."
+            )
+
+        summary[technique_name] = {
+            "evaluated": evaluated,
+            "found_count": found_count,
+            "avg_exam": avg_exam,
+            "empty_predictions": empty_predictions,
+        }
+
+    print("Technique checks:")
+    for technique_name in sorted(summary.keys()):
+        item = summary[technique_name]
+        print(
+            f" - {technique_name}: "
+            f"evaluated={item['evaluated']}, "
+            f"found={item['found_count']}, "
+            f"avg_exam={item['avg_exam']:.4f}, "
+            f"empty_predictions={item['empty_predictions']}"
+        )
+
+    if errors:
+        print("\nValidation errors:")
+        for err in errors:
+            print(f" - {err}")
+        raise RuntimeError(f"Validation failed with {len(errors)} error(s).")
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run the full pos_test safeguard benchmark and validate outputs."
+    )
+    parser.add_argument(
+        "--dataset-tar",
+        type=Path,
+        default=Path("datasets/pos_test.tar.gz"),
+        help="Path to the pos_test dataset tarball.",
+    )
+    parser.add_argument(
+        "--extracted-name",
+        type=str,
+        default="pos_test",
+        help="Expected extracted top-level dataset directory name.",
+    )
+    parser.add_argument(
+        "--clean-cache",
+        action="store_true",
+        help="Pass --clean-cache to src/run_all_models.py.",
+    )
+    parser.add_argument(
+        "--sequential",
+        action="store_true",
+        help="Pass --sequential to src/run_all_models.py.",
+    )
+    return parser.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    repo_root = find_repo_root(Path(__file__))
+
+    dataset_tar = (repo_root / args.dataset_tar).resolve() if not args.dataset_tar.is_absolute() else args.dataset_tar
+    if not dataset_tar.exists():
+        raise FileNotFoundError(f"Dataset tarball not found: {dataset_tar}")
+
+    datasets_dir = dataset_tar.parent
+    dataset_dir = extract_dataset(dataset_tar, datasets_dir, args.extracted_name)
+    mutation_count = validate_dataset_layout(dataset_dir)
+
+    run_all_models = repo_root / "src" / "run_all_models.py"
+    run_benchmark(run_all_models, dataset_dir, args.clean_cache, args.sequential)
+
+    validate_outputs(repo_root, dataset_dir, mutation_count)
+
+    print("pos_test safeguard passed.")
+    print(f" - dataset: {dataset_dir}")
+    print(f" - mutations validated: {mutation_count}")
+    print(f" - techniques validated: {len(TECHNIQUE_MAP)}")
+    print(f" - plot: {dataset_dir.parent / 'benchmark_hybrid_analysis.png'}")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except Exception as exc:  # pragma: no cover
+        print(f"pos_test safeguard failed: {exc}", file=sys.stderr)
+        raise SystemExit(1)

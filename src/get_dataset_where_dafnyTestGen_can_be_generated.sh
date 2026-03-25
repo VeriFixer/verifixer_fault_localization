@@ -9,7 +9,7 @@ mkdir -p "$OUT_DIR/original"
 mkdir -p "$OUT_DIR/not_supported"
 
 FULL_DATASET_DIR="${BASE_PATH}/datasets/sample_original_can_run"
-#FULL_DATASET_DIR="${BASE_PATH}/src/pos_test"
+#FULL_DATASET_DIR="${BASE_PATH}/datasets/pos_test"
 
 ORIG_DIR="$FULL_DATASET_DIR/original"
 KILLED_DIR="$FULL_DATASET_DIR/killed"   # define killed directory

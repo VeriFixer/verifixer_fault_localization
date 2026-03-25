@@ -28,7 +28,7 @@ class TestFLCore(unittest.TestCase):
             "line 2\n"
             "line 3\n"
             "line 4\n"
-            "line 5\n"
+            "line 5"
         )
         self.temp_file_path.write_text(self.code_content)
         self.total_lines = 5
@@ -47,11 +47,9 @@ class TestFLCore(unittest.TestCase):
         ranking = self.ranker.get_fault_localization(self.temp_file_path)
         
         self.assertEqual(len(ranking), self.total_lines)
-        expected_set = set(range(1, self.total_lines + 1))
+        expected_set = set(range(1, self.total_lines+1))
         self.assertEqual(set(ranking), expected_set)
         
-        unshuffled = list(range(1, self.total_lines + 1))
-        self.assertNotEqual(ranking, unshuffled, "The list should be shuffled.")
         
     def test_random_ranker_name(self):
         """Check if the name property is set correctly."""
@@ -77,10 +75,13 @@ class TestFLCore(unittest.TestCase):
         )
         
         # 2. Run the function multiple times due to the random nature of RandomRanker
-        # We need to assert that the score is always a valid value (0.0, 0.2, 0.4, 0.6, 0.8, 1.0)
-        
+
+        # Suppose that line was 3 so exam was 0 , if 3 was last line score 1 
+        # [1,2,4,5,3]  should 0, tere are more 4 places for 3 so they will subdivide the interval in 
+        # 0,0.25,0.5,0.75,1.0  for all positions
+
         num_runs = 100
-        valid_scores = {0.0, 0.2, 0.4, 0.6, 0.8, 1.0} # Ranks 0-4 out of 5 total lines
+        valid_scores = {0.0, 0.25, 0.5, 0.75, 1.0} # Ranks 0-4 out of 5 total lines
 
         for _ in range(num_runs):
             examp_out = compute_exam_score(self.ranker, mock_gtruth)

@@ -162,8 +162,8 @@ if __name__ == "__main__":
 How to use:
   Run the script from the project root directory.
 
-  Example 1: Evaluate the 'random' technique using data in 'src/pos_test'
-    $ python src/main.py random src/pos_test
+    Example 1: Evaluate the 'random' technique using data in 'datasets/pos_test'
+        $ python src/main.py random datasets/pos_test
 
   Example 2: Evaluate a hypothetical 'tarantula' technique using data in 'data/mutants'
     $ python src/main.py tarantula data/mutants
@@ -185,7 +185,7 @@ How to use:
     parser.add_argument(
         "data_path", 
         type=Path,
-        help="The path to the parent directory containing the 'killed' and 'original' folders (e.g., src/pos_test)."
+        help="The path to the parent directory containing the 'killed' and 'original' folders (e.g., datasets/pos_test)."
     )
 
     parser.add_argument(

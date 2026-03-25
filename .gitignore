@@ -9,6 +9,7 @@ datasets/*
 !datasets/dafnybench_original_can_run.tar.gz
 !datasets/sample_original_can_run.tar.gz
 !datasets/dafnytestgen_tests_can_run.tar.gz
+!datasets/pos_test.tar.gz
 
 
 # Byte-compiled / optimized / DLL files

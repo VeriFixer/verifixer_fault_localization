@@ -8,7 +8,7 @@ mkdir -p "$OUT_DIR/killed"
 mkdir -p "$OUT_DIR/original"
 
 #FULL_DATASET_DIR="${BASE_PATH}/datasets/dafnybench_original_can_run"
-FULL_DATASET_DIR="${BASE_PATH}/src/pos_test"
+FULL_DATASET_DIR="${BASE_PATH}/datasets/pos_test"
 
 ORIG_DIR="$FULL_DATASET_DIR/original"
 KILLED_DIR="$FULL_DATASET_DIR/killed"   # define killed directory

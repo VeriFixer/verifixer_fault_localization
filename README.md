@@ -46,11 +46,11 @@ If there is a necessity to not use Docker, all dependencies can be seen also in 
 - `src/` — Main Python evaluation framework.
   - `run_1_model.py` — Run one technique and compute EXAM score.
   - `run_all_models.py` — Run all implemented techniques and generate summary tables + plots.
+  - `run_pos_test_guard.py` — CI safeguard runner (extracts `pos_test` tar, runs all models, validates outputs).
   - `fl_eval/` — Core evaluation library (strategies, metrics, ground truth parsing, utilities).
   - `pos_mutation/` — Example dataset: contains `killed/` and `original/` subfolders.
-  - `pos_test/` — Small dataset for quick experiments.
 - `strategies/` — (Optional) C# helper projects used by some strategies.
-- `datasets/` — Generated dataset outputs (e.g., filtered subsets).
+- `datasets/` — Dataset tarballs (Git LFS tracked) and extracted datasets used at runtime.
 - `mutdafny/` — Mutation tool integration.
 - `dafny/` — Dafny source code and tools.
 
@@ -66,7 +66,9 @@ The evaluation scripts expect a dataset directory containing **two subfolders**:
 Example paths in this repo:
 
 - `src/pos_mutation/` (larger dataset)
-- `src/pos_test/` (smaller test dataset)
+- `datasets/pos_test/` (smaller test dataset, extracted from `datasets/pos_test.tar.gz`)
+
+`pos_test` is stored as a tarball in `datasets/pos_test.tar.gz` (LFS tracked), matching the policy used for other datasets.
 
 Each mutation entry is represented as a `.txt` diff file (`killed/*.txt`) and a corresponding `.dfy` mutant (`killed/*.dfy`).
 
@@ -104,6 +106,24 @@ python src/run_1_model.py random src/pos_mutation
 
 ```bash
 python src/run_all_models.py src/pos_mutation
+```
+
+### Run infrastructure safeguard on `pos_test`
+
+```bash
+python src/run_pos_test_guard.py --dataset-tar datasets/pos_test.tar.gz --clean-cache
+```
+
+This command will:
+
+- extract `datasets/pos_test.tar.gz` into `datasets/pos_test/`
+- run all techniques with `src/run_all_models.py`
+- verify expected artifacts (plot + per-technique cache outputs)
+
+### Run Python unit tests
+
+```bash
+pytest -q
 ```
 
 This produces:
