@@ -3,8 +3,10 @@ import argparse
 from pathlib import Path
 from typing import Type
 import shutil
+import sys
 
 import config as gl
+from logging_config import get_logger
 # --- Import Core Components from fl_eval package ---
 from fl_eval.core.abstract import FLTechnique
 
@@ -25,6 +27,9 @@ from fl_eval.metrics.scoring import ExamOutput
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
 
 from typing import Type, Optional
+
+logger = get_logger(__name__)
+
 # --- Mapping of Technique Names to Classes ---
 TECHNIQUE_MAP: dict[str, type[FLTechnique]] = {
     "random": RandomRanker,
@@ -43,8 +48,8 @@ def _setup_evaluation(flt_name: str, base_path: Path) -> tuple[FLTechnique, Path
     """
     # 1. Technique Validation
     if flt_name not in TECHNIQUE_MAP:
-        print(f"Error: Fault Localization Technique '{flt_name}' not recognized.")
-        print(f"Available techniques: {list(TECHNIQUE_MAP.keys())}")
+        logger.error(f"Fault Localization Technique '{flt_name}' not recognized.")
+        logger.error(f"Available techniques: {list(TECHNIQUE_MAP.keys())}")
         return None
 
     FLT_Class = TECHNIQUE_MAP[flt_name]
@@ -55,7 +60,7 @@ def _setup_evaluation(flt_name: str, base_path: Path) -> tuple[FLTechnique, Path
     original_dir = base_path / "original"
     
     if not killed_dir.is_dir() or not original_dir.is_dir():
-        print(f"Error: Required 'killed' or 'original' directories not found in {base_path}")
+        logger.error(f"Required 'killed' or 'original' directories not found in {base_path}")
         return None
         
     return fl_technique, killed_dir, original_dir
@@ -75,7 +80,7 @@ def _process_mutation(
     mutant_dfy_path = killed_dir / f"{mutation_name}.dfy"
     
     if not mutant_dfy_path.is_file():
-        print(f"Warning: Corresponding mutant file not found for {diff_path}. Skipping.")
+        logger.warning(f"Corresponding mutant file not found for {diff_path}. Skipping.")
         return None
 
     try:
@@ -84,7 +89,7 @@ def _process_mutation(
         original_file = original_dir / f"{base_name_raw}.dfy"
         
         if not original_file.is_file():
-            print(f"Error: Original file '{original_file.name}' not found. Skipping {mutation_name}.")
+            logger.error(f"Original file '{original_file.name}' not found. Skipping {mutation_name}.")
             return None
 
         # Create Ground Truth object and compute score
@@ -98,11 +103,11 @@ def _process_mutation(
         return exam_output
 
     except ValueError as e:
-        print(f"Error processing {mutation_name} (Value Error): {e}. Skipping.")
+        logger.error(f"Error processing {mutation_name} (Value Error): {e}. Skipping.")
     except IOError as e:
-        print(f"File error processing {mutation_name}: {e}. Skipping.")
+        logger.error(f"File error processing {mutation_name}: {e}. Skipping.")
     except Exception as e:
-        print(f"An unexpected error occurred for {mutation_name}: {e}. Skipping.")
+        logger.error(f"An unexpected error occurred for {mutation_name}: {e}. Skipping.")
         
     return None
 
@@ -110,10 +115,10 @@ def _process_mutation(
 
 def _generate_report(flt_name: str, all_scores: list[ExamOutput]) -> None:
     """
-    Computes the final average and prints the evaluation summary in a neat table.
+    Computes the final average and logs the evaluation summary in a neat table.
     """
     if not all_scores:
-        print("\nNo mutations were successfully evaluated.")
+        logger.info("\nNo mutations were successfully evaluated.")
         return
 
     # Compute metrics
@@ -123,15 +128,15 @@ def _generate_report(flt_name: str, all_scores: list[ExamOutput]) -> None:
     empty_score = sum(x.empty for x in all_scores) / total
 
     # Table formatting
-    print("\n" + "="*60)
-    print(f"{'EVALUATION SUMMARY':^60}")
-    print("="*60)
-    print(f"{'Filter Name':30}: {flt_name.upper():<27}")
-    print(f"{'Total Mutations':30}: {total:<27}")
-    print(f"{'Average EXAM Score':30}: {average_score:.6f}")
-    print(f"{'Fault Found (%)':30}: {found_score:.6f}")
-    print(f"{'Empty Predictions (%)':30}: {empty_score:.6f}")
-    print("="*60 + "\n")
+    logger.info("\n" + "="*60)
+    logger.info(f"{'EVALUATION SUMMARY':^60}")
+    logger.info("="*60)
+    logger.info(f"{'Filter Name':30}: {flt_name.upper():<27}")
+    logger.info(f"{'Total Mutations':30}: {total:<27}")
+    logger.info(f"{'Average EXAM Score':30}: {average_score:.6f}")
+    logger.info(f"{'Fault Found (%)':30}: {found_score:.6f}")
+    logger.info(f"{'Empty Predictions (%)':30}: {empty_score:.6f}")
+    logger.info("="*60 + "\n")
 
 # --- Orchestrator Function ---
 def compute_metrics(flt_name: str, base_path: Path, sequential: bool = False) -> None:
@@ -204,20 +209,20 @@ How to use:
 
     # Check if the path exists before proceeding
     if not args.data_path.exists():
-        print(f"Error: Data path not found: {args.data_path}")
+        logger.error(f"Data path not found: {args.data_path}")
         parser.print_help()
     else:
         cache_dir = gl.CACHE_DIR
         if args.clean_cache:
-            print("Cleaning: Results Cache")
+            logger.info("Cleaning: Results Cache")
             if cache_dir.exists():
                 try:
                     shutil.rmtree(cache_dir)
-                    print(f"Removed cache directory: {cache_dir}")
+                    logger.info(f"Removed cache directory: {cache_dir}")
                 except OSError as e:
-                    print(f"Could not remove cache directory {cache_dir}: {e}")
+                    logger.error(f"Could not remove cache directory {cache_dir}: {e}")
             else:
-                print(f"No cache directory found at: {cache_dir}")
+                logger.warning(f"No cache directory found at: {cache_dir}")
         else:
-            print(f"Using cached Results if any at {cache_dir}")
+            logger.info(f"Using cached results if any at {cache_dir}")
         compute_metrics(args.technique_name, args.data_path, args.sequential)

@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -22,7 +22,7 @@ def test_compare_two_methods_basic():
         ]
     }
     
-    # Capture print output
+    # Capture print output (for ASCII/LaTeX table output)
     with patch('builtins.print') as mock_print:
         compare_two_methods(raw_results, 'tech1', 'tech2')
         
@@ -31,28 +31,34 @@ def test_compare_two_methods_basic():
         
         # Check some key outputs
         calls = [call.args[0] for call in mock_print.call_args_list]
-        assert any("Statistical Comparison" in call for call in calls)
-        assert any("Debugging Overview" in call for call in calls)
+        assert any("Statistical Comparison" in str(call) for call in calls)
+        assert any("Debugging Overview" in str(call) for call in calls)
 
 def test_compare_two_methods_missing_tech():
     """Test with missing technique"""
     raw_results = {'tech1': []}
     
-    with patch('builtins.print') as mock_print:
+    # Mock the logger to capture error messages
+    with patch('analysis.data_analysis.logger') as mock_logger:
         compare_two_methods(raw_results, 'tech1', 'tech2')
         
-        calls = [call.args[0] for call in mock_print.call_args_list]
-        assert any("not found in results" in call for call in calls)
+        # Check that logger.error was called with appropriate message
+        mock_logger.error.assert_called()
+        error_calls = [call.args[0] if call.args else str(call.kwargs) for call in mock_logger.error.call_args_list]
+        assert any("not found in results" in str(call) for call in error_calls)
 
 def test_compare_two_methods_empty_data():
     """Test with empty data"""
     raw_results = {'tech1': [], 'tech2': []}
     
-    with patch('builtins.print') as mock_print:
+    # Mock the logger to capture error messages
+    with patch('analysis.data_analysis.logger') as mock_logger:
         compare_two_methods(raw_results, 'tech1', 'tech2')
         
-        calls = [call.args[0] for call in mock_print.call_args_list]
-        assert any("No data" in call for call in calls)
+        # Check that logger.error was called with appropriate message
+        mock_logger.error.assert_called()
+        error_calls = [call.args[0] if call.args else str(call.kwargs) for call in mock_logger.error.call_args_list]
+        assert any("No data" in str(call) for call in error_calls)
 
 def test_compare_two_methods_different_success_rates():
     """Test with different success patterns"""

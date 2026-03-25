@@ -36,6 +36,7 @@ docker run --rm -it -w /app  dafny_research:latest bash
 docker run --rm -it \
   -u $(id -u):$(id -g) \
   -e PYTHONPATH=/app/src \
+  -e FL_LOG_LEVEL=INFO \
   -e PYTEST_ADDOPTS='-o cache_dir=/tmp/pytest_cache' \
   -v "$(pwd)/src:/app/src:delegated" \
   -v "$(pwd)/Dafny-AutoFix:/app/Dafny-AutoFix:delegated" \
@@ -49,6 +50,24 @@ docker run --rm -it \
 ```
 # Inside the container 
 Once inside the contaner follow the main README, README.md
+
+# Logging Configuration
+
+Control logging output inside the container with `FL_LOG_LEVEL` environment variable:
+
+```shell
+# Verbose debugging (shows all messages)
+docker run ... -e FL_LOG_LEVEL=DEBUG ... 
+
+# Info level (default, shows info/warning/error)
+docker run ... -e FL_LOG_LEVEL=INFO ...
+
+# Errors only
+docker run ... -e FL_LOG_LEVEL=ERROR ...
+
+# Save logs to file (optional)
+docker run ... -e FL_LOG_FILE=/app/run.log ...
+```
 
 # Non-interactive test pipeline commands (inside container)
 

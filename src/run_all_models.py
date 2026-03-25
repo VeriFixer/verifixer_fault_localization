@@ -5,6 +5,7 @@ from typing import Any
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
 from fl_eval.metrics.scoring import ExamOutput
 import config as gl
+from logging_config import get_logger
 from run_1_model import (
         TECHNIQUE_MAP, 
         _setup_evaluation,  # type: ignore
@@ -12,17 +13,19 @@ from run_1_model import (
     )
 from analysis.data_analysis import print_ascii_table, print_latex_table, generate_plots
 
+logger = get_logger(__name__)
+
 def run_benchmark(base_path: Path, sequential: bool = False) -> None:
-    print(f"Starting Benchmark on: {base_path}")
-    print(f"Techniques to run: {list(TECHNIQUE_MAP.keys())}")
+    logger.info(f"Starting Benchmark on: {base_path}")
+    logger.info(f"Techniques to run: {list(TECHNIQUE_MAP.keys())}")
     raw_results: dict[str, list[ExamOutput]] = {}
     stats_summary: dict[str, dict[str, Any]] = {}
     
     for tech_name in TECHNIQUE_MAP:
-        print(f"\n--- Running {tech_name.upper()} ---")
+        logger.info(f"\n--- Running {tech_name.upper()} ---")
         setup_res = _setup_evaluation(tech_name, base_path)
         if not setup_res:
-            print(f"Skipping {tech_name} due to setup failure.")
+            logger.warning(f"Skipping {tech_name} due to setup failure.")
             continue
         fl_technique, killed_dir, original_dir = setup_res
         diff_paths = list(killed_dir.glob("*.txt"))
@@ -52,14 +55,14 @@ def run_benchmark(base_path: Path, sequential: bool = False) -> None:
             'exist_rate' : exist
         }
     if not stats_summary:
-        print("No results collected.")
+        logger.info("No results collected.")
         return
     print_ascii_table(stats_summary)  # type: ignore
     print_latex_table(stats_summary)  # type: ignore
     try:
         generate_plots(raw_results, base_path.parent)  # type: ignore
     except Exception as e:
-        print(f"Could not generate plots: {e}")
+        logger.error(f"Could not generate plots: {e}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark ALL Fault Localization techniques.")
@@ -83,20 +86,20 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
     if not args.data_path.exists():
-        print(f"Path not found: {args.data_path}")
+        logger.error(f"Path not found: {args.data_path}")
 
     cache_dir = gl.CACHE_DIR
     if args.clean_cache:
-        print("Cleaning: Results Cache")
+        logger.info("Cleaning: Results Cache")
         if cache_dir.exists():
             try:
                 shutil.rmtree(cache_dir)
-                print(f"Removed cache directory: {cache_dir}")
+                logger.info(f"Removed cache directory: {cache_dir}")
             except OSError as e:
-                print(f"Could not remove cache directory {cache_dir}: {e}")
+                logger.error(f"Could not remove cache directory {cache_dir}: {e}")
         else:
-            print(f"No cache directory found at: {cache_dir}")
+            logger.warning(f"No cache directory found at: {cache_dir}")
     else:
-        print(f"Using cached Results if any at {cache_dir}")
+        logger.info(f"Using cached results if any at {cache_dir}")
   
     run_benchmark(args.data_path, args.sequential)

@@ -6,6 +6,9 @@ from matplotlib.patches import Patch
 from matplotlib.lines import Line2D  # type: ignore
 from typing import Any
 from fl_eval.metrics.scoring import ExamOutput
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 def print_ascii_table(stats: dict[str, dict[str, Any]]):
     """Prints a clean ASCII table of the results."""
@@ -181,14 +184,14 @@ def compare_two_methods(raw_results: dict[str, list[ExamOutput]], tech1: str, te
     Compares only files that both techniques have evaluated.
     """
     if tech1 not in raw_results or tech2 not in raw_results:
-        print(f"Error: One or both techniques ({tech1}, {tech2}) not found in results.")
+        logger.error(f"One or both techniques ({tech1}, {tech2}) not found in results.")
         return
     
     data1 = raw_results[tech1]
     data2 = raw_results[tech2]
     
     if not data1 or not data2:
-        print(f"Error: No data for {tech1} or {tech2}.")
+        logger.error(f"No data for {tech1} or {tech2}.")
         return
     
     # Create dictionaries keyed by filename

@@ -4,6 +4,9 @@ import config as gl
 from pathlib import Path
 import re
 from typing import Any
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 # This will try to find globs like this base_dir/**pattern see other files for more examples
@@ -33,13 +36,12 @@ class RandomLineOfMethodThatFails(FLTechnique):
         (status, stdout, stderr) = run_cmd.run_external_cmd(command)
         if(status != run_cmd.Status.OK):
             # If run cmd finished by any reason with error send empty prediction
-            print("Sending empty prediciton because of error in execution")
-            print(command)
-            print(status)
-            print(stdout)
-            print(stderr)
-
-            print("---------------------")
+            logger.error("Sending empty prediction because of error in execution")
+            logger.debug(f"Command: {command}")
+            logger.debug(f"Status: {status}")
+            logger.debug(f"Stdout: {stdout}")
+            logger.debug(f"Stderr: {stderr}")
+            logger.debug("-" * 30)
             return []
 
         match = re.search(r"spans lines (\d+) to (\d+)", stdout)
