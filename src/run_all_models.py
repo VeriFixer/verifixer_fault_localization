@@ -1,7 +1,7 @@
 import argparse
 import shutil
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Any
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
 from fl_eval.metrics.scoring import ExamOutput
 import config as gl
@@ -15,8 +15,8 @@ from analysis.data_analysis import print_ascii_table, print_latex_table, generat
 def run_benchmark(base_path: Path, sequential: bool = False) -> None:
     print(f"Starting Benchmark on: {base_path}")
     print(f"Techniques to run: {list(TECHNIQUE_MAP.keys())}")
-    raw_results: Dict[str, List[ExamOutput]] = {}
-    stats_summary: Dict[str, Dict[str, Any]] = {}
+    raw_results: dict[str, list[ExamOutput]] = {}
+    stats_summary: dict[str, dict[str, Any]] = {}
     
     for tech_name in TECHNIQUE_MAP:
         print(f"\n--- Running {tech_name.upper()} ---")

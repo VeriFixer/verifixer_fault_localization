@@ -4,10 +4,10 @@ from scipy.stats import gaussian_kde, ttest_ind, mannwhitneyu, shapiro  # type: 
 from pathlib import Path
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D  # type: ignore
-from typing import Dict, List, Any
+from typing import Any
 from fl_eval.metrics.scoring import ExamOutput
 
-def print_ascii_table(stats: Dict[str, Dict[str, Any]]):
+def print_ascii_table(stats: dict[str, dict[str, Any]]):
     """Prints a clean ASCII table of the results."""
     h_tech = "Technique"
     h_count = "Evaluated"
@@ -35,7 +35,7 @@ def print_ascii_table(stats: Dict[str, Dict[str, Any]]):
         print(f"| {name:<{w_tech}} | {count:<{w_count}} | {avg:<{w_avg}} | {found:<{w_found}} | {exist:<{w_exist}}")
     print(separator + "\n")
 
-def print_latex_table(stats: Dict[str, Dict[str, Any]]):
+def print_latex_table(stats: dict[str, dict[str, Any]]):
     """Prints a LaTeX ready table of the results."""
     print("\n--- LaTeX Table Output ---")
     print(r"\begin{table}[h]")
@@ -60,7 +60,7 @@ def print_latex_table(stats: Dict[str, Dict[str, Any]]):
     print(r"\end{table}")
     print("--------------------------\n")
 
-def generate_plots(raw_results: Dict[str, List[ExamOutput]], output_path: Path): 
+def generate_plots(raw_results: dict[str, list[ExamOutput]], output_path: Path): 
     techniques = list(raw_results.keys())
     labels = [t for t in techniques if raw_results[t]]
     
@@ -175,7 +175,7 @@ def generate_plots(raw_results: Dict[str, List[ExamOutput]], output_path: Path):
     print(f"Final hybrid plots saved to: {filename}")
 
 
-def compare_two_methods(raw_results: Dict[str, List[ExamOutput]], tech1: str, tech2: str):
+def compare_two_methods(raw_results: dict[str, list[ExamOutput]], tech1: str, tech2: str):
     """
     Compare two fault localization techniques statistically and provide debugging insights.
     Compares only files that both techniques have evaluated.

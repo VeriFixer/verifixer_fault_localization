@@ -1,7 +1,7 @@
 
 import argparse
 from pathlib import Path
-from typing import Dict, Type, List, Tuple
+from typing import Type
 import shutil
 
 import config as gl
@@ -24,9 +24,9 @@ from fl_eval.metrics.scoring import ExamOutput
 
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
 
-from typing import Dict, Type, List, Tuple, Optional
+from typing import Type, Optional
 # --- Mapping of Technique Names to Classes ---
-TECHNIQUE_MAP: Dict[str, Type[FLTechnique]] = {
+TECHNIQUE_MAP: dict[str, type[FLTechnique]] = {
     "random": RandomRanker,
     "counterBase": CounterExampleBaseRanker,
     "empty": EmptyRanker,
@@ -36,7 +36,7 @@ TECHNIQUE_MAP: Dict[str, Type[FLTechnique]] = {
     "autofix": AutoFixRanker
 }
 
-def _setup_evaluation(flt_name: str, base_path: Path) -> Optional[Tuple[FLTechnique, Path, Path]]:
+def _setup_evaluation(flt_name: str, base_path: Path) -> tuple[FLTechnique, Path, Path] | None:
     """
     Handles validation, FL Technique instantiation, and directory setup.
     Returns the FLT instance and paths if successful, otherwise None.
@@ -108,7 +108,7 @@ def _process_mutation(
 
 # --- Helper 3: Reporting ---
 
-def _generate_report(flt_name: str, all_scores: List[ExamOutput]) -> None:
+def _generate_report(flt_name: str, all_scores: list[ExamOutput]) -> None:
     """
     Computes the final average and prints the evaluation summary in a neat table.
     """
