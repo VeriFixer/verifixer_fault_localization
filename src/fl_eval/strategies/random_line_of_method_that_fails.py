@@ -15,7 +15,7 @@ def _find_executable(base_dir : Path, pattern : str) -> Path:
 
 class RandomLineOfMethodThatFails(FLTechnique):
     def __init__(self, name: str, **kwargs: Any) -> None:
-        super().__init__(name, **kwargs)  # type: ignore
+        super().__init__(name)
 
     def get_fault_localization(self, file: Path) -> list[int]:
         # Create command to run 

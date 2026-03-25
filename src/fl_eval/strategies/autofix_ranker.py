@@ -9,7 +9,7 @@ import fl_eval.util.run_external_cmd as run_cmd
 
 class AutoFixRanker(FLTechnique):
     def __init__(self, name: str, **kwargs: Any) -> None:
-        super().__init__(name)  # type: ignore
+        super().__init__(name, **kwargs)
         self.autofix_strategy = kwargs.get("autofix_strategy", "dynamic-and-static-score")
         if self.autofix_strategy not in {"dynamic-and-static-score", "dynamic-score-only"}:
             raise ValueError(

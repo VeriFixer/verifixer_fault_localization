@@ -1,27 +1,31 @@
 from fl_eval.core.abstract import FLTechnique
 import fl_eval.util.run_external_cmd as run_cmd
 import fl_eval.util.globals as gl
-from typing import Any
+from typing import Any, cast
 from pathlib import Path
 import json
 import re
 import os
 
 class CounterExampleBaseRanker(FLTechnique):
-    def __init__(self, name: str, **kwargs) -> None:
+    def __init__(self, name: str, **kwargs: Any) -> None:
         super().__init__(name, **kwargs)
         self.dafny = os.environ.get("DAFNY_EXEC") or "dafny"
-        assert (self.dafny != None), "an environmental variable DAFNY_EXEC must be set to dafny binary path"
 
-    def get_counterexample_lines_from_json_diagnostic(self, diagnostic : dict[Any]) -> tuple[bool, list[int]]:
+    def get_counterexample_lines_from_json_diagnostic(self, diagnostic: dict[str, Any]) -> tuple[bool, list[int]]:
         lines_on_counterexamples : list[int] = []
         try:
-            counter_message: str = diagnostic["value"]["defaultFormatMessage"]
+            value = diagnostic["value"]
+            if not isinstance(value, dict):
+                return (False, lines_on_counterexamples)
+            value_dict = cast(dict[str, Any], value)
+            counter_message = value_dict.get("defaultFormatMessage")
+            if not isinstance(counter_message, str):
+                return (False, lines_on_counterexamples)
         except KeyError:
             # Handle cases where the dictionary structure is unexpected
             return (False, lines_on_counterexamples)
 
-        counter_message = diagnostic["value"]["defaultFormatMessage"]
         counterexample_must_have_string = "DafnyRef#sec-counterexamples"
         was_found_counter_example = False
         line_column_pattern = re.compile(r"dfy\((\d+),\s*\d+\)")
@@ -41,7 +45,8 @@ class CounterExampleBaseRanker(FLTechnique):
         return (was_found_counter_example, lines_on_counterexamples)
 
     def get_fault_localization(self, file: Path) -> list[int]:
-        assert(file.exists()), "File should exist when calling this function"
+        if not file.exists():
+            raise FileNotFoundError(f"File does not exist: {file}")
 
         # run this command and get the output on a variable
         command: list[str] = [
@@ -56,7 +61,9 @@ class CounterExampleBaseRanker(FLTechnique):
 
         ]
 
-        (status, stdout, stderr) = run_cmd.run_external_cmd(command)
+        (status, stdout, _stderr) = run_cmd.run_external_cmd(command)
+        if status != run_cmd.Status.OK:
+            return []
         
         # Separate json in actuall newlines need to escape new lines \\n inside json and put them back together
         placeholder = "___ESCAPED_NEWLINE_PLACEHOLDER___"
@@ -66,10 +73,10 @@ class CounterExampleBaseRanker(FLTechnique):
         results_json_list = [r.replace(placeholder,"\\n") for r in results_json_list]
 
 
-        diagnostics = []
+        diagnostics: list[dict[str, Any]] = []
         for result in results_json_list:
-            result_json = json.loads(result)
-            if(result_json["type"] == "diagnostic"):
+            result_json: dict[str, Any] = json.loads(result)
+            if(result_json.get("type") == "diagnostic"):
                 diagnostics.append(result_json)
         
         # Will use basic Grouping (meaning all lines are gatherer per order)

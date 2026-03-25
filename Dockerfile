@@ -5,7 +5,8 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/src
 
 WORKDIR /app
 
@@ -77,6 +78,9 @@ ENV PATH="${DAIKONDIR}:${PATH}"
 
 # Now copy the rest of src
 COPY src/ /app/src/
+
+# Keep pytest configuration available in-container so test discovery/path settings match local runs
+COPY pytest.ini /app/pytest.ini
 
 # Small marker file
 COPY .repo_verifixer_fault_localization_marker /app/

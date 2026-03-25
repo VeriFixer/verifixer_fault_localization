@@ -35,13 +35,14 @@ docker run --rm -it -w /app  dafny_research:latest bash
 ```shell
 docker run --rm -it \
   -u $(id -u):$(id -g) \
+  -e PYTHONPATH=/app/src \
+  -e PYTEST_ADDOPTS='-o cache_dir=/tmp/pytest_cache' \
   -v "$(pwd)/src:/app/src:delegated" \
   -v "$(pwd)/Dafny-AutoFix:/app/Dafny-AutoFix:delegated" \
   -v "$(pwd)/run_artifacts:/app/run_artifacts:delegated" \
   -v "$(pwd)/DafnyTestGen:/app/DafnyTestGen:delegated" \
   -v "$(pwd)/mutdafny:/app/mutdafny:delegated" \
   -v "$(pwd)/datasets:/app/datasets:delegated" \
-  -v "$(pwd)/Dafny-AutoFix:/app/Dafny-AutoFix:delegated" \
   -v "$(pwd)/strategies:/app/strategies:delegated" \
   -w /app \
   dafny_research:latest bash
