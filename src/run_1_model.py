@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, Type, List, Tuple
 import shutil
 
-import fl_eval.util.globals as gl
+import config as gl
 # --- Import Core Components from fl_eval package ---
 from fl_eval.core.abstract import FLTechnique
 
@@ -23,7 +23,6 @@ from fl_eval.metrics.scoring import compute_exam_score
 from fl_eval.metrics.scoring import ExamOutput
 
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
-from fl_eval.util.globals import *
 
 from typing import Dict, Type, List, Tuple, Optional
 # --- Mapping of Technique Names to Classes ---

@@ -1,11 +1,9 @@
 import unittest
+import tempfile
 from pathlib import Path
 
 # Assume fl_eval is correctly installed or paths are set up for relative import
 from fl_eval.strategies.random_ranker import RandomRanker
-from pathlib import Path
-
-# Assume fl_eval is correctly installed or paths are set up for relative import
 from fl_eval.metrics.scoring import compute_exam_score # Assuming this is the renamed compute_exam_score_one_file
 
 # --- MOCK CLASSES (needed for the test environment) ---
@@ -22,7 +20,9 @@ class TestFLCore(unittest.TestCase):
     
     def setUp(self):
         """Create a temporary dummy file for testing."""
-        self.temp_file_path = Path("temp_code_file.py")
+        # Use tempfile for cross-platform, permission-safe temp file creation
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.temp_file_path = Path(self.temp_dir.name) / "temp_code_file.py"
         self.code_content = (
             "line 1\n"
             "line 2\n"
@@ -35,9 +35,8 @@ class TestFLCore(unittest.TestCase):
         self.ranker = RandomRanker(name="TestRanker")
 
     def tearDown(self):
-        """Clean up the temporary file."""
-        if self.temp_file_path.exists():
-            self.temp_file_path.unlink()
+        """Clean up the temporary directory."""
+        self.temp_dir.cleanup()
 
     # --- Original Tests ---
     

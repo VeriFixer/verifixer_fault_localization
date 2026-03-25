@@ -1,0 +1,129 @@
+"""
+Central configuration module for Fault Localization framework.
+
+Handles:
+- Repository root discovery via marker file
+- Cache and output directory paths
+- Performance limits (timeout, memory) for external programs
+- Strategy executable paths with environment variable overrides
+"""
+
+from pathlib import Path
+import os
+from typing import Optional
+
+
+def find_repo_root(marker: str = ".repo_verifixer_fault_localization_marker") -> Path:
+    """Finds the root of the repository by looking for a marker file.
+    
+    Args:
+        marker: Filename to search for (default: .repo_verifixer_fault_localization_marker)
+    
+    Returns:
+        Path to the repository root directory
+    
+    Raises:
+        FileNotFoundError: If marker file is not found when traversing up from current module
+    """
+    current: Path = Path(__file__).resolve().parent
+    while str(current) != current.root:
+        if (current / marker).exists():
+            return current
+        current = current.parent
+    raise FileNotFoundError("Could not find repository root. Make sure you're running inside a valid repo.")
+
+
+# === Repository Structure ===
+BASE_PATH: Path = find_repo_root()
+
+# === Output and Cache Directories ===
+CACHE_DIR: Path = BASE_PATH / "run_artifacts" / "cached_results"
+AUTOFIX_RUNS_DIR: Path = BASE_PATH / "run_artifacts" / "autofix_fl_runs"
+
+# === Performance Limits for External Programs ===
+# Can be overridden via environment variables: FL_MAX_RAM_GB, FL_MAX_TIME_SECONDS
+MAX_RAM_EXTERNAL_PROGRAMS: int = int(os.environ.get("FL_MAX_RAM_GB", "24"))  # GBytes
+MAX_TIME_EXTERNAL_PROGRAMS: int = int(os.environ.get("FL_MAX_TIME_SECONDS", "60"))  # Seconds
+
+# === Strategy Executable Paths ===
+# These are discovered via BASE_PATH but can be overridden via environment variables
+# for custom build locations or non-standard setups
+
+def get_strategy_executable_path(
+    strategy_name: str,
+    env_var_name: Optional[str] = None
+) -> Optional[Path]:
+    """Get the path to a strategy executable with environment variable override support.
+    
+    Args:
+        strategy_name: Name of strategy (e.g., 'CounterExampleIf')
+        env_var_name: Optional environment variable name to check for override
+    
+    Returns:
+        Path to executable if found, None otherwise
+    """
+    # Check environment override first
+    if env_var_name and env_var_name in os.environ:
+        override_path = Path(os.environ[env_var_name])
+        if override_path.is_file():
+            return override_path
+    
+    # Default discovery location
+    default_search_dir = BASE_PATH / f"build_output/{strategy_name}"
+    if default_search_dir.exists():
+        return default_search_dir
+    
+    return None
+
+
+# Convenience accessors for known strategies
+COUNTER_EXAMPLE_IF_DIR: Optional[Path] = get_strategy_executable_path(
+    "CounterExampleIf",
+    "FL_COUNTER_EXAMPLE_IF_DIR"
+)
+COUNTER_EXAMPLE_IF_REASSUME_DIR: Optional[Path] = get_strategy_executable_path(
+    "CounterExampleIfReassume",
+    "FL_COUNTER_EXAMPLE_IF_REASSUME_DIR"
+)
+RETURN_AT_RANDOM_ALL_LINES_DIR: Optional[Path] = get_strategy_executable_path(
+    "ReturnAtRandomAllLinesOfFailingMethod",
+    "FL_RETURN_AT_RANDOM_ALL_LINES_DIR"
+)
+AUTOFIX_DIR: Path = BASE_PATH / "Dafny-AutoFix"
+
+# Autofix script path
+AUTOFIX_SCRIPT: Path = AUTOFIX_DIR / "run.sh"
+
+
+def print_config(verbose: bool = True) -> None:
+    """Print all configuration values to stdout.
+    
+    Useful for debugging and verifying configuration at runtime.
+    
+    Args:
+        verbose: If True, print all configuration values. If False, print minimal info.
+    """
+    if verbose:
+        print("\n" + "="*70)
+        print("FAULT LOCALIZATION CONFIGURATION")
+        print("="*70)
+        print(f"Repository Root (BASE_PATH)        : {BASE_PATH}")
+        print(f"Cache Directory                    : {CACHE_DIR}")
+        print(f"AutoFix Runs Directory             : {AUTOFIX_RUNS_DIR}")
+        print(f"Max RAM for External Programs      : {MAX_RAM_EXTERNAL_PROGRAMS} GB")
+        print(f"Max Time for External Programs     : {MAX_TIME_EXTERNAL_PROGRAMS} seconds")
+        print()
+        print("Strategy Directories:")
+        print(f"  CounterExampleIf                 : {COUNTER_EXAMPLE_IF_DIR if COUNTER_EXAMPLE_IF_DIR else '(not found)'}")
+        print(f"  CounterExampleIfReassume         : {COUNTER_EXAMPLE_IF_REASSUME_DIR if COUNTER_EXAMPLE_IF_REASSUME_DIR else '(not found)'}")
+        print(f"  ReturnAtRandomAllLines           : {RETURN_AT_RANDOM_ALL_LINES_DIR if RETURN_AT_RANDOM_ALL_LINES_DIR else '(not found)'}")
+        print(f"  AutoFix                          : {AUTOFIX_DIR if AUTOFIX_DIR else '(not found)'}")
+        print()
+    else:
+        print(f"Config: BASE_PATH={BASE_PATH}, MAX_RAM={MAX_RAM_EXTERNAL_PROGRAMS}GB, MAX_TIME={MAX_TIME_EXTERNAL_PROGRAMS}s")
+
+
+# === Initialization ===
+# Print configuration at module load time if FL_VERBOSE is set
+if __name__ != "__main__" and os.environ.get("FL_VERBOSE"):
+    print_config(verbose=True)

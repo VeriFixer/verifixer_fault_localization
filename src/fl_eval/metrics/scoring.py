@@ -1,6 +1,6 @@
 from fl_eval.core.abstract import FLTechnique 
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
-import fl_eval.util.globals as gl
+import config as gl
 from pathlib import Path
 import json
 import traceback

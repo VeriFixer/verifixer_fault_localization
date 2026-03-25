@@ -1,6 +1,6 @@
 from fl_eval.core.abstract import FLTechnique
 import fl_eval.util.run_external_cmd as run_cmd
-import fl_eval.util.globals as gl
+import config as gl
 import json
 import re
 from pathlib import Path

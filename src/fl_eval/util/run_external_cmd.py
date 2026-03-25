@@ -1,4 +1,4 @@
-import fl_eval.util.globals as gl
+import config as gl
 import subprocess
 from enum import Enum
 

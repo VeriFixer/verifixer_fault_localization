@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, List, Any
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
 from fl_eval.metrics.scoring import ExamOutput
-import fl_eval.util.globals as gl
+import config as gl
 
 from run_1_model import (
         TECHNIQUE_MAP, 
