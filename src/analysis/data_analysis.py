@@ -106,7 +106,7 @@ def generate_plots(raw_results: dict[str, list[ExamOutput]], output_path: Path):
 
         # --- 2. Overlay Overall Box Plot ---
         # This shows the trend of ALL data (Found + Not Found combined)
-        ax1.boxplot(all_scores, positions=[i], vert=True, widths=0.25,
+        ax1.boxplot(all_scores, positions=[i], orientation='vertical', widths=0.25,
                     showfliers=False, # Keeps the plot clean
                     patch_artist=True,
                     showmeans=True,
