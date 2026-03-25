@@ -1,0 +1,114 @@
+# AGENTS.md — Repository Onboarding Guide
+
+This file is a practical guide for automated coding agents and new contributors.
+It captures the operational knowledge needed to work safely in this repository.
+
+## 1) Mission of this repository
+
+This project evaluates fault-localization (FL) techniques for Dafny mutants using EXAM score metrics.
+
+Core flow:
+1. Read dataset (`original/` + `killed/`)
+2. Run FL techniques
+3. Compute EXAM metrics
+4. Cache predictions/results
+5. Optionally generate plots and statistical comparisons
+
+## 2) High-signal entry points
+
+- `src/run_1_model.py`: run one technique on one dataset
+- `src/run_all_models.py`: run all techniques + summarize
+- `src/run_pos_test_guard.py`: integration safeguard pipeline (preferred integration validation)
+- `src/fl_eval/metrics/scoring.py`: EXAM computation + cache serialization
+- `src/fl_eval/util/run_external_cmd.py`: external command execution + last-run metadata capture
+- `src/analysis/data_analysis.py`: tables, plots, method comparison
+- `src/config.py`: centralized paths + limits configuration
+- `src/logging_config.py`: centralized logging setup
+
+## 3) Canonical validation commands
+
+### Unit tests
+
+```bash
+pytest -q src/tests
+```
+
+### Integration safeguard (preferred integration check)
+
+```bash
+python src/run_pos_test_guard.py --dataset-tar datasets/pos_test.tar.gz --clean-cache
+```
+
+## 4) Configuration knobs (environment variables)
+
+- `FL_MAX_RAM_GB` (default: `24`)
+- `FL_MAX_TIME_SECONDS` (default: `60`)
+- `FL_VERBOSE` (`1` to print full config)
+- `FL_LOG_LEVEL` (`DEBUG|INFO|WARNING|ERROR`, default `INFO`)
+- `FL_LOG_FILE` (optional file path)
+
+## 5) Cache format and compatibility
+
+Cache location: `run_artifacts/cached_results/<technique>/<mutant>.json`
+
+Current schema (v2) stores:
+- `schema_version`
+- `predictions`
+- `execution_metadata`:
+  - `timestamp_utc`
+  - `command`
+  - `status`
+  - `return_code`
+  - `stdout`
+  - `stderr`
+
+Backward compatibility:
+- legacy cache files containing plain `list[int]` are still accepted.
+
+Important serialization note:
+- metadata may include non-JSON-native values (e.g., `Path`).
+- cache writing uses JSON serialization tolerant conversion (`default=str`).
+
+## 6) Logging conventions
+
+- Use `from logging_config import get_logger`
+- Create module logger: `logger = get_logger(__name__)`
+- Prefer:
+  - `logger.debug(...)` for diagnostics
+  - `logger.info(...)` for normal progress
+  - `logger.warning(...)` for recoverable issues
+  - `logger.error(...)` for failures/skips
+
+## 7) Dataset assumptions
+
+Expected structure:
+- `<dataset>/original/*.dfy`
+- `<dataset>/killed/*.dfy`
+- `<dataset>/killed/*.txt` (diff files)
+
+Mutant/original pairing failures should be handled gracefully (skip with logs).
+
+## 8) Common pitfalls (recently observed)
+
+1. **Docker permissions for tests**
+   - Avoid writing temp files in working directory during tests.
+   - Use `tempfile.TemporaryDirectory()`.
+
+2. **JSON cache serialization crashes**
+   - If metadata includes `Path`, plain `json.dump(...)` fails.
+   - Ensure tolerant serialization.
+
+3. **Matplotlib deprecation noise**
+   - Use `orientation='vertical'` instead of `vert=True` in `boxplot`.
+
+4. **`fl_eval.util.globals` is deprecated**
+   - Use `src/config.py` (`import config as gl`).
+
+## 9) Suggested change workflow for agents
+
+1. Read target module + tests first
+2. Make smallest safe patch
+3. Run `pytest -q src/tests`
+4. If touching pipeline behavior, run `run_pos_test_guard.py`
+5. Keep cache compatibility when changing payload schema
+6. Update docs when changing runtime behavior

@@ -41,6 +41,14 @@ For the easiest setup, use the provided Docker environment. This includes Dafny,
 
 If there is a necessity to not use Docker, all dependencies can be seen also in README_DOCKER.md
 
+## Agent / Contributor Onboarding
+
+If you are using an automated coding agent or you are new to this repo, read:
+
+- [AGENTS.md](AGENTS.md)
+
+It contains high-signal entry points, canonical validation commands, cache format notes, and common pitfalls.
+
 ## Project Layout (Quick Overview)
 
 - `src/` — Main Python evaluation framework.

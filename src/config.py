@@ -1,11 +1,31 @@
-"""
-Central configuration module for Fault Localization framework.
+"""Central configuration module for Fault Localization framework.
 
-Handles:
-- Repository root discovery via marker file
-- Cache and output directory paths
-- Performance limits (timeout, memory) for external programs
-- Strategy executable paths with environment variable overrides
+This module centralizes all runtime configuration, replacing deprecated globals.py.
+
+Responsibilities:
+1. Repository root discovery via marker file
+2. Paths: cache dirs, output dirs, strategy executables
+3. Performance limits: timeouts and memory for external programs
+4. Strategy executable paths with environment variable overrides
+
+Usage:
+    import config as gl
+    print(gl.BASE_PATH)  # Repository root
+    print(gl.CACHE_DIR)  # run_artifacts/cached_results
+    print(gl.MAX_TIME_EXTERNAL_PROGRAMS)  # Timeout in seconds
+    print(gl.RANDOM_FL_EXECUTABLE)  # Path to random strategy executable
+
+Environment Variables (all optional):
+    FL_MAX_RAM_GB: Override MAX_RAM_EXTERNAL_PROGRAMS (default: 24)
+    FL_MAX_TIME_SECONDS: Override MAX_TIME_EXTERNAL_PROGRAMS (default: 60)
+    FL_VERBOSE: Print full config on import if set to "1"
+    FL_<TECHNIQUE>_EXECUTABLE: Override strategy executable path
+
+Thread Safety:
+    Module-level constants only. Thread-safe for read access. Do not mutate.
+
+Migration Notes:
+    fl_eval.util.globals is deprecated; use this module instead.
 """
 
 from pathlib import Path

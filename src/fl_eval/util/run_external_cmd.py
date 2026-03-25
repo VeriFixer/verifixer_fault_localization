@@ -1,3 +1,35 @@
+"""External command execution with automatic metadata capture for caching and reproducibility.
+
+This module provides:
+1. run_external_cmd(): Execute a command with timeout/resource limits
+2. Automatic metadata recording: timestamp, command, status, return code, stdout/stderr
+3. Global state accessor: get_last_execution_metadata() returns dict or None
+
+Metadata Capture Flow:
+    run_external_cmd(cmd) → subprocess.run() → _record_last_execution()
+    ↓ (side effect)
+    _LAST_EXECUTION_METADATA (global state) ← updated
+    ↓ (accessed by consumer)
+    scoring.compute_exam_score() calls get_last_execution_metadata()
+    → metadata included in cache payload
+
+Thread Safety:
+    NOT thread-safe due to global state. Single-threaded execution only.
+    For parallel workflows, wrap each thread's execution separately.
+
+Status Codes:
+    OK: Successful execution (return_code may still be non-zero)
+    TIMEOUT: Exceeded MAX_TIME_EXTERNAL_PROGRAMS + 10 seconds
+    MEMORY_ERROR: Out of memory (future)
+    SYSTEMD_LAUNCH_ERROR: systemd-run not found
+    ERROR_EXIT_CODE: Non-zero return code from subprocess
+
+Important Notes:
+    - Command array may contain Path objects; cache serialization handles via default=str
+    - Metadata records commands as-executed (may include absolute paths)
+    - Timeouts gracefully handled; stderr includes timeout notice
+"""
+
 import config as gl
 import subprocess
 from enum import Enum

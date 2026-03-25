@@ -1,3 +1,33 @@
+"""EXAM score computation and cache serialization for fault localization metrics.
+
+This module provides functionality to:
+1. Compute EXAM scores: percentage of code to inspect to find a fault (0=perfect, 1=worst)
+2. Serialize/deserialize predictions and execution metadata to/from JSON cache
+3. Maintain backward compatibility with legacy cache format (v1 = plain list[int])
+
+Cache Schema (v2):
+    {
+        "schema_version": 2,
+        "predictions": [line_no, ...],
+        "execution_metadata": {
+            "timestamp_utc": "2025-...",
+            "command": [...],
+            "status": "OK|TIMEOUT|...",
+            "return_code": int or null,
+            "stdout": str,
+            "stderr": str
+        }
+    }
+
+Legacy Cache (v1): plain list[int] of predictions still accepted for backward compat.
+
+Key Implementation Notes:
+- Cache writes use json.dump(..., default=str) for Path serialization tolerance
+- Cache reads handle invalid JSON gracefully (treated as cache miss)
+- Metadata capture delegated to run_external_cmd module via get_last_execution_metadata()
+- Thread-safe if single-threaded execution (global state in run_external_cmd)
+"""
+
 from fl_eval.core.abstract import FLTechnique 
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 import config as gl

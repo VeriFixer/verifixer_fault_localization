@@ -1,11 +1,32 @@
 #!/usr/bin/env python3
-"""Run a full pos_test safeguard benchmark and verify expected artifacts.
+"""Integration safeguard pipeline: Run full pos_test benchmark with infrastructure validation.
 
-This script is intended for CI and local smoke checks to detect infrastructure
-breakage. It performs the following steps:
-1) Extract `datasets/pos_test.tar.gz` to `datasets/pos_test`.
-2) Execute `src/run_all_models.py` on that dataset.
-3) Validate key outputs (plot + cache files per technique).
+This script serves as CI/local smoke test to detect infrastructure breakage. It executes the
+full FL evaluation pipeline and validates that all expected artifacts are produced.
+
+Flow:
+    1) Extract datasets/pos_test.tar.gz → datasets/pos_test
+    2) Execute src/run_all_models.py on that dataset
+    3) Validate key outputs:
+       - Plot files: run_artifacts/plots_<mutant>.png per FL technique
+       - Cache files: run_artifacts/cached_results/<technique>/<mutant>.json
+       - Metadata: execution_metadata (timestamps, commands, status) in cache
+    4) Apply quality gates (EXAM score thresholds, minimum fault detection rate)
+
+Usage:
+    python src/run_pos_test_guard.py --dataset-tar datasets/pos_test.tar.gz [--clean-cache]
+
+Quality Gates:
+    Each technique has max_avg_exam and min_found_count thresholds to detect regressions.
+    See TECHNIQUE_GUARDS constant for current per-technique limits.
+    All gates must pass for successful integration validation.
+
+Exits:
+    0: All validations passed
+    1: Dataset extraction failed
+    2: Pipeline execution failed
+    3: Artifact validation failed (missing files, metadata inconsistent)
+    4: Quality gate failures (EXAM too high, not enough faults found)
 """
 
 from __future__ import annotations
