@@ -1,0 +1,47 @@
+name: Infrastructure Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  docker-infrastructure-guard:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          lfs: true
+
+      - name: Build Docker image
+        run: docker build -t dafny_research:ci .
+
+      - name: Run Python tests in container
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/app" \
+            -w /app \
+            dafny_research:ci \
+            bash -lc "set -euo pipefail; python -m pip install pytest; pytest -q"
+
+      - name: Run pos_test safeguard in container
+        run: |
+          mkdir -p run_artifacts
+          docker run --rm \
+            -v "${{ github.workspace }}:/app" \
+            -w /app \
+            dafny_research:ci \
+            bash -lc "set -euo pipefail; python src/run_pos_test_guard.py --dataset-tar datasets/pos_test.tar.gz --clean-cache | tee run_artifacts/pos_test_guard.log"
+
+      - name: Upload safeguard artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: infra-guard-artifacts
+          path: |
+            run_artifacts/pos_test_guard.log
+            datasets/benchmark_hybrid_analysis.png
