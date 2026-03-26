@@ -3,7 +3,7 @@
 This module provides functionality to:
 1. Compute EXAM scores: percentage of code to inspect to find a fault (0=perfect, 1=worst)
 2. Serialize/deserialize predictions and execution metadata to/from JSON cache
-3. Maintain backward compatibility with legacy cache format (v1 = plain list[int])
+3. Support dataset-specific cache directories
 
 Cache Schema (v2):
     {
@@ -19,13 +19,12 @@ Cache Schema (v2):
         }
     }
 
-Legacy Cache (v1): plain list[int] of predictions still accepted for backward compat.
-
 Key Implementation Notes:
 - Cache writes use json.dump(..., default=str) for Path serialization tolerance
-- Cache reads handle invalid JSON gracefully (treated as cache miss)
+- Cache reads strictly validate schema v2 format (no backward compatibility)
 - Metadata capture delegated to run_external_cmd module via get_last_execution_metadata()
 - Thread-safe if single-threaded execution (global state in run_external_cmd)
+- All cache paths are dataset-specific: run_artifacts/cached_results/<dataset_name>/<technique>/<mutant>.json
 """
 
 from fl_eval.core.abstract import FLTechnique 
@@ -118,17 +117,38 @@ def compute_exam_score_one_file(
     exam_score = rank / (total_lines-1)
     return ExamOutput( score = exam_score, found = found_in_predictions, empty = is_empty, filename=filename)
 
-def _results_file_path(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> Path:
-    return gl.CACHE_DIR / flt.name / f"{Gtruth.mutantfile.name}.json"
+def _results_file_path(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit, dataset_dir: Path) -> Path:
+    """Get the cache file path for a technique's predictions on a specific mutant.
+    
+    Args:
+        flt: The fault localization technique
+        Gtruth: Ground truth information for the mutant
+        dataset_dir: Path to the dataset directory for dataset-specific caching
+    
+    Returns:
+        Path to the cache file (run_artifacts/cached_results/<dataset_name>/<technique>/<mutant>.json)
+    """
+    cache_dir = gl.get_dataset_cache_dir(dataset_dir)
+    return cache_dir / flt.name / f"{Gtruth.mutantfile.name}.json"
 
 
 def save_to_file_output(
     flt: FLTechnique,
     Gtruth: GroundTruthAndLineLimit,
     predictions: list[int],
+    dataset_dir: Path,
     execution_metadata: dict[str, Any] | None = None,
 ) -> None:
-    results_file = _results_file_path(flt, Gtruth)
+    """Save predictions and execution metadata to cache file.
+    
+    Args:
+        flt: The fault localization technique
+        Gtruth: Ground truth information for the mutant
+        predictions: List of predicted suspicious line numbers
+        dataset_dir: Path to the dataset directory for dataset-specific caching
+        execution_metadata: Optional metadata about execution (timestamps, return codes, etc.)
+    """
+    results_file = _results_file_path(flt, Gtruth, dataset_dir)
     results_file.parent.mkdir(parents=True, exist_ok=True)
 
     payload: dict[str, Any] = {
@@ -140,19 +160,34 @@ def save_to_file_output(
     with results_file.open("w", encoding="utf-8") as f:
             json.dump(payload, f, default=str)
 
-def load_from_file_output(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> list[int]:
-    results_file = _results_file_path(flt, Gtruth)
+def load_from_file_output(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit, dataset_dir: Path) -> list[int]:
+    """Load predictions from cache file.
+    
+    Args:
+        flt: The fault localization technique
+        Gtruth: Ground truth information for the mutant
+        dataset_dir: Path to the dataset directory for dataset-specific caching
+    
+    Returns:
+        List of predicted suspicious line numbers
+    
+    Raises:
+        FileNotFoundError: If cache file does not exist
+        ValueError: If cache file format is invalid
+        json.JSONDecodeError: If cache file is not valid JSON
+    """
+    results_file = _results_file_path(flt, Gtruth, dataset_dir)
     if not results_file.exists():
         raise FileNotFoundError(f"Cached results not found: {results_file}")
     with results_file.open("r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # Backward compatibility with v1 cache files (plain list[int])
-    if isinstance(data, list):
-        return data
-
     if not isinstance(data, dict):
-        raise ValueError(f"Invalid cache format in {results_file}")
+        raise ValueError(f"Invalid cache format in {results_file}. Expected dict, got {type(data).__name__}")
+
+    predictions = data.get("predictions")
+    if not isinstance(predictions, list):
+        raise ValueError(f"Invalid predictions payload in {results_file}")
 
     predictions = data.get("predictions")
     if not isinstance(predictions, list):
@@ -161,10 +196,20 @@ def load_from_file_output(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit) -> 
     return predictions
 
 
-def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthAndLineLimit) -> ExamOutput:
+def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthAndLineLimit, dataset_dir: Path) -> ExamOutput:
+    """Compute EXAM score for a mutation, using cached results if available.
+    
+    Args:
+        flt: The fault localization technique
+        Gtruth: Ground truth information for the mutant
+        dataset_dir: Path to the dataset directory for dataset-specific caching
+    
+    Returns:
+        ExamOutput with the computed score
+    """
     try:
         # Try loading from cached results
-        predictions = load_from_file_output(flt, Gtruth)
+        predictions = load_from_file_output(flt, Gtruth, dataset_dir)
     except (FileNotFoundError, PermissionError, OSError, json.JSONDecodeError, ValueError):
         # Compute predictions localization
         execution_metadata: dict[str, Any] | None = None
@@ -178,7 +223,7 @@ def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthAndLineLimit) -> E
             traceback.print_exc(file=sys.stderr)
             predictions = []
             execution_metadata = run_cmd.get_last_execution_metadata()
-        save_to_file_output(flt, Gtruth, predictions, execution_metadata)
+        save_to_file_output(flt, Gtruth, predictions, dataset_dir, execution_metadata)
     
     ground_truth = Gtruth.ground_truth
     total_line_start = Gtruth.startLine

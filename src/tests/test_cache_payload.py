@@ -17,6 +17,7 @@ class DummyTechnique(FLTechnique):
 def test_save_load_rich_cache_roundtrip(tmp_path, monkeypatch):
     monkeypatch.setattr(gl, "CACHE_DIR", tmp_path)
 
+    dataset_dir = Path("datasets/pos_test")
     flt = DummyTechnique(name="dummy")
     gtruth = SimpleNamespace(mutantfile=Path("mutant.dfy"))
 
@@ -27,12 +28,12 @@ def test_save_load_rich_cache_roundtrip(tmp_path, monkeypatch):
         "stderr": "",
     }
 
-    save_to_file_output(flt, gtruth, [3, 4], metadata)
-    loaded = load_from_file_output(flt, gtruth)
+    save_to_file_output(flt, gtruth, [3, 4], dataset_dir, metadata)
+    loaded = load_from_file_output(flt, gtruth, dataset_dir)
 
     assert loaded == [3, 4]
 
-    cache_file = tmp_path / "dummy" / "mutant.dfy.json"
+    cache_file = tmp_path / "pos_test" / "dummy" / "mutant.dfy.json"
     payload = json.loads(cache_file.read_text(encoding="utf-8"))
     assert payload["schema_version"] == 2
     assert payload["predictions"] == [3, 4]
@@ -40,23 +41,10 @@ def test_save_load_rich_cache_roundtrip(tmp_path, monkeypatch):
     assert payload["execution_metadata"]["command"][0] == "/tmp/tool"
 
 
-def test_load_legacy_cache_list_format(tmp_path, monkeypatch):
-    monkeypatch.setattr(gl, "CACHE_DIR", tmp_path)
-
-    flt = DummyTechnique(name="legacy")
-    gtruth = SimpleNamespace(mutantfile=Path("legacy.dfy"))
-
-    legacy_file = tmp_path / "legacy" / "legacy.dfy.json"
-    legacy_file.parent.mkdir(parents=True, exist_ok=True)
-    legacy_file.write_text("[10, 20, 30]", encoding="utf-8")
-
-    loaded = load_from_file_output(flt, gtruth)
-    assert loaded == [10, 20, 30]
-
-
 def test_compute_exam_score_writes_rich_metadata(tmp_path, monkeypatch):
     monkeypatch.setattr(gl, "CACHE_DIR", tmp_path)
 
+    dataset_dir = Path("datasets/pos_test")
     flt = DummyTechnique(name="compute")
     gtruth = SimpleNamespace(
         mutantfile=Path("sample.dfy"),
@@ -71,10 +59,10 @@ def test_compute_exam_score_writes_rich_metadata(tmp_path, monkeypatch):
         lambda: {"status": "OK", "command": [Path("/tmp/fake_tool")], "stdout": "ok", "stderr": ""},
     )
 
-    out = compute_exam_score(flt, gtruth)
+    out = compute_exam_score(flt, gtruth, dataset_dir)
     assert out.filename == "sample.dfy"
 
-    payload_file = tmp_path / "compute" / "sample.dfy.json"
+    payload_file = tmp_path / "pos_test" / "compute" / "sample.dfy.json"
     payload = json.loads(payload_file.read_text(encoding="utf-8"))
     assert payload["schema_version"] == 2
     assert payload["execution_metadata"]["status"] == "OK"

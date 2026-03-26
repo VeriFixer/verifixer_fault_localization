@@ -17,7 +17,7 @@ docker save -o dafny_research_latest.tar dafny_research:latest
 ```
 
 # Build the docker image (from reporoot)
-This repository includes a ready-to-use Dockerfile that installs .NET, Z3, Python deps and builds the Dafny + Laurel tools.
+This repository includes a ready-to-use Dockerfile that installs .NET, Z3, Python deps and builds all tools.
 
 
 ```shell

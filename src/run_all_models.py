@@ -36,6 +36,7 @@ def run_benchmark(base_path: Path, sequential: bool = False) -> None:
             fl_technique, 
             killed_dir, 
             original_dir,
+            base_path,
             parallel= not sequential
         )
         scores_clean = [s for s in scores_dirty if s is not None]
@@ -88,18 +89,19 @@ if __name__ == "__main__":
     if not args.data_path.exists():
         logger.error(f"Path not found: {args.data_path}")
 
-    cache_dir = gl.CACHE_DIR
+    # Compute dataset-specific cache directory
+    dataset_cache_dir = gl.get_dataset_cache_dir(args.data_path)
     if args.clean_cache:
-        logger.info("Cleaning: Results Cache")
-        if cache_dir.exists():
+        logger.info(f"Cleaning: Results Cache for dataset '{args.data_path.name}'")
+        if dataset_cache_dir.exists():
             try:
-                shutil.rmtree(cache_dir)
-                logger.info(f"Removed cache directory: {cache_dir}")
+                shutil.rmtree(dataset_cache_dir)
+                logger.info(f"Removed dataset cache directory: {dataset_cache_dir}")
             except OSError as e:
-                logger.error(f"Could not remove cache directory {cache_dir}: {e}")
+                logger.error(f"Could not remove cache directory {dataset_cache_dir}: {e}")
         else:
-            logger.warning(f"No cache directory found at: {cache_dir}")
+            logger.warning(f"No cache directory found at: {dataset_cache_dir}")
     else:
-        logger.info(f"Using cached results if any at {cache_dir}")
+        logger.info(f"Using cached results if any at {dataset_cache_dir}")
   
     run_benchmark(args.data_path, args.sequential)

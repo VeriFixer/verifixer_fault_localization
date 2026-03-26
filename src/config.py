@@ -115,6 +115,29 @@ AUTOFIX_DIR: Path = BASE_PATH / "Dafny-AutoFix"
 AUTOFIX_SCRIPT: Path = AUTOFIX_DIR / "run.sh"
 
 
+def get_dataset_cache_dir(dataset_dir: Path) -> Path:
+    """Get the cache directory for a specific dataset.
+    
+    Cache structure: run_artifacts/cached_results/<dataset_name>/
+    
+    Args:
+        dataset_dir: Path to the dataset directory (e.g., datasets/pos_test).
+    
+    Returns:
+        Path to the cache directory for this dataset.
+    
+    Examples:
+        >>> get_dataset_cache_dir(Path("datasets/pos_test"))
+        Path('run_artifacts/cached_results/pos_test')
+    """
+    # Use the absolute path's name to create a dataset-specific cache dir
+    dataset_abs = dataset_dir.resolve()
+    dataset_key = dataset_abs.name  # Use the directory name (e.g., "pos_test")
+    
+    return CACHE_DIR / dataset_key
+
+
+
 def print_config(verbose: bool = True) -> None:
     """Print all configuration values to stdout.
     

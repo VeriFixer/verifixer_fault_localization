@@ -84,11 +84,19 @@ def _process_mutation(
     diff_path: Path, 
     fl_technique: FLTechnique, 
     killed_dir: Path, 
-    original_dir: Path
+    original_dir: Path,
+    dataset_dir: Path
 ) -> Optional[ExamOutput]:
     """
     Processes a single mutation file pair, computes the EXAM score, and returns it.
     Returns None if any error occurs.
+    
+    Args:
+        diff_path: Path to the diff file (.txt)
+        fl_technique: The fault localization technique instance
+        killed_dir: Path to the killed (mutant) directory
+        original_dir: Path to the original (passing) directory
+        dataset_dir: Path to the dataset directory for dataset-specific caching
     """
     mutation_name = diff_path.stem 
     mutant_dfy_path = killed_dir / f"{mutation_name}.dfy"
@@ -112,8 +120,8 @@ def _process_mutation(
             mutantfile=mutant_dfy_path, 
             difffile=diff_path
         )
-        # Note: compute_exam_score handles calling the FL technique
-        exam_output = compute_exam_score(fl_technique, gtruth_finder)
+        # Note: compute_exam_score handles calling the FL technique with dataset_dir for dataset-specific caching
+        exam_output = compute_exam_score(fl_technique, gtruth_finder, dataset_dir)
         return exam_output
 
     except ValueError as e:
@@ -157,6 +165,11 @@ def compute_metrics(flt_name: str, base_path: Path, sequential: bool = False) ->
     """
     Receives a technique name and directory, iterates through mutation files, 
     computes EXAM scores, and reports the average.
+    
+    Args:
+        flt_name: Name of the fault localization technique
+        base_path: Path to the dataset directory containing 'killed' and 'original' subdirectories
+        sequential: If True, run evaluations sequentially; otherwise run in parallel
     """
     setup_result = _setup_evaluation(flt_name, base_path)
     if setup_result is None:
@@ -168,7 +181,7 @@ def compute_metrics(flt_name: str, base_path: Path, sequential: bool = False) ->
     diff_paths = list(killed_dir.glob("*.txt"))
 
     all_scores = run_parallel_or_seq(diff_paths, _process_mutation, f"Get metrics for {flt_name}",
-                                     fl_technique, killed_dir, original_dir, parallel=not sequential)
+                                     fl_technique, killed_dir, original_dir, base_path, parallel=not sequential)
     all_scores_clean: list[ExamOutput] = [x for x in all_scores if x is not None]
     _generate_report(flt_name, all_scores_clean)
 
@@ -226,17 +239,18 @@ How to use:
         logger.error(f"Data path not found: {args.data_path}")
         parser.print_help()
     else:
-        cache_dir = gl.CACHE_DIR
+        # Compute dataset-specific cache directory
+        dataset_cache_dir = gl.get_dataset_cache_dir(args.data_path)
         if args.clean_cache:
-            logger.info("Cleaning: Results Cache")
-            if cache_dir.exists():
+            logger.info(f"Cleaning: Results Cache for dataset '{args.data_path.name}'")
+            if dataset_cache_dir.exists():
                 try:
-                    shutil.rmtree(cache_dir)
-                    logger.info(f"Removed cache directory: {cache_dir}")
+                    shutil.rmtree(dataset_cache_dir)
+                    logger.info(f"Removed dataset cache directory: {dataset_cache_dir}")
                 except OSError as e:
-                    logger.error(f"Could not remove cache directory {cache_dir}: {e}")
+                    logger.error(f"Could not remove cache directory {dataset_cache_dir}: {e}")
             else:
-                logger.warning(f"No cache directory found at: {cache_dir}")
+                logger.warning(f"No cache directory found at: {dataset_cache_dir}")
         else:
-            logger.info(f"Using cached results if any at {cache_dir}")
+            logger.info(f"Using cached results if any at {dataset_cache_dir}")
         compute_metrics(args.technique_name, args.data_path, args.sequential)

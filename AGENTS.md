@@ -47,27 +47,27 @@ python src/run_pos_test_guard.py --dataset-tar datasets/pos_test.tar.gz --clean-
 - `FL_LOG_LEVEL` (`DEBUG|INFO|WARNING|ERROR`, default `INFO`)
 - `FL_LOG_FILE` (optional file path)
 
-## 5) Cache format and compatibility
+## 5) Cache format
 
-Cache location: `run_artifacts/cached_results/<technique>/<mutant>.json`
+Cache location: `run_artifacts/cached_results/<dataset_name>/<technique>/<mutant>.json`
+
+All caches are organized by dataset name to allow independent cache management per dataset.
 
 Current schema (v2) stores:
-- `schema_version`
-- `predictions`
+- `schema_version`: 2
+- `predictions`: list of line numbers ranked by suspiciousness
 - `execution_metadata`:
-  - `timestamp_utc`
-  - `command`
-  - `status`
-  - `return_code`
-  - `stdout`
-  - `stderr`
-
-Backward compatibility:
-- legacy cache files containing plain `list[int]` are still accepted.
+  - `timestamp_utc`: UTC timestamp of execution
+  - `command`: command executed
+  - `status`: execution status (OK, TIMEOUT, ERROR, etc.)
+  - `return_code`: process return code
+  - `stdout`: standard output
+  - `stderr`: standard error
 
 Important serialization note:
 - metadata may include non-JSON-native values (e.g., `Path`).
 - cache writing uses JSON serialization tolerant conversion (`default=str`).
+- Only schema v2 format is supported (strict validation, no backward compatibility).
 
 ## 6) Logging conventions
 
@@ -124,5 +124,4 @@ Validation runs once per technique in `_setup_evaluation()` before mutation proc
 2. Make smallest safe patch
 3. Run `pytest -q src/tests`
 4. If touching pipeline behavior, run `run_pos_test_guard.py`
-5. Keep cache compatibility when changing payload schema
-6. Update docs when changing runtime behavior
+5. Update docs when changing runtime behavior

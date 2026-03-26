@@ -1,10 +1,12 @@
 import unittest
 import tempfile
+import shutil
 from pathlib import Path
 
 # Assume fl_eval is correctly installed or paths are set up for relative import
 from fl_eval.strategies.random_ranker import RandomRanker
 from fl_eval.metrics.scoring import compute_exam_score # Assuming this is the renamed compute_exam_score_one_file
+import config as gl
 
 # --- MOCK CLASSES (needed for the test environment) ---
 # We need a mock class that holds the attributes required by compute_exam_score
@@ -35,8 +37,13 @@ class TestFLCore(unittest.TestCase):
         self.ranker = RandomRanker(name="TestRanker")
 
     def tearDown(self):
-        """Clean up the temporary directory."""
+        """Clean up the temporary directory and cache files."""
         self.temp_dir.cleanup()
+        
+        # Clean up cached results for this test dataset
+        dataset_cache = gl.get_dataset_cache_dir(Path("datasets/test"))
+        if dataset_cache.exists():
+            shutil.rmtree(dataset_cache)
 
     # --- Original Tests ---
     
@@ -81,9 +88,10 @@ class TestFLCore(unittest.TestCase):
 
         num_runs = 100
         valid_scores = {0.0, 0.25, 0.5, 0.75, 1.0} # Ranks 0-4 out of 5 total lines
+        dataset_dir = Path("datasets/test")
 
         for _ in range(num_runs):
-            examp_out = compute_exam_score(self.ranker, mock_gtruth)
+            examp_out = compute_exam_score(self.ranker, mock_gtruth, dataset_dir)
             found, score, empty = examp_out.found, examp_out.score, examp_out.empty 
             
             # Since RandomRanker covers all lines, the bug should always be found 

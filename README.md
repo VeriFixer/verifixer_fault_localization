@@ -141,12 +141,18 @@ This produces:
 
 ### Cache behavior
 
-Results are cached in `src/cached_results/`.
+Results are cached in `run_artifacts/cached_results/<dataset_name>/` with separate caches per dataset.
 
-To clean the cache (for a specific technique):
+To clean the cache for a specific dataset:
 
 ```bash
-rm -rf src/cached_results/<technique_name>
+rm -rf run_artifacts/cached_results/<dataset_name>
+```
+
+To clean the cache for a specific technique within a dataset:
+
+```bash
+rm -rf run_artifacts/cached_results/<dataset_name>/<technique_name>
 ```
 
 ---

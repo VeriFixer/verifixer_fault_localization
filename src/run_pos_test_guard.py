@@ -40,6 +40,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import config as gl
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import compute_exam_score_one_file, load_from_file_output
 from run_1_model import TECHNIQUE_MAP
@@ -152,7 +153,7 @@ def validate_outputs(repo_root: Path, dataset_dir: Path, expected_mutation_count
             f"Found {len(diff_paths)} diffs in dataset, expected {expected_mutation_count}."
         )
 
-    cache_root = repo_root / "run_artifacts" / "cached_results"
+    cache_root = gl.get_dataset_cache_dir(dataset_dir)
     summary: dict[str, dict[str, Any]] = {}
 
     for technique_name, technique_cls in TECHNIQUE_MAP.items():
@@ -193,7 +194,7 @@ def validate_outputs(repo_root: Path, dataset_dir: Path, expected_mutation_count
                 )
 
                 # Reuse cached-results loading logic from fl_eval.metrics.scoring.
-                predictions = load_from_file_output(flt, gtruth)
+                predictions = load_from_file_output(flt, gtruth, dataset_dir)
                 if not predictions:
                     empty_predictions += 1
 
