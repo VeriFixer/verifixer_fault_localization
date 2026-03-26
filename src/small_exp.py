@@ -37,6 +37,7 @@ def run_benchmark(base_path: Path, sequential: bool = False) -> None:
             fl_technique, 
             killed_dir, 
             original_dir,
+            base_path,
             parallel= not sequential
         )
         scores_clean = [s for s in scores_dirty if s is not None]
@@ -90,9 +91,9 @@ if __name__ == "__main__":
     if not args.data_path.exists():
         logger.error(f"Path not found: {args.data_path}")
 
-    cache_dir = gl.CACHE_DIR
+    cache_dir = gl.get_dataset_cache_dir(args.data_path)
     if args.clean_cache:
-        logger.info("Cleaning: Results Cache")
+        logger.info(f"Cleaning: Results Cache for dataset '{args.data_path.name}'")
         if cache_dir.exists():
             try:
                 shutil.rmtree(cache_dir)
