@@ -1,7 +1,7 @@
 from pathlib import Path
-from types import SimpleNamespace
 import json
 import sys
+from dataclasses import dataclass
 
 import config as gl
 from fl_eval.core.abstract import FLTechnique
@@ -14,12 +14,20 @@ class DummyTechnique(FLTechnique):
         return [1, 2]
 
 
+@dataclass
+class MockGroundTruth:
+    mutantfile: Path
+    ground_truth: int = 1
+    startLine: int = 1
+    endLine: int = 5
+
+
 def test_save_load_rich_cache_roundtrip(tmp_path, monkeypatch):
     monkeypatch.setattr(gl, "CACHE_DIR", tmp_path)
 
     dataset_dir = Path("datasets/pos_test")
     flt = DummyTechnique(name="dummy")
-    gtruth = SimpleNamespace(mutantfile=Path("mutant.dfy"))
+    gtruth = MockGroundTruth(mutantfile=Path("mutant.dfy"))
 
     metadata = {
         "status": "OK",
@@ -46,7 +54,7 @@ def test_compute_exam_score_writes_rich_metadata(tmp_path, monkeypatch):
 
     dataset_dir = Path("datasets/pos_test")
     flt = DummyTechnique(name="compute")
-    gtruth = SimpleNamespace(
+    gtruth = MockGroundTruth(
         mutantfile=Path("sample.dfy"),
         ground_truth=1,
         startLine=1,

@@ -54,8 +54,7 @@ It contains high-signal entry points, canonical validation commands, cache forma
 - `src/` — Main Python evaluation framework.
   - `run_1_model.py` — Run one technique and compute EXAM score.
   - `run_all_models.py` — Run all implemented techniques and generate summary tables + plots.
-  - `run_pos_test_guard.py` — CI safeguard runner (extracts `pos_test` tar, runs all models, validates outputs).
-  - `fl_eval/` — Core evaluation library (strategies, metrics, ground truth parsing, utilities).
+  - `run_repo_health_check.py` — Complete repository health check (type check + tests + safeguard).
   - `pos_mutation/` — Example dataset: contains `killed/` and `original/` subfolders.
 - `strategies/` — (Optional) C# helper projects used by some strategies.
 - `datasets/` — Dataset tarballs (Git LFS tracked) and extracted datasets used at runtime.
@@ -128,6 +127,21 @@ This command will:
 - run all techniques with `src/run_all_models.py`
 - verify expected artifacts (plot + per-technique cache outputs)
 
+### Run complete repository health check (recommended)
+
+```bash
+python src/run_repo_health_check.py --clean-cache
+```
+
+This command will:
+
+1. run static type checking (`pyright src`, aligned with Pylance diagnostics)
+2. run Python unit tests (`pytest -q src/tests`)
+3. run the `pos_test` safeguard pipeline
+
+> Note: the missing-parameter issue in `src/small_exp.py` is exactly the kind of problem caught by this type-check step.
+> Even when tests pass, run Pylance (or `pyright src`) to confirm the repository is healthy.
+
 ### Run Python unit tests
 
 ```bash
@@ -138,6 +152,12 @@ This produces:
 
 - Console summary tables (ASCII + LaTeX)
 - A `benchmark_hybrid_analysis.png` plot (saved next to the dataset directory)
+
+### Run static type checking only
+
+```bash
+pyright src
+```
 
 ### Cache behavior
 

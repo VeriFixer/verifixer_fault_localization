@@ -28,15 +28,21 @@ Key Implementation Notes:
 """
 
 from fl_eval.core.abstract import FLTechnique 
-from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 import config as gl
 from pathlib import Path
 import json
 import traceback
 from dataclasses import dataclass
 import sys
-from typing import Any
+from typing import Any, Protocol, cast
 import fl_eval.util.run_external_cmd as run_cmd
+
+
+class GroundTruthLike(Protocol):
+    mutantfile: Path
+    ground_truth: int
+    startLine: int
+    endLine: int
 
 @dataclass
 class ExamOutput:
@@ -117,7 +123,7 @@ def compute_exam_score_one_file(
     exam_score = rank / (total_lines-1)
     return ExamOutput( score = exam_score, found = found_in_predictions, empty = is_empty, filename=filename)
 
-def _results_file_path(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit, dataset_dir: Path) -> Path:
+def _results_file_path(flt: FLTechnique, Gtruth: GroundTruthLike, dataset_dir: Path) -> Path:
     """Get the cache file path for a technique's predictions on a specific mutant.
     
     Args:
@@ -134,7 +140,7 @@ def _results_file_path(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit, datase
 
 def save_to_file_output(
     flt: FLTechnique,
-    Gtruth: GroundTruthAndLineLimit,
+    Gtruth: GroundTruthLike,
     predictions: list[int],
     dataset_dir: Path,
     execution_metadata: dict[str, Any] | None = None,
@@ -160,7 +166,7 @@ def save_to_file_output(
     with results_file.open("w", encoding="utf-8") as f:
             json.dump(payload, f, default=str)
 
-def load_from_file_output(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit, dataset_dir: Path) -> list[int]:
+def load_from_file_output(flt: FLTechnique, Gtruth: GroundTruthLike, dataset_dir: Path) -> list[int]:
     """Load predictions from cache file.
     
     Args:
@@ -180,23 +186,23 @@ def load_from_file_output(flt: FLTechnique, Gtruth: GroundTruthAndLineLimit, dat
     if not results_file.exists():
         raise FileNotFoundError(f"Cached results not found: {results_file}")
     with results_file.open("r", encoding="utf-8") as f:
-        data = json.load(f)
+        data: Any = json.load(f)
 
     if not isinstance(data, dict):
         raise ValueError(f"Invalid cache format in {results_file}. Expected dict, got {type(data).__name__}")
 
-    predictions = data.get("predictions")
+    payload = cast(dict[str, Any], data)
+    predictions = payload.get("predictions")
     if not isinstance(predictions, list):
         raise ValueError(f"Invalid predictions payload in {results_file}")
+    raw_predictions = cast(list[Any], predictions)
+    if not all(isinstance(item, int) for item in raw_predictions):
+        raise ValueError(f"Predictions must be a list of integers in {results_file}")
 
-    predictions = data.get("predictions")
-    if not isinstance(predictions, list):
-        raise ValueError(f"Invalid predictions payload in {results_file}")
-
-    return predictions
+    return [int(item) for item in raw_predictions]
 
 
-def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthAndLineLimit, dataset_dir: Path) -> ExamOutput:
+def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir: Path) -> ExamOutput:
     """Compute EXAM score for a mutation, using cached results if available.
     
     Args:

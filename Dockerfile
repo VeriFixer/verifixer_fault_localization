@@ -29,7 +29,7 @@ COPY src/requirements.txt /app/src/requirements.txt
 RUN python3 -m venv /opt/venv && \
     /opt/venv/bin/pip install --upgrade pip && \
     /opt/venv/bin/pip install -r /app/src/requirements.txt && \
-    /opt/venv/bin/pip install pytest
+    /opt/venv/bin/pip install pytest pyright
 ENV PATH="/opt/venv/bin:${PATH}"
 
 # Z3 – pick the right binary for the build architecture

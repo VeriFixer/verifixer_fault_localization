@@ -78,6 +78,19 @@ python -m pip install pytest
 pytest -q
 ```
 
+Run static type checking (same class of issues surfaced by Pylance):
+
+```shell
+python -m pip install pyright
+pyright src
+```
+
+Run complete repository health check:
+
+```shell
+python src/run_repo_health_check.py --clean-cache
+```
+
 Run infrastructure safeguard with full `pos_test`:
 
 ```shell

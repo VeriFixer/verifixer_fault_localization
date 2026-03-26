@@ -14,7 +14,7 @@ class CounterExampleBaseRanker(FLTechnique):
         if self.dafny is None:
             raise ValueError("DAFNY_EXEC environment variable must be set or dafny must be in PATH")
 
-    def get_counterexample_lines_from_json_diagnostic(self, diagnostic : dict[Any]) -> tuple[bool, list[int]]:
+    def get_counterexample_lines_from_json_diagnostic(self, diagnostic: dict[str, Any]) -> tuple[bool, list[int]]:
         lines_on_counterexamples : list[int] = []
         try:
             counter_message: str = diagnostic["value"]["defaultFormatMessage"]

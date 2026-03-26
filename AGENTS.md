@@ -18,6 +18,7 @@ Core flow:
 
 - `src/run_1_model.py`: run one technique on one dataset
 - `src/run_all_models.py`: run all techniques + summarize
+- `src/run_repo_health_check.py`: complete repository health check (type check + tests + safeguard)
 - `src/run_pos_test_guard.py`: integration safeguard pipeline (preferred integration validation)
 - `src/fl_eval/metrics/scoring.py`: EXAM computation + cache serialization
 - `src/fl_eval/util/run_external_cmd.py`: external command execution + last-run metadata capture
@@ -33,10 +34,22 @@ Core flow:
 pytest -q src/tests
 ```
 
+### Type checking (Pylance-equivalent)
+
+```bash
+pyright src
+```
+
 ### Integration safeguard (preferred integration check)
 
 ```bash
 python src/run_pos_test_guard.py --dataset-tar datasets/pos_test.tar.gz --clean-cache
+```
+
+### Complete repository health check (recommended)
+
+```bash
+python src/run_repo_health_check.py --clean-cache
 ```
 
 ## 4) Configuration knobs (environment variables)
@@ -122,6 +135,7 @@ Validation runs once per technique in `_setup_evaluation()` before mutation proc
 
 1. Read target module + tests first
 2. Make smallest safe patch
-3. Run `pytest -q src/tests`
-4. If touching pipeline behavior, run `run_pos_test_guard.py`
-5. Update docs when changing runtime behavior
+3. Run `pyright src`
+4. Run `pytest -q src/tests`
+5. If touching pipeline behavior, run `run_pos_test_guard.py` (or `run_repo_health_check.py`)
+6. Update docs when changing runtime behavior

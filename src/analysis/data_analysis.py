@@ -213,8 +213,10 @@ def compare_two_methods(raw_results: dict[str, list[ExamOutput]], tech1: str, te
     print(f"Comparing {len(common_files)} common files.")
     
     # Check normality
-    _, p1 = shapiro(scores1)
-    _, p2 = shapiro(scores2)
+    shapiro_1: Any = shapiro(scores1)
+    shapiro_2: Any = shapiro(scores2)
+    p1 = float(shapiro_1.pvalue)
+    p2 = float(shapiro_2.pvalue)
     normal1 = p1 > 0.05
     normal2 = p2 > 0.05
     
@@ -223,13 +225,22 @@ def compare_two_methods(raw_results: dict[str, list[ExamOutput]], tech1: str, te
     # Choose test
     if normal1 and normal2:
         # Assume equal variances? Could test with Levene, but for simplicity, use unequal
-        stat, p_val = ttest_ind(scores1, scores2, equal_var=False)
+        test_res: Any = ttest_ind(scores1, scores2, equal_var=False)
         test_name = "Welch's t-test"
         justification = "Both distributions are approximately normal, so we use Welch's t-test (unequal variances) to compare means."
+        stat = float(test_res.statistic)
+        p_val = float(test_res.pvalue)
     else:
-        stat, p_val = mannwhitneyu(scores1, scores2, alternative='two-sided')
+        test_res = mannwhitneyu(scores1, scores2, alternative='two-sided')
         test_name = "Mann-Whitney U test"
         justification = "At least one distribution is not normal, so we use the non-parametric Mann-Whitney U test to compare distributions."
+        stat = float(test_res.statistic)
+        p_val = float(test_res.pvalue)
+
+    if stat != stat or p_val != p_val:
+        # Numerical instability fallback for near-identical samples
+        stat = 0.0
+        p_val = 1.0
     
     print(f"Test used: {test_name}")
     print(f"Justification: {justification}")
@@ -241,7 +252,7 @@ def compare_two_methods(raw_results: dict[str, list[ExamOutput]], tech1: str, te
         better = tech1 if mean1 < mean2 else tech2
         print(f"{better} has lower average EXAM score ({mean1:.4f} vs {mean2:.4f})")
     else:
-        print("Result: No significant difference (p >= 0.05) (p_val={p_val:.4f})")
+        print(f"Result: No significant difference (p >= 0.05) (p_val={p_val:.4f})")
     
     # Debugging overview
     print(f"\n--- Debugging Overview ---")
