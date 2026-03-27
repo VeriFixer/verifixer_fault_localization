@@ -2,12 +2,25 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Debug CounterExampleIf",
+            "type": "coreclr",
+            "request": "launch",
+            "program": "${workspaceFolder}/build_output/CounterExampleIf/CounterExampleIf.dll",
+            "args": [
+                "${workspaceFolder}/datasets/pos_test/killed/example_to_test_reassume__MUTANT.dfy"
+            ],
+            "cwd": "${workspaceFolder}",
+            "stopAtEntry": false,
+            "console": "integratedTerminal",
+            "preLaunchTask": "build CounterExampleIf"
+        },
+        {
             "name": "Debug CounterExampleIfReassume",
             "type": "coreclr",
             "request": "launch",
             "program": "${workspaceFolder}/build_output/CounterExampleIfReassume/CounterExampleIfReassume.dll",
             "args": [
-                "${workspaceFolder}/strategies/CounterExampleIfReassume/example_to_test.dfy"
+                "${workspaceFolder}/datasets/pos_test/killed/example_to_test_reassume__MUTANT.dfy"
             ],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,
@@ -15,14 +28,14 @@
             "preLaunchTask": "build CounterExampleIfReassume"
         },
         {
-         "name": "Python Debug with Args",
+            "name": "Python Debug with Args",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/run_1_model.py",
             "console": "integratedTerminal",
             "args": [
                 "counterExampleIfReassume",
-                "${workspaceFolder}/src/pos_test",
+                "${workspaceFolder}/datasets/pos_test",
                 "--clean-cache"
             ]
         }

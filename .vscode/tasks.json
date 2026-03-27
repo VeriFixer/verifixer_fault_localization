@@ -2,9 +2,18 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "build CounterExampleIf",
+            "type": "shell",
+            "command": "dotnet build ${workspaceFolder}/strategies/CounterExampleIf/CounterExampleIf.csproj -c Debug -o ${workspaceFolder}/build_output/CounterExampleIf",
+            "group": {
+                "kind": "build"
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
             "label": "build CounterExampleIfReassume",
             "type": "shell",
-            "command": "dotnet build ${workspaceFolder}/strategies/CounterExampleIfReassume/CounterExampleIfReassume.csproj -c Release -o ${workspaceFolder}/build_output/CounterExampleIfReassume",
+            "command": "dotnet build ${workspaceFolder}/strategies/CounterExampleIfReassume/CounterExampleIfReassume.csproj -c Debug -o ${workspaceFolder}/build_output/CounterExampleIfReassume",
             "group": {
                 "kind": "build",
                 "isDefault": true

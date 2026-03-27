@@ -72,6 +72,56 @@ TECHNIQUE_GUARDS: dict[str, TechniqueGuard] = {
 }
 
 
+def check_prediction_guarantees(
+    per_technique_predictions: dict[str, dict[str, list[int]]],
+) -> list[str]:
+    """Validate cross-technique monotonic guarantees.
+
+    Guarantees:
+        1) Every line predicted by counterBase for a mutation must also be
+            predicted by counterExampleIf for that mutation.
+      2) Every line predicted by counterExampleIf for a mutation must also be
+         predicted by counterExampleIfReassume for that mutation.
+    """
+
+    errors: list[str] = []
+
+    counter_base = per_technique_predictions.get("counterBase", {})
+    counter_if = per_technique_predictions.get("counterExampleIf", {})
+    counter_reassume = per_technique_predictions.get("counterExampleIfReassume", {})
+
+    all_mutations = sorted(
+        set(counter_base.keys())
+        | set(counter_if.keys())
+        | set(counter_reassume.keys())
+    )
+
+    for mutation_name in all_mutations:
+        base_preds = counter_base.get(mutation_name, [])
+        if_preds = counter_if.get(mutation_name, [])
+        reassume_preds = counter_reassume.get(mutation_name, [])
+
+        missing_from_if = sorted(set(base_preds) - set(if_preds))
+        if missing_from_if:
+            errors.append(
+                "Guarantee failed for mutation "
+                f"'{mutation_name}': counterBase lines {sorted(set(base_preds))} "
+                "must be included in counterExampleIf, but missing "
+                f"lines are {missing_from_if}."
+            )
+
+        missing_from_reassume = sorted(set(if_preds) - set(reassume_preds))
+        if missing_from_reassume:
+            errors.append(
+                "Guarantee failed for mutation "
+                f"'{mutation_name}': counterExampleIf lines {sorted(set(if_preds))} "
+                "must be included in counterExampleIfReassume, but missing "
+                f"lines are {missing_from_reassume}."
+            )
+
+    return errors
+
+
 def find_repo_root(start: Path) -> Path:
     current = start.resolve()
     if current.is_file():
@@ -160,6 +210,10 @@ def validate_outputs(repo_root: Path, dataset_dir: Path, expected_mutation_count
 
     cache_root = gl.get_dataset_cache_dir(dataset_dir)
     summary: dict[str, dict[str, Any]] = {}
+    per_technique_predictions: dict[str, dict[str, list[int]]] = {
+        technique_name: {}
+        for technique_name in TECHNIQUE_MAP.keys()
+    }
 
     for technique_name, technique_cls in TECHNIQUE_MAP.items():
         technique_dir = cache_root / technique_name
@@ -200,6 +254,7 @@ def validate_outputs(repo_root: Path, dataset_dir: Path, expected_mutation_count
 
                 # Reuse cached-results loading logic from fl_eval.metrics.scoring.
                 predictions = load_from_file_output(flt, gtruth, dataset_dir)
+                per_technique_predictions[technique_name][mutation_name] = predictions
                 if not predictions:
                     empty_predictions += 1
 
@@ -247,6 +302,8 @@ def validate_outputs(repo_root: Path, dataset_dir: Path, expected_mutation_count
             "avg_exam": avg_exam,
             "empty_predictions": empty_predictions,
         }
+
+    errors.extend(check_prediction_guarantees(per_technique_predictions))
 
     print("Technique checks:")
     for technique_name in sorted(summary.keys()):

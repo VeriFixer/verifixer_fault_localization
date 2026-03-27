@@ -7,17 +7,48 @@ using System.Text.Json;
 using Std.Wrappers;
 using System.Diagnostics.Metrics;
 using System.Security.Principal;
+using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 
 namespace returnMethodLinesRandom
 {
     class Program
     {
+        private sealed class ProgramArguments
+        {
+            public string FilePath { get; init; } = "";
+            public int MaxTime { get; init; }
+            public int MaxRam { get; init; }
+        }
+
         static async Task<int> Main(string[] args)
         {
-            string filePath = null;
+            if (!TryParseArguments(args, out var parsedArguments))
+            {
+                Console.WriteLine("Usage: program <file.dfy> [--max-time <seconds>] [--max-ram <MB>]");
+                return 1;
+            }
+
+            var options = SetupDafnyOptions(parsedArguments.FilePath, parsedArguments.MaxTime, parsedArguments.MaxRam);
+            var compilation = CliCompilation.Create(options);
+            compilation.Start();
+
+            var failedResults = await CollectFailedResultsAsync(compilation);
+            var failedMethodBodies = GetFailedMethodBodies(failedResults);
+
+            int exitCode = await compilation.GetAndReportExitCode();
+            var statePositions = ExtractStatePositionsFromCli(parsedArguments.FilePath);
+            EmitReportFromCliStates(statePositions, failedMethodBodies);
+            return exitCode;
+        }
+
+        private static bool TryParseArguments(string[] args, out ProgramArguments parsedArguments)
+        {
+            string? filePath = null;
             int maxTime = 60;
             int maxRam = 24; // GB
+
             for (int i = 0; i < args.Length; i++)
             {
                 if (args[i] == "--max-time" && i + 1 < args.Length)
@@ -36,22 +67,28 @@ namespace returnMethodLinesRandom
                 }
                 else
                 {
-                    Console.WriteLine("Usage: program <file.dfy> [--max-time <seconds>] [--max-ram <MB>]");
-                    return 1;
+                    parsedArguments = null!;
+                    return false;
                 }
             }
-            if (filePath == null)
+
+            if (string.IsNullOrWhiteSpace(filePath))
             {
-                Console.WriteLine("Usage: program <file.dfy> [--max-time <seconds>] [--max-ram <MB>]");
-                return 1;
+                parsedArguments = null!;
+                return false;
             }
-            var options = SetupDafnyOptions(filePath, maxTime, maxRam);
-            var compilation = CliCompilation.Create(options);
-            compilation.Start();
 
-    
+            parsedArguments = new ProgramArguments
+            {
+                FilePath = filePath,
+                MaxTime = maxTime,
+                MaxRam = maxRam
+            };
+            return true;
+        }
 
-            // 1. Collect only the failed results
+        private static async Task<List<CanVerifyResult>> CollectFailedResultsAsync(CliCompilation compilation)
+        {
             var failedResults = new List<CanVerifyResult>();
             await foreach (var result in compilation.VerifyAllLazily())
             {
@@ -60,12 +97,18 @@ namespace returnMethodLinesRandom
                     failedResults.Add(result);
                 }
             }
-            // 2. Process each failure
-            foreach (var fail in failedResults)
-            {
-                ProcessVerificationFailure(fail, options);
-            }
-            return await compilation.GetAndReportExitCode();
+
+            return failedResults;
+        }
+
+        private static List<BlockStmt> GetFailedMethodBodies(List<CanVerifyResult> failedResults)
+        {
+            return failedResults
+                .Select(r => r.CanVerify)
+                .OfType<Method>()
+                .Where(m => m.Body != null)
+                .Select(m => m.Body!)
+                .ToList();
         }
 
         private static DafnyOptions SetupDafnyOptions(string filePath, int maxTime, int maxRam)
@@ -94,25 +137,12 @@ namespace returnMethodLinesRandom
 
             options.Set(CommonOptionBag.AllowWarnings, true);
             options.Set(CommonOptionBag.ExtractCounterexample, true);
-            options.Set(BoogieOptionBag.IsolateAssertions, true);
+            // Keep assertions in one VC so model states include intermediate trace positions.
+            options.Set(BoogieOptionBag.IsolateAssertions, false);
             options.Set(BoogieOptionBag.VerificationErrorLimit, 0);
 
             options.CliRootSourceUris.Add(new Uri("file://" + Path.GetFullPath(filePath)));
             return options;
-        }
-
-        private static void ProcessVerificationFailure(CanVerifyResult fail, DafnyOptions options)
-        {
-            // Guard: We only care about methods with bodies
-            if (fail.CanVerify is not Method method || method.Body == null) return;
-
-            foreach (var taskResult in fail.Results)
-            {
-                foreach (var ce in taskResult.Result.CounterExamples)
-                {
-                    ProcessCounterExample(ce, method.Body, options);
-                }
-            }
         }
 
         public class CounterExampleData
@@ -127,79 +157,181 @@ namespace returnMethodLinesRandom
             public string Content { get; set; } // The actual code string
         }
 
-        private static void ProcessCounterExample(Counterexample ce, BlockStmt methodBody, DafnyOptions options)
+        private sealed class StatePosition
         {
-            // Data for each counterexample has to be non repeated
-            var foundNodes = new List<INode>();
-            if (ce.Model == null) return;
-            var dafnyModel = new DafnyModel(ce.Model, options);
-            foreach (var state in dafnyModel.States)
+            public int Line { get; init; }
+            public int Col { get; init; }
+            public string Raw { get; init; } = "";
+        }
+
+        private static List<StatePosition> ExtractStatePositionsFromCli(string filePath)
+        {
+            string repoRoot = PathHelper.FindRepoRoot();
+            string dafnyBinary = Path.Combine(repoRoot, "dafny", "Binaries", "Dafny");
+
+            var psi = new ProcessStartInfo {
+                FileName = dafnyBinary,
+                Arguments = $"verify --extract-counterexample \"{filePath}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process == null)
             {
-                // Guard: Skip states without source mapping (like <initial>)
-                if (!state.StateContainsPosition()) continue;
+                return [];
+            }
 
-                int line = state.GetLineId();
-                int col = state.GetCharId();
+            string stdout = process.StandardOutput.ReadToEnd();
+            string stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
 
-                // The visitor does not fill that is working for some examples
-                // Need to debug lets go
+            string output = string.IsNullOrWhiteSpace(stderr) ? stdout : stdout + "\n" + stderr;
+            var result = new List<StatePosition>();
+            var seen = new HashSet<string>();
 
-                var visitor = new FindExpressionAndParentByTokenVisitor(line, col);
-                visitor.VisitManual(methodBody);
+            bool insideCounterexample = false;
+            var positionRegex = new Regex(@"\.dfy\((?<line>\d+),(?<col>\d+)\):", RegexOptions.Compiled);
 
-                if (visitor.MatchingStatementWithAllParent.Count > 0)
+            foreach (string rawLine in output.Split('\n'))
+            {
+                string line = rawLine.TrimEnd();
+
+                if (line.Contains("Related counterexample:"))
                 {
-                    var (stmt, parents) = visitor.MatchingStatementWithAllParent[0];
-                    while (parents.Count > 0)
-                    {
-                        var currentParent = parents.Pop();
-                        if (foundNodes.Contains(currentParent))
-                        { continue; }
-
-                        if (currentParent is IfStmt ifStmt || 
-                            currentParent is WhileStmt whileStmt){
-                            foundNodes.Add(currentParent);
-                            break;
-                        }
-                    }
-                    foundNodes.Add(stmt);
+                    insideCounterexample = true;
+                    continue;
                 }
+
+                if (!insideCounterexample)
+                {
+                    continue;
+                }
+
+                if (line.Contains("Error:") || line.StartsWith("   |") || line.StartsWith("Dafny program verifier finished"))
+                {
+                    insideCounterexample = false;
+                    continue;
+                }
+
+                var match = positionRegex.Match(line);
+                if (!match.Success)
+                {
+                    continue;
+                }
+
+                int parsedLine = int.Parse(match.Groups["line"].Value);
+                int parsedCol = int.Parse(match.Groups["col"].Value);
+                string key = $"{parsedLine}:{parsedCol}";
+                if (!seen.Add(key))
+                {
+                    continue;
+                }
+
+                result.Add(new StatePosition {
+                    Line = parsedLine,
+                    Col = parsedCol,
+                    Raw = line.Trim()
+                });
             }
 
-            // Save the counterexamples with the if brnaching lines
+            return result;
+        }
+
+        private static void EmitReportFromCliStates(List<StatePosition> statePositions, List<BlockStmt> failedMethodBodies)
+        {
             var report = new CounterExampleData();
-            foreach (var node in foundNodes)
+            var seenStateLines = new HashSet<string>();
+            var seenBranchLines = new HashSet<int>();
+
+            foreach (var state in statePositions)
             {
-                report.Nodes.Add(new NodeInfo
+                string key = $"{state.Line}:{state.Col}";
+                if (seenStateLines.Add(key))
                 {
-                    Type = node switch {
-                        IfStmt => "IfStmt",
-                        WhileStmt => "WhileStmt",
-                        _ => "Stmt"
-                    }, 
-                    Line = node.StartToken.line,
-                    Content = node.ToString() // Converts AST node back to source string
-                });
+                    report.Nodes.Add(new NodeInfo
+                    {
+                        Type = "State",
+                        Line = state.Line,
+                        Content = state.Raw
+                    });
+                }
+
+                AddBranchLogicLines(state.Line, state.Col, failedMethodBodies, report, seenBranchLines);
             }
 
-            if(foundNodes.Count == 0)
-            {
-                // This means that the counterexample are only found the method beginning without any node related to it
-                // So will add the method beggining line as fall back
-                report.Nodes.Add(new NodeInfo
-                {
-                    Type = "Stmt",
-                    Line = methodBody.StartToken.line,
-                    Content = "//No node found counterexample only affected start state "
-                });
-            }
+            report.Nodes = report.Nodes.OrderBy(n => n.Line).ToList();
+
             var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
             string jsonString = JsonSerializer.Serialize(report, jsonOptions);
             Console.WriteLine("```json");
             Console.WriteLine(jsonString);
             Console.WriteLine("```");
-
         }
+
+        private static void AddBranchLogicLines(int line, int col, List<BlockStmt> failedMethodBodies, CounterExampleData report, HashSet<int> seenBranchLines)
+        {
+            foreach (var methodBody in failedMethodBodies)
+            {
+                if (line < methodBody.StartToken.line || line > methodBody.EndToken.line)
+                {
+                    continue;
+                }
+
+                var visitor = new FindExpressionAndParentByTokenVisitor(line, col);
+                visitor.VisitManual(methodBody);
+                if (visitor.MatchingStatementWithAllParent.Count == 0)
+                {
+                    continue;
+                }
+
+                var (stmt, parents) = visitor.MatchingStatementWithAllParent[0];
+
+                if ((stmt is IfStmt || stmt is WhileStmt) && seenBranchLines.Add(stmt.StartToken.line))
+                {
+                    report.Nodes.Add(new NodeInfo
+                    {
+                        Type = "Branch",
+                        Line = stmt.StartToken.line,
+                        Content = stmt.ToString()
+                    });
+                }
+
+                while (parents.Count > 0)
+                {
+                    var parent = parents.Pop();
+                    if (parent is IfStmt ifStmt)
+                    {
+                        if (seenBranchLines.Add(ifStmt.StartToken.line))
+                        {
+                            report.Nodes.Add(new NodeInfo
+                            {
+                                Type = "Branch",
+                                Line = ifStmt.StartToken.line,
+                                Content = ifStmt.ToString()
+                            });
+                        }
+                    }
+                    else if (parent is WhileStmt whileStmt)
+                    {
+                        if (seenBranchLines.Add(whileStmt.StartToken.line))
+                        {
+                            report.Nodes.Add(new NodeInfo
+                            {
+                                Type = "Branch",
+                                Line = whileStmt.StartToken.line,
+                                Content = whileStmt.ToString()
+                            });
+                        }
+                    }
+                }
+
+                break;
+            }
+        }
+
     }
 
     // --- Visitor Implementation ---

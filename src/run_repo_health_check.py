@@ -21,7 +21,10 @@ from pathlib import Path
 from run_pos_test_guard import find_repo_root
 
 
-TYPE_CHECK_CMD: list[str] = ["pyright", "src"]
+TYPE_CHECK_CMDS: list[tuple[str, list[str]]] = [
+    ("type-check-src", ["pyright", "src"]),
+    ("type-check-tests", ["pyright", "src/tests"]),
+]
 PYTEST_CMD: list[str] = ["pytest", "-q", "src/tests"]
 
 
@@ -91,11 +94,12 @@ def main() -> int:
     step_results: list[StepResult] = []
 
     if not args.skip_type_check:
-        typecheck_result = run_step(TYPE_CHECK_CMD, repo_root, "type-check")
-        step_results.append(typecheck_result)
-        if args.fail_fast and typecheck_result.return_code != 0:
-            print("[repo-health] stopping early due to --fail-fast")
-            return typecheck_result.return_code
+        for step_name, command in TYPE_CHECK_CMDS:
+            typecheck_result = run_step(command, repo_root, step_name)
+            step_results.append(typecheck_result)
+            if args.fail_fast and typecheck_result.return_code != 0:
+                print("[repo-health] stopping early due to --fail-fast")
+                return typecheck_result.return_code
     else:
         print("[repo-health] skipping type-check step")
 

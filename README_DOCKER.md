@@ -39,6 +39,7 @@ docker run --rm -it \
   -e FL_LOG_LEVEL=INFO \
   -e PYTEST_ADDOPTS='-o cache_dir=/tmp/pytest_cache' \
   -v "$(pwd)/src:/app/src:delegated" \
+  -v "$(pwd)/run_artifacts:/app/run_artifacts:delegated" \
   -v "$(pwd)/Dafny-AutoFix:/app/Dafny-AutoFix:delegated" \
   -v "$(pwd)/run_artifacts:/app/run_artifacts:delegated" \
   -v "$(pwd)/DafnyTestGen:/app/DafnyTestGen:delegated" \
