@@ -19,6 +19,10 @@ class CounterExampleIfReassume(FLTechnique):
         super().__init__(name, **kwargs)
 
     def get_fault_localization(self, file: Path) -> list[int]:
+        # Reassume is heavier than CounterExampleIf on some mutants.
+        # Give it a technique-specific timeout floor to avoid false empty predictions.
+        reassume_max_time = 2*gl.MAX_TIME_EXTERNAL_PROGRAMS
+
         # Create command to run 
         base_dir = gl.BASE_PATH / "build_output/CounterExampleIfReassume"
         pattern = "**/CounterExampleIfReassume"
@@ -27,7 +31,7 @@ class CounterExampleIfReassume(FLTechnique):
         command = [
              exec,
             str(file),
-            "--max-time", str(gl.MAX_TIME_EXTERNAL_PROGRAMS),
+            "--max-time", str(reassume_max_time),
             "--max-ram", str(gl.MAX_RAM_EXTERNAL_PROGRAMS)
         ]
 

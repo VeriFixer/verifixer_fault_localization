@@ -296,16 +296,25 @@ namespace CounterExampleIfReassume
                 method.Name != config.MethodName)
                 return (next_files, createdWrites);
 
-            var statePositions = analyzer.ExtractStatePositionsFromCli(programConfig.ProgramFile);
-            var analysis = analyzer.Analyze(statePositions, method.Body);
+            // Only extract and analyze state positions on the original program file,
+            // not on recursively-generated variants.
+            bool isOriginalProgram = Path.GetFileName(config.ProgramFile) == Path.GetFileName(programConfig.ProgramFile);
+            AnalysisResult analysis = AnalysisResult.Empty;
 
-            // Baseline guarantee: emit at least CLI-extracted state lines even if Dafny task
-            // counterexamples are absent for this failing method.
-            if (analysis.RawStateLines.Count > 0)
+            var statePositions = analyzer.ExtractStatePositionsFromCli(programConfig.ProgramFile);
+            analysis = analyzer.Analyze(statePositions, method.Body);
+            
+            if (isOriginalProgram)
             {
-                var baselineMutator = new ProgramMutator(TempWorkDir);
-                baselineMutator.writeSolutionNode(program, analysis, "unknown", -1);
-                createdWrites = true;
+
+                // Baseline guarantee: emit at least CLI-extracted state lines even if Dafny task
+                // counterexamples are absent for this failing method.
+                if (analysis.RawStateLines.Count > 0)
+                {
+                    var baselineMutator = new ProgramMutator(TempWorkDir);
+                    baselineMutator.writeSolutionNode(program, analysis, "unknown", -1);
+                    createdWrites = true;
+                }
             }
 
 
@@ -345,11 +354,17 @@ namespace CounterExampleIfReassume
                         continue;
 
 
-                    next_files.Add(await mutator.WriteAssumeFalse(
+                    var nextConfig = await mutator.WriteAssumeFalse(
                         program,
+                        programConfig.ProgramFile,
                         analysis,
                         postcondition,
-                        postconditionLine));
+                        postconditionLine);
+
+                    if (nextConfig != null)
+                    {
+                        next_files.Add(nextConfig);
+                    }
                 }
             }
 
@@ -559,12 +574,21 @@ namespace CounterExampleIfReassume
 
 
 
-        public async Task<VerificationConfig> WriteAssumeFalse(
+        public async Task<VerificationConfig?> WriteAssumeFalse(
             Microsoft.Dafny.Program program,
+            string sourceProgramFile,
             AnalysisResult analysis,
             string postcondition,
             int postconditionLine)
         {
+            if (!File.Exists(sourceProgramFile))
+            {
+                Console.Error.WriteLine($"[WriteAssumeFalse] Source file not found: {sourceProgramFile}");
+                return null;
+            }
+
+            var sourceText = await File.ReadAllTextAsync(sourceProgramFile);
+            var sourceAssumeFalseCount = CountAssumeFalseOccurrences(sourceText);
 
             var block = analysis.TargetBlock!;
             // Origin relates source code with position of the token (in this case)
@@ -575,25 +599,51 @@ namespace CounterExampleIfReassume
             if (block.Body is not List<Statement> body)
                 throw new InvalidOperationException("Block body not mutable");
 
-            body.Insert(0, assumeStmt);
-
             var nextFile = Path.Combine(TempWorkDir, $"postLine_{postconditionLine}_iter_{Guid.NewGuid()}_next.dfy");
 
-            var config = new VerificationConfig
+            body.Insert(0, assumeStmt);
+            try
+            {
+                // Program used in the recursive call.
+                ProgramWriter.Write(program, nextFile, new List<INode>(), postcondition, postconditionLine);
+            }
+            finally
+            {
+                // Keep the in-memory AST unchanged for subsequent mutations.
+                body.RemoveAt(0);
+            }
+
+            var nextText = await File.ReadAllTextAsync(nextFile);
+            var nextAssumeFalseCount = CountAssumeFalseOccurrences(nextText);
+
+            if (sourceText == nextText)
+            {
+                Console.Error.WriteLine(
+                    $"[WriteAssumeFalse] Skipping next file because no change was produced: {nextFile}");
+                File.Delete(nextFile);
+                return null;
+            }
+
+            if (nextAssumeFalseCount <= sourceAssumeFalseCount)
+            {
+                Console.Error.WriteLine(
+                    "[WriteAssumeFalse] Skipping next file because 'assume false' was not added. " +
+                    $"source={sourceAssumeFalseCount}, next={nextAssumeFalseCount}, file={nextFile}");
+                File.Delete(nextFile);
+                return null;
+            }
+
+            return new VerificationConfig
             {
                 ProgramFile = nextFile,
                 MethodName = "",
                 PostCondition = postcondition,
             };
+        }
 
-            // Program used in the recursive call!
-            ProgramWriter.Write(program, nextFile, new List<INode>(), postcondition, postconditionLine);
-
-            // Need to remove the mutation to have the program as it was for any other postcondiiotn that failed
-            // on other coutnerexample
-            body.RemoveAt(0);
-
-            return config;
+        private static int CountAssumeFalseOccurrences(string text)
+        {
+            return Regex.Matches(text, @"\bassume\s+false\b").Count;
         }
     }
 

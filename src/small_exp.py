@@ -62,6 +62,7 @@ def run_benchmark(base_path: Path, sequential: bool = False) -> None:
     print_ascii_table(stats_summary)  # type: ignore
     print_latex_table(stats_summary)  # type: ignore
     compare_two_methods(raw_results, "counterBase", "counterExampleIf")  # type: ignore
+    compare_two_methods(raw_results, "counterExampleIf", "counterExampleIfReassume")  # type: ignore
     try:
         generate_plots(raw_results, base_path.parent)  # type: ignore
     except Exception as e:
