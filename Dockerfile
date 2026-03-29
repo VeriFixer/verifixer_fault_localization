@@ -42,7 +42,7 @@ ENV PATH="/opt/venv/bin:${PATH}"
 # Z3 – pick the right binary for the build architecture
 RUN git clone --depth 1 --branch "z3-${Z3_VERSION}" "${Z3_REPO}" /tmp/z3 && \
     cd /tmp/z3 && \
-    python scripts/mk_make.py && \
+    python scripts/mk_make.py --dotnet && \
     cd build && \
     make -j"$(nproc)" && \
     make install && \
@@ -50,11 +50,7 @@ RUN git clone --depth 1 --branch "z3-${Z3_VERSION}" "${Z3_REPO}" /tmp/z3 && \
     cp -a /opt/venv/lib/libz3.so /usr/local/lib/ && \
     cp -a /opt/venv/include/* /usr/local/include/ 2>/dev/null || true && \
     chmod 755 /usr/local/bin/z3 && \
-    ldconfig && \
-    cd .. && \
-    python scripts/mk_make.py --dotnet && \
-    cd build && \
-    make
+    ldconfig
 
 ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
 
