@@ -13,6 +13,7 @@ WORKDIR /app
 
 ARG Z3_VERSION=4.12.1
 ARG DAFNY_VERSION=v4.11.0
+ARG Z3_REPO=https://github.com/Z3Prover/z3.git
 ARG DAFNY_REPO=https://github.com/dafny-lang/dafny.git
 
 # Base packages, installed once
@@ -24,6 +25,12 @@ RUN --mount=type=cache,target=/var/cache/apt \
       git openssh-client openjdk-17-jdk ant rsync \
     && rm -rf /var/lib/apt/lists/*
 
+# .NET SDK 8
+RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh && \
+    bash /tmp/dotnet-install.sh --channel 8.0 --install-dir /usr/share/dotnet && \
+    ln -sfn /usr/share/dotnet/dotnet /usr/local/bin/dotnet && \
+    rm -f /tmp/dotnet-install.sh
+
 # Python dependencies: copy only requirements first
 COPY src/requirements.txt /app/src/requirements.txt
 RUN python3 -m venv /opt/venv && \
@@ -33,26 +40,23 @@ RUN python3 -m venv /opt/venv && \
 ENV PATH="/opt/venv/bin:${PATH}"
 
 # Z3 – pick the right binary for the build architecture
-RUN git clone --depth 1 --branch z3-4.12.1 https://github.com/Z3Prover/z3.git /tmp/z3 && \
+RUN git clone --depth 1 --branch "z3-${Z3_VERSION}" "${Z3_REPO}" /tmp/z3 && \
     cd /tmp/z3 && \
     python scripts/mk_make.py && \
     cd build && \
     make -j"$(nproc)" && \
     make install && \
     cp -a /opt/venv/bin/z3 /usr/local/bin/ && \
-    cp -a /opt/venv/lib/libz3.so* /usr/local/lib/ && \
-    cp -a /opt/venv/include/* /usr/local/include/ 2>/dev/null || true; \
-    chmod 755 /usr/local/bin/z3; \
-    ldconfig; \
-    rm -rf /tmp/z3 /tmp/z3.zip
+    cp -a /opt/venv/lib/libz3.so /usr/local/lib/ && \
+    cp -a /opt/venv/include/* /usr/local/include/ 2>/dev/null || true && \
+    chmod 755 /usr/local/bin/z3 && \
+    ldconfig && \
+    cd .. && \
+    python scripts/mk_make.py --dotnet && \
+    cd build && \
+    make
 
 ENV LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH}"
-
-# .NET SDK 8
-RUN curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh && \
-    bash /tmp/dotnet-install.sh --channel 8.0 --install-dir /usr/share/dotnet && \
-    ln -sfn /usr/share/dotnet/dotnet /usr/local/bin/dotnet && \
-    rm -f /tmp/dotnet-install.sh
 
 # Make JAVA_HOME architecture‑independent
 RUN JAVA_ARCH=$(dpkg --print-architecture) && \
@@ -112,6 +116,9 @@ RUN --mount=type=cache,target=/root/.nuget/packages \
 # Build Autofix
 COPY Dafny-AutoFix/ /app/Dafny-AutoFix/
 RUN --mount=type=cache,target=/root/.nuget/packages \
+    mkdir /app/Dafny-AutoFix/autofix/lib && \
+    cp -a /tmp/z3/build/Microsoft.Z3.dll /app/Dafny-AutoFix/autofix/lib && \
+    cp -a /tmp/z3/build/libz3.so /app/Dafny-AutoFix/autofix/lib && \
     dotnet restore /app/Dafny-AutoFix/autofix && \
     dotnet build /app/Dafny-AutoFix/autofix -c Release -o /app/build_output/Autofix --no-restore
 
