@@ -38,6 +38,8 @@ process_file() {
 
     # real success condition
     if [ $status -eq 0 ]; then
+        # eliminate metadata comments
+        sed -i '1,5d' "$out_file"
         cp "$killed_file" "$OUT_DIR/killed/"
 
         killed_txt="${killed_file%.dfy}.txt"
