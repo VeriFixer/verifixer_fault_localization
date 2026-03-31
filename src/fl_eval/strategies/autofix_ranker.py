@@ -43,7 +43,8 @@ class AutoFixRanker(FLTechnique):
             return []
 
         self.output_root.mkdir(parents=True, exist_ok=True)
-        run_out_dir = Path(tempfile.mkdtemp(prefix="autofix_", dir=str(self.output_root)))
+        run_out_dir = Path(tempfile.mkdtemp(prefix="autofix_", dir=str(self.output_root))) / file.stem
+        run_out_dir.mkdir(parents=True, exist_ok=True)
 
         # Things autofix is apllied to the file with name .test.dfy and not the .dfy file, so we need to adjust the path accordingly.
         file_test = file.with_suffix(".test.dfy")
@@ -57,8 +58,8 @@ class AutoFixRanker(FLTechnique):
             str(file_test),
             "--strategy",
             self.autofix_strategy,
-            #"--out-dir",
-            #str(run_out_dir),
+            "--out-dir",
+            str(run_out_dir),
         ]
 
         status, stdout, stderr = run_cmd.run_external_cmd(command)
@@ -73,7 +74,7 @@ class AutoFixRanker(FLTechnique):
             )
             return []
 
-        result_file = run_out_dir / file.stem / "lines-suspiciousness.csv"
+        result_file = run_out_dir / "lines-suspiciousness.csv"
         ranked_lines = self._parse_ranked_lines(result_file)
 
         if not ranked_lines:
