@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Preserve the refs payload from stdin so we can forward it to git lfs pre-push.
+REFS_PAYLOAD="$(cat)"
+
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
@@ -17,5 +20,13 @@ docker build -t "${IMAGE_TAG}" .
 echo "[pre-push] Running repository health check inside container"
 docker run --rm -w /app "${IMAGE_TAG}" \
   python src/run_repo_health_check.py --clean-cache
+
+if ! command -v git >/dev/null 2>&1 || ! git lfs version >/dev/null 2>&1; then
+  echo "[pre-push] git lfs is required for this repository but was not found." >&2
+  exit 1
+fi
+
+echo "[pre-push] Uploading Git LFS objects"
+printf '%s\n' "$REFS_PAYLOAD" | git lfs pre-push "$@"
 
 echo "[pre-push] All checks passed. Push allowed."
