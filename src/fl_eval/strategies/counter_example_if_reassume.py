@@ -4,6 +4,7 @@ import config as gl
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 # This will try to find globs like this base_dir/**pattern see other files for more examples
 def _find_executable(base_dir : Path, pattern : str) -> Path:
@@ -15,7 +16,7 @@ def _find_executable(base_dir : Path, pattern : str) -> Path:
 
 
 class CounterExampleIfReassume(FLTechnique):
-    def __init__(self, name: str, **kwargs) -> None:
+    def __init__(self, name: str, **kwargs: Any) -> None:
         super().__init__(name, **kwargs)
 
     def get_fault_localization(self, file: Path) -> list[int]:
@@ -26,10 +27,10 @@ class CounterExampleIfReassume(FLTechnique):
         # Create command to run 
         base_dir = gl.BASE_PATH / "build_output/CounterExampleIfReassume"
         pattern = "**/CounterExampleIfReassume"
-        exec = _find_executable(base_dir, pattern)
+        executable = _find_executable(base_dir, pattern)
                # run this command and get the output on a variable
-        command = [
-             exec,
+        command: list[str] = [
+            str(executable),
             str(file),
             "--max-time", str(reassume_max_time),
             "--max-ram", str(gl.MAX_RAM_EXTERNAL_PROGRAMS)

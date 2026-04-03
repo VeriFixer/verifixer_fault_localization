@@ -2,12 +2,27 @@
 from pathlib import Path
 from typing import Optional
 from fl_eval.util.file_helpers import read_diff_file  # Import helper from the same package
+from fl_eval.core.method_extractor import extract_method_containing_line
+from logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class GroundTruthAndLineLimit:
     """
     Represents the ground truth for a fault localization task where the 
     MUTANT file is the buggy version under test. The ground truth is the 
     line number in the MUTANT file that was changed from the original.
+    
+    Attributes:
+        mutantfile: Path to the mutant (buggy) Dafny file
+        originalfile: Path to the original (correct) Dafny file
+        difffile: Path to the diff file
+        ground_truth: Line number in mutant file where the fault was introduced
+        startLine: Beginning of file-wide code range (file-scoped metrics)
+        endLine: End of file-wide code range (file-scoped metrics)
+        method_name: Name of the method containing ground_truth (if any)
+        method_start: Start line of the containing method
+        method_end: End line of the containing method
     """
     def __init__(self, originalfile: Path, mutantfile: Path, difffile: Path):
         self.originalfile = originalfile
@@ -16,8 +31,12 @@ class GroundTruthAndLineLimit:
         self.ground_truth: int = -1
         self.startLine : int = -1
         self.endLine : int = -1
+        self.method_name: Optional[str] = None
+        self.method_start: int = -1
+        self.method_end: int = -1
         self._parse_ground_truth()
         self._parse_limits()
+        self._parse_method_span()
 
     def _read_diff_file(self) -> str:
         """Helper to safely read the content of the diff file."""
@@ -110,4 +129,38 @@ class GroundTruthAndLineLimit:
 
         if self.ground_truth is None:
             raise ValueError(f"Could not extract ground truth line number from diff file: {self.difffile}")
+    
+    def _parse_method_span(self):
+        """
+        Extract method span containing the ground truth line.
         
+        Uses method_extractor to find the method in the mutant file that contains
+        the fault line. Falls back gracefully if extraction fails (e.g., no methods,
+        fault outside all methods, or Dafny execution error).
+        """
+        if self.ground_truth < 0:
+            logger.warning(f"Ground truth not set, skipping method extraction for {self.mutantfile.name}")
+            return
+        
+        try:
+            result = extract_method_containing_line(self.mutantfile, self.ground_truth)
+            if result:
+                self.method_name, self.method_start, self.method_end = result
+                logger.debug(
+                    f"Method span for {self.mutantfile.name}: "
+                    f"method='{self.method_name}', lines {self.method_start}-{self.method_end}"
+                )
+            else:
+                logger.debug(
+                    f"Fault at line {self.ground_truth} not in any method "
+                    f"(likely top-level declaration in {self.mutantfile.name})"
+                )
+                # Keep defaults: method_name=None, method_start/end=-1
+        except Exception as e:
+            logger.warning(
+                f"Failed to extract method span from {self.mutantfile.name}: {e}. "
+                f"Continuing with file-wide scope only."
+            )
+            # Keep defaults: method extraction failed, fall back to file-wide metrics
+        
+

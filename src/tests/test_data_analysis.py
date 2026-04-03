@@ -6,20 +6,30 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from analysis.data_analysis import compare_two_methods, generate_plots
-from fl_eval.metrics.scoring import ExamOutput
+from fl_eval.metrics.scoring import ExamOutput, ExamScore
+
+
+def mk_exam(score: float, found: bool, filename: str) -> ExamOutput:
+    scoped = ExamScore(score=score, found=found, prediction=True)
+    return ExamOutput(
+        filename=filename,
+        method_name="m",
+        file=scoped,
+        method=scoped,
+    )
 
 def test_compare_two_methods_basic():
     """Test basic comparison with normal data"""
     raw_results = {
         'tech1': [
-            ExamOutput(0.1, True, False, "file1.dfy"),
-            ExamOutput(0.2, True, False, "file2.dfy"),
-            ExamOutput(0.3, False, False, "file3.dfy"),
+            mk_exam(0.1, True, "file1.dfy"),
+            mk_exam(0.2, True, "file2.dfy"),
+            mk_exam(0.3, False, "file3.dfy"),
         ],
         'tech2': [
-            ExamOutput(0.4, False, False, "file1.dfy"),
-            ExamOutput(0.5, False, False, "file2.dfy"),
-            ExamOutput(0.6, True, False, "file3.dfy"),
+            mk_exam(0.4, False, "file1.dfy"),
+            mk_exam(0.5, False, "file2.dfy"),
+            mk_exam(0.6, True, "file3.dfy"),
         ]
     }
     
@@ -65,14 +75,14 @@ def test_compare_two_methods_different_success_rates():
     """Test with different success patterns"""
     raw_results = {
         'tech1': [
-            ExamOutput(0.1, True, False, "file1.dfy"),  # found
-            ExamOutput(0.2, False, False, "file2.dfy"), # not found
-            ExamOutput(0.3, True, False, "file3.dfy"),  # found
+            mk_exam(0.1, True, "file1.dfy"),  # found
+            mk_exam(0.2, False, "file2.dfy"), # not found
+            mk_exam(0.3, True, "file3.dfy"),  # found
         ],
         'tech2': [
-            ExamOutput(0.4, False, False, "file1.dfy"), # not found
-            ExamOutput(0.5, True, False, "file2.dfy"),  # found
-            ExamOutput(0.6, False, False, "file3.dfy"), # not found
+            mk_exam(0.4, False, "file1.dfy"), # not found
+            mk_exam(0.5, True, "file2.dfy"),  # found
+            mk_exam(0.6, False, "file3.dfy"), # not found
         ]
     }
     
@@ -88,21 +98,21 @@ def test_compare_two_methods_different_success_rates():
 def test_generate_plots_creates_output_file(tmp_path: Path):
     raw_results = {
         "tech1": [
-            ExamOutput(0.1, True, False, "f1.dfy"),
-            ExamOutput(0.4, False, False, "f2.dfy"),
-            ExamOutput(0.2, True, False, "f3.dfy"),
+            mk_exam(0.1, True, "f1.dfy"),
+            mk_exam(0.4, False, "f2.dfy"),
+            mk_exam(0.2, True, "f3.dfy"),
         ],
         "tech2": [
-            ExamOutput(0.3, True, False, "f1.dfy"),
-            ExamOutput(0.8, False, False, "f2.dfy"),
-            ExamOutput(0.5, False, False, "f3.dfy"),
+            mk_exam(0.3, True, "f1.dfy"),
+            mk_exam(0.8, False, "f2.dfy"),
+            mk_exam(0.5, False, "f3.dfy"),
         ],
     }
 
     with patch("builtins.print"):
         generate_plots(raw_results, tmp_path)
 
-    out_file = tmp_path / "benchmark_hybrid_analysis.png"
+    out_file = tmp_path / "benchmark_hybrid_analysis_FILE.png"
     assert out_file.exists()
     assert out_file.stat().st_size > 0
 

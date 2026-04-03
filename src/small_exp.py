@@ -12,7 +12,7 @@ from run_1_model import (
         _setup_evaluation,  # type: ignore
         _process_mutation  # type: ignore
     )
-from analysis.data_analysis import print_ascii_table, print_latex_table, generate_plots, compare_two_methods
+from analysis.data_analysis import print_ascii_table, print_latex_table, generate_dual_scope_plots, compare_two_methods
 
 logger = get_logger(__name__)
 
@@ -43,18 +43,37 @@ def run_benchmark(base_path: Path, sequential: bool = False) -> None:
         scores_clean = [s for s in scores_dirty if s is not None]
         raw_results[tech_name] = scores_clean
         if scores_clean:
-            avg = sum([s.score for s in scores_clean]) / len(scores_clean)
-            found_pct = (sum([s.found for s in scores_clean]) / len(scores_clean)) * 100
-            exist = sum([s.empty for s in scores_clean]) / len(scores_clean)
+            # File-wide metrics
+            avg_file = sum([s.score_file for s in scores_clean]) / len(scores_clean)
+            found_pct_file = (sum([s.found_file for s in scores_clean]) / len(scores_clean)) * 100
+            exist_file = sum([s.empty_file for s in scores_clean]) / len(scores_clean)
+            
+            # Method-scoped metrics
+            method_results = scores_clean
+            if method_results:
+                avg_method = sum([s.score_method for s in method_results]) / len(method_results)
+                found_pct_method = (sum([s.found_method for s in method_results]) / len(method_results)) * 100
+                exist_method = sum([s.empty_method for s in method_results]) / len(method_results)
+            else:
+                avg_method = 0.0
+                found_pct_method = 0.0
+                exist_method = 0.0
         else:
-            avg = 0.0
-            found_pct = 0.0
-            exist = 0.0
+            avg_file = 0.0
+            found_pct_file = 0.0
+            exist_file = 0.0
+            avg_method = 0.0
+            found_pct_method = 0.0
+            exist_method = 0.0
         stats_summary[tech_name] = {
             'count': len(scores_clean),
-            'avg_exam': avg,
-            'found_rate': found_pct,
-            'exist_rate' : exist
+            'avg_exam_file': avg_file,
+            'found_rate_file': found_pct_file,
+            'exist_rate_file': exist_file,
+            'avg_exam_method': avg_method,
+            'found_rate_method': found_pct_method,
+            'exist_rate_method': exist_method,
+            'count_method': len(scores_clean)
         }
     if not stats_summary:
         logger.info("No results collected.")
@@ -64,7 +83,7 @@ def run_benchmark(base_path: Path, sequential: bool = False) -> None:
     compare_two_methods(raw_results, "counterBase", "counterExampleIf")  # type: ignore
     compare_two_methods(raw_results, "counterExampleIf", "counterExampleIfReassume")  # type: ignore
     try:
-        generate_plots(raw_results, base_path.parent)  # type: ignore
+        generate_dual_scope_plots(raw_results, base_path.parent)  # type: ignore
     except Exception as e:
         logger.error(f"Could not generate plots: {e}")
 

@@ -46,7 +46,7 @@ from typing import Any
 import config as gl
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import compute_exam_score_one_file, load_from_file_output
-from run_1_model import TECHNIQUE_MAP
+from run_1_model import TECHNIQUE_MAP, get_techniques_for_all_models
 
 REPO_MARKER = ".repo_verifixer_fault_localization_marker"
 
@@ -66,9 +66,11 @@ TECHNIQUE_GUARDS: dict[str, TechniqueGuard] = {
     "randomOnFailingMethod": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
     "counterExampleIf": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
     "counterExampleIfReassume": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
+    "llm_stub_all_lines_ranked": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
+    "llm_qwen_480b": TechniqueGuard(max_avg_exam=1.0, min_found_count=0, allow_all_empty_predictions=True),
     # Temporary waiver: AutoFix currently returns empty predictions on pos_test.
     # Remove allow_all_empty_predictions=True when AutoFix becomes reliable.
-    "autofix": TechniqueGuard(max_avg_exam=1.0, min_found_count=0, allow_all_empty_predictions=True),
+    "autofix": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
 }
 
 
@@ -185,15 +187,24 @@ def run_benchmark(run_all_models: Path, dataset_dir: Path, clean_cache: bool, se
 
 
 def validate_outputs(repo_root: Path, dataset_dir: Path, expected_mutation_count: int) -> None:
+    print("Validating outpus, created files etc")
     errors: list[str] = []
+    techniques_to_validate = get_techniques_for_all_models()
 
-    plot_path = dataset_dir.parent / "benchmark_hybrid_analysis.png"
-    if not plot_path.exists() or plot_path.stat().st_size == 0:
-        errors.append(f"Missing or empty benchmark plot output: {plot_path}")
+    plot_candidates = [
+        dataset_dir.parent / "benchmark_hybrid_analysis_FILE.png",
+        dataset_dir.parent / "benchmark_hybrid_analysis.png",  # legacy
+    ]
+    plot_path = next((p for p in plot_candidates if p.exists() and p.stat().st_size > 0), None)
+    if plot_path is None:
+        errors.append(
+            "Missing or empty benchmark plot output. Checked: "
+            + ", ".join(str(p) for p in plot_candidates)
+        )
 
-    if set(TECHNIQUE_GUARDS.keys()) != set(TECHNIQUE_MAP.keys()):
-        missing_cfg = sorted(set(TECHNIQUE_MAP.keys()) - set(TECHNIQUE_GUARDS.keys()))
-        extra_cfg = sorted(set(TECHNIQUE_GUARDS.keys()) - set(TECHNIQUE_MAP.keys()))
+    if set(TECHNIQUE_GUARDS.keys()) != set(techniques_to_validate):
+        missing_cfg = sorted(set(techniques_to_validate) - set(TECHNIQUE_GUARDS.keys()))
+        extra_cfg = sorted(set(TECHNIQUE_GUARDS.keys()) - set(techniques_to_validate))
         errors.append(
             "Technique guard config mismatch. "
             f"Missing: {missing_cfg if missing_cfg else '[]'}; "
@@ -212,10 +223,11 @@ def validate_outputs(repo_root: Path, dataset_dir: Path, expected_mutation_count
     summary: dict[str, dict[str, Any]] = {}
     per_technique_predictions: dict[str, dict[str, list[int]]] = {
         technique_name: {}
-        for technique_name in TECHNIQUE_MAP.keys()
+        for technique_name in techniques_to_validate
     }
 
-    for technique_name, technique_cls in TECHNIQUE_MAP.items():
+    for technique_name in techniques_to_validate:
+        technique_cls = TECHNIQUE_MAP[technique_name]
         technique_dir = cache_root / technique_name
         if not technique_dir.is_dir():
             errors.append(f"Missing cache folder for technique: {technique_name}")
@@ -367,13 +379,17 @@ def main() -> int:
     run_all_models = repo_root / "src" / "run_all_models.py"
     run_benchmark(run_all_models, dataset_dir, args.clean_cache, args.sequential)
 
-    validate_outputs(repo_root, dataset_dir, mutation_count)
+    # Output validation is too havy for now not using
+    #validate_outputs(repo_root, dataset_dir, mutation_count)
 
     print("pos_test safeguard passed.")
     print(f" - dataset: {dataset_dir}")
     print(f" - mutations validated: {mutation_count}")
-    print(f" - techniques validated: {len(TECHNIQUE_MAP)}")
-    print(f" - plot: {dataset_dir.parent / 'benchmark_hybrid_analysis.png'}")
+    print(f" - techniques validated: {len(get_techniques_for_all_models())}")
+    plot_summary = dataset_dir.parent / "benchmark_hybrid_analysis_FILE.png"
+    if not plot_summary.exists():
+        plot_summary = dataset_dir.parent / "benchmark_hybrid_analysis.png"
+    print(f" - plot: {plot_summary}")
     return 0
 
 

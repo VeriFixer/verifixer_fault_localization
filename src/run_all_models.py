@@ -2,68 +2,89 @@ import argparse
 import shutil
 from pathlib import Path
 from typing import Any
-from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
+from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq, shutdown_parallel_executor
 from fl_eval.metrics.scoring import ExamOutput
 import config as gl
 from logging_config import get_logger
 from run_1_model import (
-        TECHNIQUE_MAP, 
-        _setup_evaluation,  # type: ignore
-        _process_mutation  # type: ignore
-    )
+    get_techniques_for_all_models,
+    _setup_evaluation,  # type: ignore
+    _process_mutation,  # type: ignore
+)
 from analysis.data_analysis import print_ascii_table, print_latex_table, generate_plots
 
 logger = get_logger(__name__)
 
 def run_benchmark(base_path: Path, sequential: bool = False) -> None:
-    logger.info(f"Starting Benchmark on: {base_path}")
-    logger.info(f"Techniques to run: {list(TECHNIQUE_MAP.keys())}")
-    raw_results: dict[str, list[ExamOutput]] = {}
-    stats_summary: dict[str, dict[str, Any]] = {}
-    
-    for tech_name in TECHNIQUE_MAP:
-        logger.info(f"\n--- Running {tech_name.upper()} ---")
-        setup_res = _setup_evaluation(tech_name, base_path)
-        if not setup_res:
-            logger.warning(f"Skipping {tech_name} due to setup failure.")
-            continue
-        fl_technique, killed_dir, original_dir = setup_res
-        diff_paths = list(killed_dir.glob("*.txt"))
-        scores_dirty = run_parallel_or_seq(
-            diff_paths, 
-            _process_mutation, 
-            f"Eval {tech_name}", 
-            fl_technique, 
-            killed_dir, 
-            original_dir,
-            base_path,
-            parallel= not sequential
-        )
-        scores_clean = [s for s in scores_dirty if s is not None]
-        raw_results[tech_name] = scores_clean
-        if scores_clean:
-            avg = sum([s.score for s in scores_clean]) / len(scores_clean)
-            found_pct = (sum([s.found for s in scores_clean]) / len(scores_clean)) * 100
-            exist = sum([s.empty for s in scores_clean]) / len(scores_clean)
-        else:
-            avg = 0.0
-            found_pct = 0.0
-            exist = 0.0
-        stats_summary[tech_name] = {
-            'count': len(scores_clean),
-            'avg_exam': avg,
-            'found_rate': found_pct,
-            'exist_rate' : exist
-        }
-    if not stats_summary:
-        logger.info("No results collected.")
-        return
-    print_ascii_table(stats_summary)  # type: ignore
-    print_latex_table(stats_summary)  # type: ignore
     try:
-        generate_plots(raw_results, base_path.parent)  # type: ignore
-    except Exception as e:
-        logger.error(f"Could not generate plots: {e}")
+        techniques_to_run = get_techniques_for_all_models()
+        logger.info(f"Starting Benchmark on: {base_path}")
+        logger.info(f"Techniques to run: {techniques_to_run}")
+        raw_results: dict[str, list[ExamOutput]] = {}
+        stats_summary: dict[str, dict[str, Any]] = {}
+
+        for tech_name in techniques_to_run:
+            logger.info(f"\n--- Running {tech_name.upper()} ---")
+            setup_res = _setup_evaluation(tech_name, base_path)
+            if not setup_res:
+                logger.warning(f"Skipping {tech_name} due to setup failure.")
+                continue
+            fl_technique, killed_dir, original_dir = setup_res
+            diff_paths = list(killed_dir.glob("*.txt"))
+            scores_dirty = run_parallel_or_seq(
+                diff_paths,
+                _process_mutation,
+                f"Eval {tech_name}",
+                fl_technique,
+                killed_dir,
+                original_dir,
+                base_path,
+                parallel=not sequential
+            )
+            scores_clean = [s for s in scores_dirty if s is not None]
+            raw_results[tech_name] = scores_clean
+            if scores_clean:
+                # File-wide metrics
+                avg_file = sum([s.score_file for s in scores_clean]) / len(scores_clean)
+                found_pct_file = (sum([s.found_file for s in scores_clean]) / len(scores_clean)) * 100
+                exist_file = sum([s.empty_file for s in scores_clean]) / len(scores_clean)
+
+                # Method-scoped metrics
+                avg_method = 0.0
+                found_pct_method = 0.0
+                exist_method = 0.0
+                method_results = scores_clean
+                avg_method = sum([s.score_method for s in method_results]) / len(method_results)
+                found_pct_method = (sum([s.found_method for s in method_results]) / len(method_results)) * 100
+                exist_method = sum([s.empty_method for s in method_results]) / len(method_results)
+            else:
+                avg_file = 0.0
+                found_pct_file = 0.0
+                exist_file = 0.0
+                avg_method = 0.0
+                found_pct_method = 0.0
+                exist_method = 0.0
+            stats_summary[tech_name] = {
+                'count': len(scores_clean),
+                'avg_exam_file': avg_file,
+                'found_rate_file': found_pct_file,
+                'exist_rate_file': exist_file,
+                'avg_exam_method': avg_method,
+                'found_rate_method': found_pct_method,
+                'exist_rate_method': exist_method,
+                'count_method': len(scores_clean)
+            }
+        if not stats_summary:
+            logger.info("No results collected.")
+            return
+        print_ascii_table(stats_summary)  # type: ignore
+        print_latex_table(stats_summary)  # type: ignore
+        try:
+            generate_plots(raw_results, base_path.parent)  # type: ignore
+        except Exception as e:
+            logger.error(f"Could not generate plots: {e}")
+    finally:
+        shutdown_parallel_executor(wait=True)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark ALL Fault Localization techniques.")

@@ -52,6 +52,28 @@ docker run --rm -it \
 # Inside the container 
 Once inside the contaner follow the main README, README.md
 
+# Using AWS Bedrock-backed LLMs
+The LLM code in `src/fl_eval/llm` expects these environment variables when you want to use a Bedrock model inside Docker:
+
+```shell
+-e AWS_BEARER_TOKEN_BEDROCK=... \
+-e AWS_DEFAULT_REGION=us-east-2
+```
+
+Example:
+
+```shell
+docker run --rm -it \
+  -u $(id -u):$(id -g) \
+  -e PYTHONPATH=/app/src \
+  -e FL_LOG_LEVEL=INFO \
+  -e AWS_BEARER_TOKEN_BEDROCK="$AWS_BEARER_TOKEN_BEDROCK" \
+  -e AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-us-east-2}" \
+  -v "$(pwd)/src:/app/src:delegated" \
+  -w /app \
+  dafny_research:latest bash
+```
+
 # Logging Configuration
 
 Control logging output inside the container with `FL_LOG_LEVEL` environment variable:

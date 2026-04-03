@@ -45,11 +45,117 @@ class GroundTruthLike(Protocol):
     endLine: int
 
 @dataclass
-class ExamOutput:
-    score : float # it is the exam score
-    found : bool  # defines if the line of the oracle is inside any line predicted
-    empty : bool  # Defines that the predicter did not predict anything
-    filename : str  # the filename where the score refers to
+class ExamScore:
+    score: float
+    found: bool
+    prediction: bool
+
+    @property
+    def empty(self) -> bool:
+        return not self.prediction
+
+
+@dataclass
+class ExamScoreOutput:
+    filename: str
+    method_name: str
+
+    file: ExamScore
+    method: ExamScore
+
+    # Compatibility aliases for existing call sites
+    @property
+    def score_file(self) -> float:
+        return self.file.score
+
+    @property
+    def found_file(self) -> bool:
+        return self.file.found
+
+    @property
+    def empty_file(self) -> bool:
+        return self.file.empty
+
+    @property
+    def score_method(self) -> float:
+        return self.method.score
+
+    @property
+    def found_method(self) -> bool:
+        return self.method.found
+
+    @property
+    def empty_method(self) -> bool:
+        return self.method.empty
+
+    # Legacy aliases where "score/found/empty" means file scope
+    @property
+    def score(self) -> float:
+        return self.file.score
+
+    @property
+    def found(self) -> bool:
+        return self.file.found
+
+    @property
+    def empty(self) -> bool:
+        return self.file.empty
+
+
+# Backward-compatible type alias
+ExamOutput = ExamScoreOutput
+
+
+def _compute_exam_score_in_scope(
+    predictions: list[int],
+    ground_truth: int,
+    scope_start: int,
+    scope_end: int,
+) -> ExamScore:
+    """Compute EXAM score for an arbitrary [scope_start, scope_end] range."""
+    total_lines = scope_end - scope_start + 1
+
+    if total_lines <= 0:
+        raise ValueError("Invalid line range: scope_end must be >= scope_start")
+
+    if not (scope_start <= ground_truth <= scope_end):
+        raise ValueError(f"Ground truth {ground_truth} is out of bounds ({scope_start}-{scope_end})")
+
+    # Normalize predictions to support both absolute line numbers and relative
+    # positions in [1, total_lines] produced by some techniques.
+    normalized_predictions: list[int] = []
+    seen: set[int] = set()
+    for p in predictions:
+        candidate: int | None = None
+        if scope_start <= p <= scope_end:
+            candidate = p
+        elif 1 <= p <= total_lines:
+            candidate = scope_start + p - 1
+
+        if candidate is not None and candidate not in seen:
+            seen.add(candidate)
+            normalized_predictions.append(candidate)
+
+    in_scope_predictions = normalized_predictions
+    has_prediction = len(in_scope_predictions) > 0
+
+    if total_lines == 1:
+        return ExamScore(score=0.0, found=ground_truth in in_scope_predictions, prediction=has_prediction)
+
+    try:
+        rank = in_scope_predictions.index(ground_truth)
+        found_in_predictions = True
+    except ValueError:
+        found_in_predictions = False
+        lines_inspected_so_far = len(in_scope_predictions)
+        remaining_unranked_lines = total_lines - lines_inspected_so_far
+        if remaining_unranked_lines <= 0:
+            raise ValueError("Predictions cover all lines but ground truth is missing.")
+        expected_position_in_unranked = (remaining_unranked_lines - 1) / 2
+        rank = lines_inspected_so_far + expected_position_in_unranked
+
+    exam_score = rank / (total_lines - 1)
+    return ExamScore(score=exam_score, found=found_in_predictions, prediction=has_prediction)
 
 def compute_exam_score_one_file(
     predictions: list[int], 
@@ -57,7 +163,7 @@ def compute_exam_score_one_file(
     total_line_start: int, 
     total_line_end: int,
     filename: str
-) -> ExamOutput:
+) -> ExamScore:
     """
     Evaluates the effectiveness of a fault localization technique by calculating the EXAM score.
 
@@ -82,55 +188,62 @@ def compute_exam_score_one_file(
         filename (str): The filename associated with the score.
 
     Returns:
-        ExamOutput: The computed exam score with metadata.
+        ExamScore for file scope.
 
     Raises:
         ValueError: If the ground_truth is not within the specified line range.
     """
-    total_lines = total_line_end - total_line_start + 1
+    _ = filename  # kept for API compatibility with existing callers
+    return _compute_exam_score_in_scope(
+        predictions=predictions,
+        ground_truth=ground_truth,
+        scope_start=total_line_start,
+        scope_end=total_line_end,
+    )
+
+
+def compute_exam_score_method_scope(
+    predictions: list[int],
+    ground_truth: int,
+    method_start: int,
+    method_end: int,
+    filename: str
+) -> ExamScore:
+    """
+    Compute EXAM score within a method scope (not file-wide).
     
-    if total_lines <= 0:
-        raise ValueError("Invalid line range: total_line_end must be >= total_line_start")
-
-    if not (total_line_start <= ground_truth <= total_line_end):
-        raise ValueError(f"Ground truth {ground_truth} is out of bounds ({total_line_start}-{total_line_end})")
+    Similar to compute_exam_score_one_file but restricts evaluation to method boundaries.
     
-    pred = list(filter(lambda x: (x < total_line_start) or (x > total_line_end), predictions))
-       
-    if  len(pred) != 0:
-        raise ValueError(f"Some predictions are outside the bounds of the line start {total_line_start} line end {total_line_end} prediction {pred}")
+    Args:
+        predictions (list[int]): A list of line numbers ranked by suspiciousness (descending).
+        ground_truth (int): The actual line number where the fault is located.
+        method_start (int): The starting line number of the method scope.
+        method_end (int): The ending line number of the method scope.
+        filename (str): The filename associated with the score.
 
-    is_empty = predictions == []
-    if(total_lines == 1): # If one line it is found and exam is always 0 as no effort is wasted
-        return  ExamOutput(score = 0, found = predictions != [], empty = is_empty, filename=filename) 
-
-    try:
-        rank = predictions.index(ground_truth)
-        found_in_predictions = True
+    Returns:
+        ExamScore for method scope.
         
-    except ValueError:
-        found_in_predictions = False
-        lines_inspected_so_far = len(predictions)
-        remaining_unranked_lines = total_lines - lines_inspected_so_far
-        
-        if remaining_unranked_lines <= 0:
-             raise ValueError("Predictions cover all lines but ground truth is missing.")
-        # We assume the fault is one of the remaining unranked lines.
-        # The expected position of the fault in the unranked set is the average position.
-        expected_position_in_unranked = (remaining_unranked_lines-1) / 2
-        rank = lines_inspected_so_far + expected_position_in_unranked
+    Raises:
+        ValueError: If the ground_truth is not within the method scope
+    """
+    _ = filename  # kept for API compatibility with existing callers
+    return _compute_exam_score_in_scope(
+        predictions=predictions,
+        ground_truth=ground_truth,
+        scope_start=method_start,
+        scope_end=method_end,
+    )
 
-    exam_score = rank / (total_lines-1)
-    return ExamOutput( score = exam_score, found = found_in_predictions, empty = is_empty, filename=filename)
 
 def _results_file_path(flt: FLTechnique, Gtruth: GroundTruthLike, dataset_dir: Path) -> Path:
     """Get the cache file path for a technique's predictions on a specific mutant.
-    
+
     Args:
         flt: The fault localization technique
         Gtruth: Ground truth information for the mutant
         dataset_dir: Path to the dataset directory for dataset-specific caching
-    
+
     Returns:
         Path to the cache file (run_artifacts/cached_results/<dataset_name>/<technique>/<mutant>.json)
     """
@@ -202,22 +315,29 @@ def load_from_file_output(flt: FLTechnique, Gtruth: GroundTruthLike, dataset_dir
     return [int(item) for item in raw_predictions]
 
 
-def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir: Path) -> ExamOutput:
-    """Compute EXAM score for a mutation, using cached results if available.
+def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir: Path) -> ExamScoreOutput:
+    """Compute EXAM score for a mutation in both file-wide and method scopes.
+    
+    Uses cached results if available. Requires method information (method_name, method_start, method_end)
+    to be present in Gtruth. Computes dual-scope metrics:
+    - File-wide: entire file from startLine to endLine
+    - Method-scoped: only within the method containing the fault
     
     Args:
         flt: The fault localization technique
-        Gtruth: Ground truth information for the mutant
+        Gtruth: Ground truth information for the mutant (must include method fields)
         dataset_dir: Path to the dataset directory for dataset-specific caching
     
     Returns:
-        ExamOutput with the computed score
+        ExamScoreOutput with computed scores for both file and method scopes
+        
+    Raises:
+        AttributeError: If Gtruth lacks required method fields (method_start, method_end, method_name)
     """
+    # Load or compute predictions (same as before)
     try:
-        # Try loading from cached results
         predictions = load_from_file_output(flt, Gtruth, dataset_dir)
     except (FileNotFoundError, PermissionError, OSError, json.JSONDecodeError, ValueError):
-        # Compute predictions localization
         execution_metadata: dict[str, Any] | None = None
         try:
             predictions = flt.get_fault_localization(Gtruth.mutantfile) 
@@ -227,18 +347,43 @@ def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir:
             print("Exception occurred while running fault localization:", file=sys.stderr)
             print(str(e), file=sys.stderr)
             traceback.print_exc(file=sys.stderr)
-            predictions = []
             execution_metadata = run_cmd.get_last_execution_metadata()
         save_to_file_output(flt, Gtruth, predictions, dataset_dir, execution_metadata)
     
+    # Compute file-wide EXAM score
     ground_truth = Gtruth.ground_truth
     total_line_start = Gtruth.startLine
     total_line_end = Gtruth.endLine
     
-    return compute_exam_score_one_file(
+    exam_file = compute_exam_score_one_file(
         predictions, 
         ground_truth, 
         total_line_start, 
         total_line_end,
         str(Gtruth.mutantfile)
+    )
+    
+    # Compute method-scoped EXAM score when method metadata exists.
+    raw_method_start = getattr(Gtruth, "method_start", None)
+    raw_method_end = getattr(Gtruth, "method_end", None)
+    raw_method_name = getattr(Gtruth, "method_name", "")
+
+    method_name = raw_method_name if isinstance(raw_method_name, str) else ""
+    method_score = exam_file
+
+    if isinstance(raw_method_start, int) and isinstance(raw_method_end, int):
+        if raw_method_start <= ground_truth <= raw_method_end:
+            method_score = compute_exam_score_method_scope(
+                predictions,
+                ground_truth,
+                raw_method_start,
+                raw_method_end,
+                str(Gtruth.mutantfile)
+            )
+    
+    return ExamScoreOutput(
+        filename=str(Gtruth.mutantfile),
+        method_name=method_name,
+        file=exam_file,
+        method=method_score,
     )

@@ -1,9 +1,8 @@
 
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Type
 import shutil
-import sys
 
 import config as gl
 from logging_config import get_logger
@@ -19,6 +18,7 @@ from fl_eval.strategies.random_line_of_method_that_fails import RandomLineOfMeth
 from fl_eval.strategies.counter_example_if import CounterExampleIf
 from fl_eval.strategies.counter_example_if_reassume import CounterExampleIfReassume
 from fl_eval.strategies.autofix_ranker import AutoFixRanker
+from fl_eval.strategies.llm_ranker import LLMRanker
 
 
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
@@ -31,16 +31,35 @@ from typing import Optional
 
 logger = get_logger(__name__)
 
-# --- Mapping of Technique Names to Classes ---
-TECHNIQUE_MAP: dict[str, type[FLTechnique]] = {
-    "random": RandomRanker,
-    "counterBase": CounterExampleBaseRanker,
-    "empty": EmptyRanker,
-    "randomOnFailingMethod" : RandomLineOfMethodThatFails,
-    "counterExampleIf": CounterExampleIf,
-    "counterExampleIfReassume" : CounterExampleIfReassume,
-    "autofix": AutoFixRanker
+@dataclass(frozen=True)
+class TechniqueConfig:
+    technique_class: type[FLTechnique]
+    run_on_all_models: bool = False
+
+
+# --- Mapping of Technique Names to Config ---
+TECHNIQUE_CONFIG: dict[str, TechniqueConfig] = {
+    "random": TechniqueConfig(RandomRanker, run_on_all_models=True),
+    "counterBase": TechniqueConfig(CounterExampleBaseRanker, run_on_all_models=True),
+    "empty": TechniqueConfig(EmptyRanker, run_on_all_models=True),
+    "randomOnFailingMethod": TechniqueConfig(RandomLineOfMethodThatFails, run_on_all_models=True),
+    "counterExampleIf": TechniqueConfig(CounterExampleIf, run_on_all_models=True),
+    "counterExampleIfReassume": TechniqueConfig(CounterExampleIfReassume, run_on_all_models=True),
+    "autofix": TechniqueConfig(AutoFixRanker, run_on_all_models=True),
+    "llm_stub_all_lines_ranked": TechniqueConfig(LLMRanker, run_on_all_models=True),
+    "llm_without_api": TechniqueConfig(LLMRanker, run_on_all_models=False),
+    "llm_qwen_480b": TechniqueConfig(LLMRanker, run_on_all_models=True),
 }
+
+# Backwards-compatibility map for callers that only need the class.
+TECHNIQUE_MAP: dict[str, type[FLTechnique]] = {
+    name: cfg.technique_class for name, cfg in TECHNIQUE_CONFIG.items()
+}
+
+
+def get_techniques_for_all_models() -> list[str]:
+    """Return techniques explicitly enabled for run_all_models and guard pipelines."""
+    return [name for name, cfg in TECHNIQUE_CONFIG.items() if cfg.run_on_all_models]
 
 def _setup_evaluation(flt_name: str, base_path: Path) -> tuple[FLTechnique, Path, Path] | None:
     """
@@ -59,24 +78,24 @@ def _setup_evaluation(flt_name: str, base_path: Path) -> tuple[FLTechnique, Path
 
     FLT_Class = TECHNIQUE_MAP[flt_name]
     fl_technique = FLT_Class(name=flt_name)
-    
+
     # 2. Dataset Structure and Consistency Validation
     # Note: Validation errors are logged but do not block evaluation.
     # Individual mutations will handle their own validation during processing.
     validation_result = validate_dataset(base_path)
     log_validation_result(validation_result, base_path)
-    
+
     if not validation_result.is_valid:
         logger.error(
             f"Dataset validation detected issues for {base_path}. "
             f"Continuing with evaluation but some mutations may be skipped. "
             f"Issues: {len([m for m in validation_result.messages if 'validation' not in m.lower()])} errors detected."
         )
-    
+
     # 3. Directory Setup
     killed_dir = base_path / "killed"
     original_dir = base_path / "original"
-        
+
     return fl_technique, killed_dir, original_dir
 
 # --- Helper 2: Process a Single Mutation ---
@@ -161,7 +180,11 @@ def _generate_report(flt_name: str, all_scores: list[ExamOutput]) -> None:
     logger.info("="*60 + "\n")
 
 # --- Orchestrator Function ---
-def compute_metrics(flt_name: str, base_path: Path, sequential: bool = False) -> None:
+def compute_metrics(
+    flt_name: str,
+    base_path: Path,
+    sequential: bool = False,
+) -> None:
     """
     Receives a technique name and directory, iterates through mutation files, 
     computes EXAM scores, and reports the average.
@@ -184,6 +207,10 @@ def compute_metrics(flt_name: str, base_path: Path, sequential: bool = False) ->
                                      fl_technique, killed_dir, original_dir, base_path, parallel=not sequential)
     all_scores_clean: list[ExamOutput] = [x for x in all_scores if x is not None]
     _generate_report(flt_name, all_scores_clean)
+
+    if flt_name == "llm_stub_all_lines_ranked" and isinstance(fl_technique, LLMRanker):
+        print("LLM expected cost:")
+        fl_technique.get_costs()
 
 
 

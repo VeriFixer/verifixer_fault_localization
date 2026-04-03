@@ -17,6 +17,22 @@ CPU_LIMITER = threading.BoundedSemaphore(SAFE_THREADS)
 # 5,000 threads is well within the limits of modern OSs for sleeping threads.
 MAX_MANAGEMENT_THREADS = 5000
 _SHARED_EXECUTOR = ThreadPoolExecutor(max_workers=MAX_MANAGEMENT_THREADS)
+_EXECUTOR_SHUTDOWN = False
+
+
+def _get_shared_executor() -> ThreadPoolExecutor:
+    global _SHARED_EXECUTOR, _EXECUTOR_SHUTDOWN
+    if _EXECUTOR_SHUTDOWN:
+        _SHARED_EXECUTOR = ThreadPoolExecutor(max_workers=MAX_MANAGEMENT_THREADS)
+        _EXECUTOR_SHUTDOWN = False
+    return _SHARED_EXECUTOR
+
+
+def shutdown_parallel_executor(wait: bool = True) -> None:
+    global _SHARED_EXECUTOR, _EXECUTOR_SHUTDOWN
+    if not _EXECUTOR_SHUTDOWN:
+        _SHARED_EXECUTOR.shutdown(wait=wait)
+        _EXECUTOR_SHUTDOWN = True
 
 def run_parallel_or_seq(items: Iterable[Any], task_fn: Callable[..., R], desc: str, *task_args: Any, parallel: bool = True) -> list[R]:
     results: list[Any] = []
@@ -29,8 +45,9 @@ def run_parallel_or_seq(items: Iterable[Any], task_fn: Callable[..., R], desc: s
 
     if parallel:
         # We use the massive pool so we can always fit 'parent' tasks
+        executor = _get_shared_executor()
         futures = {
-            _SHARED_EXECUTOR.submit(semaphore_task, item): item
+            executor.submit(semaphore_task, item): item
             for item in items
         }
         

@@ -3,12 +3,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/find_repo_root.sh"
 BASE_PATH="$(find_repo_root)" || exit 1 
 
-OUT_DIR="${BASE_PATH}/datasets/dafnytestgen_tests_can_run"
+OUT_DIR="${BASE_PATH}/datasets/post_test_with_tests"
 mkdir -p "$OUT_DIR/killed"
 mkdir -p "$OUT_DIR/original"
 mkdir -p "$OUT_DIR/not_supported"
 
-FULL_DATASET_DIR="${BASE_PATH}/datasets/sample_original_can_run"
+FULL_DATASET_DIR="${BASE_PATH}/datasets/pos_test"
 #FULL_DATASET_DIR="${BASE_PATH}/datasets/pos_test"
 
 ORIG_DIR="$FULL_DATASET_DIR/original"
