@@ -41,6 +41,17 @@ def run_benchmark(base_path: Path, sequential: bool = False) -> None:
                 base_path,
                 parallel=not sequential
             )
+            get_costs_fn = getattr(fl_technique, "get_costs", None)
+            if callable(get_costs_fn):
+                try:
+                    cost_output = get_costs_fn()
+                    if cost_output is None:
+                        logger.info(f"[{tech_name}] get_costs() executed.")
+                    else:
+                        logger.info(f"[{tech_name}] costs: {cost_output}")
+                except Exception as e:
+                    logger.warning(f"[{tech_name}] failed to retrieve costs: {e}")
+            
             scores_clean = [s for s in scores_dirty if s is not None]
             raw_results[tech_name] = scores_clean
             stats_summary[tech_name] = build_summary_entry(scores_clean)

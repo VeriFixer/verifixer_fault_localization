@@ -2,5 +2,5 @@ matplotlib==3.10.8
 numpy==2.4.3
 psutil==7.0.0
 scipy==1.17.1
-boto3==1.37.38
+boto3==1.40.75
 tqdm==4.67.1
