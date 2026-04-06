@@ -11,6 +11,33 @@ namespace CounterExampleIfReassume
 {
     class Program
     {
+        public class CounterExampleReport
+        {
+            public List<CounterExampleTrace> traces { get; set; } = new();
+        }
+
+        public class CounterExampleTrace
+        {
+            public int trace_id { get; set; }
+            public List<CounterExampleNode> nodes { get; set; } = new();
+        }
+
+        public class ParentNodeInfo
+        {
+            public string parent_node_type { get; set; } = "";
+            public int parent_node_line { get; set; }
+        }
+
+        public class CounterExampleNode
+        {
+            public int line { get; set; }
+            public int depth { get; set; }
+            public string type { get; set; } = "";
+            public string source { get; set; } = "";
+            public string content { get; set; } = "";
+            public List<ParentNodeInfo> parents { get; set; } = new();
+        }
+
         private sealed class ProgramArguments
         {
             public string ProgramFile { get; init; } = "";
@@ -44,9 +71,9 @@ namespace CounterExampleIfReassume
             var runner = new VerificationRunner(config, TempWorkDir, parsedArguments.MaxTime, parsedArguments.MaxRam);
             await runner.Run();
 
-            var allSuspiciousLines = await CollectSuspiciousLinesAsync(TempWorkDir);
+            var report = await CollectSuspiciousLinesAsync(TempWorkDir);
 
-            WriteJsonOutput(allSuspiciousLines);
+            WriteJsonOutput(report);
             
             Directory.Delete(TempWorkDir, true); 
             return 0;
@@ -108,42 +135,39 @@ namespace CounterExampleIfReassume
             return true;
         }
 
-        private static void WriteJsonOutput(List<List<int>> allSuspiciousLines)
+        private static void WriteJsonOutput(CounterExampleReport report)
         {
-            var json = JsonSerializer.Serialize(allSuspiciousLines);
+            var json = JsonSerializer.Serialize(report);
             Console.WriteLine("JSON_OUTPUT_START");
             Console.WriteLine(json);
             Console.WriteLine("JSON_OUTPUT_END");
         }
 
-        private static async Task<List<List<int>>> CollectSuspiciousLinesAsync(string tempWorkDir)
+        private static async Task<CounterExampleReport> CollectSuspiciousLinesAsync(string tempWorkDir)
         {
-            var allSuspiciousLines = new List<List<int>>();
+            var report = new CounterExampleReport();
             var solutionFiles = Directory.GetFiles(tempWorkDir, "*_solution.dfy");
 
+            int traceId = 0;
             foreach (var file in solutionFiles)
             {
-                allSuspiciousLines.Add(await ParseSolutionFileAsync(file));
+                var trace = await ParseSolutionFileAsync(file, traceId);
+                report.traces.Add(trace);
+                traceId += 1;
             }
 
-            return allSuspiciousLines;
+            return report;
         }
 
-        private static async Task<List<int>> ParseSolutionFileAsync(string solutionFile)
+        private static async Task<CounterExampleTrace> ParseSolutionFileAsync(string solutionFile, int traceId)
         {
-            var assumeFalseLines = new List<int>();
-            var suspiciousLines = new List<int>();
+            var trace = new CounterExampleTrace { trace_id = traceId };
             var lines = await File.ReadAllLinesAsync(solutionFile);
             bool suspiciousSection = false;
 
             for (int i = 0; i < lines.Length; i++)
             {
                 string line = lines[i];
-
-                if (line.Contains("assume false"))
-                {
-                    assumeFalseLines.Add(i);
-                }
 
                 if (line.Contains("---- Suspicious nodes ----"))
                 {
@@ -156,10 +180,21 @@ namespace CounterExampleIfReassume
                     continue;
                 }
 
-                var match = Regex.Match(line, @"// line (\d+)");
-                if (match.Success && int.TryParse(match.Groups[1].Value, out int lineNumber))
+                if (line.StartsWith("// node "))
                 {
-                    suspiciousLines.Add(ShiftLineNumberForInsertedAssumes(lineNumber, assumeFalseLines));
+                    var rawJson = line.Substring("// node ".Length);
+                    try
+                    {
+                        var parsed = JsonSerializer.Deserialize<CounterExampleNode>(rawJson);
+                        if (parsed != null)
+                        {
+                            trace.nodes.Add(parsed);
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                        // Ignore malformed node lines and continue parsing.
+                    }
                     continue;
                 }
 
@@ -169,21 +204,7 @@ namespace CounterExampleIfReassume
                 }
             }
 
-            return suspiciousLines;
-        }
-
-        private static int ShiftLineNumberForInsertedAssumes(int lineNumber, List<int> assumeFalseLines)
-        {
-            int shiftedLine = lineNumber;
-            foreach (var assumeFalseLine in assumeFalseLines)
-            {
-                if (assumeFalseLine < shiftedLine)
-                {
-                    shiftedLine -= 1;
-                }
-            }
-
-            return shiftedLine;
+            return trace;
         }
     }
 
@@ -462,7 +483,8 @@ namespace CounterExampleIfReassume
             if (statePositions.Count == 0)
                 return AnalysisResult.Empty;
 
-            var suspiciousNodes = new List<INode>();
+            var suspiciousNodes = new List<AnalysisResult.SuspiciousNodeInfo>();
+            var seenSuspicious = new HashSet<string>();
             BlockStmt? firstBlockStmt = null;
             bool insideIf = false;
 
@@ -477,20 +499,51 @@ namespace CounterExampleIfReassume
                 if (!visitor.MatchingStatementWithAllParent.Any()) continue;
 
                 var (stmt, parents) = visitor.MatchingStatementWithAllParent[0];
+                int matchedDepth = parents.Count + 1;
 
+                string matchedType = stmt switch
+                {
+                    IfStmt => "IfStmt",
+                    WhileStmt => "WhileStmt",
+                    _ => "Statement",
+                };
+
+                string matchedKey = $"{stmt.StartToken.line}:{matchedDepth}:matched_statement:{matchedType}";
+                if (seenSuspicious.Add(matchedKey))
+                {
+                    suspiciousNodes.Add(new AnalysisResult.SuspiciousNodeInfo
+                    {
+                        Line = stmt.StartToken.line,
+                        Depth = matchedDepth,
+                        Type = matchedType,
+                        Source = "matched_statement",
+                        Content = stmt.ToString(),
+                        Parents = BuildParentRefs(parents),
+                    });
+                }
+
+                int ancestorDepth = parents.Count;
                 while (parents.Count > 0)
                 {
                     var parent = parents.Pop();
-                    if (suspiciousNodes.Contains(parent))
-                    {
-                        continue;
-                    }
-
+                    var parentRefs = BuildParentRefs(parents);
                     if (parent is IfStmt ifStmt)
                     {
                         insideIf = true;
                         firstBlockStmt ??= ResolveIfTargetBlock(ifStmt, stmt);
-                        suspiciousNodes.Add(parent);
+                        string key = $"{ifStmt.StartToken.line}:{ancestorDepth}:ancestor_chain:IfStmt";
+                        if (seenSuspicious.Add(key))
+                        {
+                            suspiciousNodes.Add(new AnalysisResult.SuspiciousNodeInfo
+                            {
+                                Line = ifStmt.StartToken.line,
+                                Depth = Math.Max(ancestorDepth, 0),
+                                Type = "IfStmt",
+                                Source = "ancestor_chain",
+                                Content = ifStmt.ToString(),
+                                Parents = parentRefs,
+                            });
+                        }
                         break;
                     }
 
@@ -498,11 +551,37 @@ namespace CounterExampleIfReassume
                     {
                         insideIf = true;
                         firstBlockStmt ??= whileStmt.Body as BlockStmt;
-                        suspiciousNodes.Add(parent);
+                        string key = $"{whileStmt.StartToken.line}:{ancestorDepth}:ancestor_chain:WhileStmt";
+                        if (seenSuspicious.Add(key))
+                        {
+                            suspiciousNodes.Add(new AnalysisResult.SuspiciousNodeInfo
+                            {
+                                Line = whileStmt.StartToken.line,
+                                Depth = Math.Max(ancestorDepth, 0),
+                                Type = "WhileStmt",
+                                Source = "ancestor_chain",
+                                Content = whileStmt.ToString(),
+                                Parents = parentRefs,
+                            });
+                        }
                         break;
                     }
+                    ancestorDepth -= 1;
                 }
-                suspiciousNodes.Add(stmt);
+
+                string stateKey = $"{state.Line}:0:counterexample_state:State";
+                if (seenSuspicious.Add(stateKey))
+                {
+                    suspiciousNodes.Add(new AnalysisResult.SuspiciousNodeInfo
+                    {
+                        Line = state.Line,
+                        Depth = 0,
+                        Type = "State",
+                        Source = "counterexample_state",
+                        Content = state.Raw,
+                        Parents = new List<Program.ParentNodeInfo>(),
+                    });
+                }
             }
 
             var rawStateLines = statePositions.Select(p => p.Line).Distinct().OrderBy(x => x).ToList();
@@ -529,20 +608,48 @@ namespace CounterExampleIfReassume
             return block.StartToken.line <= statement.StartToken.line &&
                 statement.EndToken.line <= block.EndToken.line;
         }
+
+        private static List<Program.ParentNodeInfo> BuildParentRefs(Stack<INode> parents)
+        {
+            var refs = new List<Program.ParentNodeInfo>();
+            var parentCopy = new Stack<INode>(parents.Reverse());
+
+            while (parentCopy.Count > 0)
+            {
+                var parent = parentCopy.Pop();
+                refs.Add(new Program.ParentNodeInfo
+                {
+                    parent_node_type = parent.GetType().Name,
+                    parent_node_line = parent.StartToken.line,
+                });
+            }
+
+            return refs;
+        }
     }
 
     class AnalysisResult
     {
+        public class SuspiciousNodeInfo
+        {
+            public int Line { get; init; }
+            public int Depth { get; init; }
+            public string Type { get; init; } = "";
+            public string Source { get; init; } = "";
+            public string Content { get; init; } = "";
+            public List<Program.ParentNodeInfo> Parents { get; init; } = new();
+        }
+
         public bool ShouldInject => InsideIf && TargetBlock != null;
 
         public bool InsideIf { get; }
         public BlockStmt? TargetBlock { get; }
-        public List<INode> SuspiciousNodes { get; }
+        public List<SuspiciousNodeInfo> SuspiciousNodes { get; }
         public List<int> RawStateLines { get; }
 
         public static AnalysisResult Empty => new(false, null, new(), new());
 
-        public AnalysisResult(bool insideIf, BlockStmt? block, List<INode> nodes, List<int> rawStateLines)
+        public AnalysisResult(bool insideIf, BlockStmt? block, List<SuspiciousNodeInfo> nodes, List<int> rawStateLines)
         {
             InsideIf = insideIf;
             TargetBlock = block;
@@ -673,15 +780,18 @@ namespace CounterExampleIfReassume
 
             writer.WriteLine("// ---- Suspicious nodes ----");
 
-            var allLines = new HashSet<int>(analysis.RawStateLines);
             foreach (var node in analysis.SuspiciousNodes)
             {
-                allLines.Add(node.StartToken.line);
-            }
-
-            foreach (var line in allLines.OrderBy(x => x))
-            {
-                writer.WriteLine($"// line {line}");
+                var nodePayload = new Program.CounterExampleNode
+                {
+                    line = node.Line,
+                    depth = node.Depth,
+                    type = node.Type,
+                    source = node.Source,
+                    content = node.Content,
+                    parents = node.Parents,
+                };
+                writer.WriteLine($"// node {JsonSerializer.Serialize(nodePayload)}");
             }
 
             writer.WriteLine($"// Postcondition {postcondition}");

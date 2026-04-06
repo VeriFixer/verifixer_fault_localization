@@ -3,6 +3,7 @@
 using Microsoft.Dafny;
 using DafnyDriver.Commands;
 using Microsoft.Boogie;
+using System.Linq;
 using System.Text.Json;
 using Std.Wrappers;
 using System.Diagnostics.Metrics;
@@ -145,16 +146,31 @@ namespace returnMethodLinesRandom
             return options;
         }
 
-        public class CounterExampleData
+        public class CounterExampleReport
         {
-            public List<NodeInfo> Nodes { get; set; } = new();
+            public List<CounterExampleTrace> traces { get; set; } = new();
         }
 
-        public class NodeInfo
+        public class CounterExampleTrace
         {
-            public string Type { get; set; }
-            public int Line { get; set; }
-            public string Content { get; set; } // The actual code string
+            public int trace_id { get; set; }
+            public List<CounterExampleNode> nodes { get; set; } = new();
+        }
+
+        public class ParentNodeInfo
+        {
+            public string parent_node_type { get; set; } = "";
+            public int parent_node_line { get; set; }
+        }
+
+        public class CounterExampleNode
+        {
+            public int line { get; set; }
+            public int depth { get; set; }
+            public string type { get; set; } = "";
+            public string source { get; set; } = "";
+            public string content { get; set; } = "";
+            public List<ParentNodeInfo> parents { get; set; } = new();
         }
 
         private sealed class StatePosition
@@ -242,37 +258,29 @@ namespace returnMethodLinesRandom
 
         private static void EmitReportFromCliStates(List<StatePosition> statePositions, List<BlockStmt> failedMethodBodies)
         {
-            var report = new CounterExampleData();
-            var seenStateLines = new HashSet<string>();
-            var seenBranchLines = new HashSet<int>();
+            var report = new CounterExampleReport();
 
-            foreach (var state in statePositions)
+            for (int traceId = 0; traceId < statePositions.Count; traceId++)
             {
-                string key = $"{state.Line}:{state.Col}";
-                if (seenStateLines.Add(key))
-                {
-                    report.Nodes.Add(new NodeInfo
-                    {
-                        Type = "State",
-                        Line = state.Line,
-                        Content = state.Raw
-                    });
-                }
-
-                AddBranchLogicLines(state.Line, state.Col, failedMethodBodies, report, seenBranchLines);
+                var state = statePositions[traceId];
+                var trace = new CounterExampleTrace { trace_id = traceId };
+                trace.nodes.AddRange(AddBranchLogicLines(state.Line, state.Col, state.Raw, failedMethodBodies));
+                trace.nodes = trace.nodes.OrderBy(n => n.line).ThenByDescending(n => n.depth).ToList();
+                report.traces.Add(trace);
             }
-
-            report.Nodes = report.Nodes.OrderBy(n => n.Line).ToList();
 
             var jsonOptions = new JsonSerializerOptions { WriteIndented = true };
             string jsonString = JsonSerializer.Serialize(report, jsonOptions);
-            Console.WriteLine("```json");
+            Console.WriteLine("JSON_OUTPUT_START");
             Console.WriteLine(jsonString);
-            Console.WriteLine("```");
+            Console.WriteLine("JSON_OUTPUT_END");
         }
 
-        private static void AddBranchLogicLines(int line, int col, List<BlockStmt> failedMethodBodies, CounterExampleData report, HashSet<int> seenBranchLines)
+        private static List<CounterExampleNode> AddBranchLogicLines(int line, int col, string rawState, List<BlockStmt> failedMethodBodies)
         {
+            var branchNodes = new List<CounterExampleNode>();
+            var seenBranchKeys = new HashSet<string>();
+
             foreach (var methodBody in failedMethodBodies)
             {
                 if (line < methodBody.StartToken.line || line > methodBody.EndToken.line)
@@ -288,48 +296,98 @@ namespace returnMethodLinesRandom
                 }
 
                 var (stmt, parents) = visitor.MatchingStatementWithAllParent[0];
+                int matchedDepth = parents.Count + 1;
+                var matchedParents = BuildParentRefs(parents);
 
-                if ((stmt is IfStmt || stmt is WhileStmt) && seenBranchLines.Add(stmt.StartToken.line))
+                branchNodes.Add(new CounterExampleNode
                 {
-                    report.Nodes.Add(new NodeInfo
+                    line = line,
+                    depth = matchedDepth,
+                    type = "State",
+                    source = "counterexample_state",
+                    content = rawState,
+                    parents = matchedParents,
+                });
+
+                if (stmt is IfStmt || stmt is WhileStmt)
+                {
+                    string matchedKey = $"{stmt.StartToken.line}:matched_statement:{matchedDepth}";
+                    if (seenBranchKeys.Add(matchedKey))
                     {
-                        Type = "Branch",
-                        Line = stmt.StartToken.line,
-                        Content = stmt.ToString()
-                    });
+                        branchNodes.Add(new CounterExampleNode
+                        {
+                            line = stmt.StartToken.line,
+                            depth = matchedDepth,
+                            type = stmt is IfStmt ? "IfStmt" : "WhileStmt",
+                            source = "matched_statement",
+                            content = stmt.ToString(),
+                            parents = matchedParents,
+                        });
+                    }
                 }
 
+                int ancestorDepth = parents.Count;
                 while (parents.Count > 0)
                 {
                     var parent = parents.Pop();
+                    var parentParents = BuildParentRefs(parents);
                     if (parent is IfStmt ifStmt)
                     {
-                        if (seenBranchLines.Add(ifStmt.StartToken.line))
+                        string key = $"{ifStmt.StartToken.line}:ancestor_chain:{ancestorDepth}";
+                        if (seenBranchKeys.Add(key))
                         {
-                            report.Nodes.Add(new NodeInfo
+                            branchNodes.Add(new CounterExampleNode
                             {
-                                Type = "Branch",
-                                Line = ifStmt.StartToken.line,
-                                Content = ifStmt.ToString()
+                                line = ifStmt.StartToken.line,
+                                depth = Math.Max(ancestorDepth, 0),
+                                type = "IfStmt",
+                                source = "ancestor_chain",
+                                content = ifStmt.ToString(),
+                                parents = parentParents,
                             });
                         }
                     }
                     else if (parent is WhileStmt whileStmt)
                     {
-                        if (seenBranchLines.Add(whileStmt.StartToken.line))
+                        string key = $"{whileStmt.StartToken.line}:ancestor_chain:{ancestorDepth}";
+                        if (seenBranchKeys.Add(key))
                         {
-                            report.Nodes.Add(new NodeInfo
+                            branchNodes.Add(new CounterExampleNode
                             {
-                                Type = "Branch",
-                                Line = whileStmt.StartToken.line,
-                                Content = whileStmt.ToString()
+                                line = whileStmt.StartToken.line,
+                                depth = Math.Max(ancestorDepth, 0),
+                                type = "WhileStmt",
+                                source = "ancestor_chain",
+                                content = whileStmt.ToString(),
+                                parents = parentParents,
                             });
                         }
                     }
+                    ancestorDepth -= 1;
                 }
 
                 break;
             }
+
+            return branchNodes;
+        }
+
+        private static List<ParentNodeInfo> BuildParentRefs(Stack<INode> parents)
+        {
+            var refs = new List<ParentNodeInfo>();
+            var parentCopy = new Stack<INode>(parents.Reverse());
+
+            while (parentCopy.Count > 0)
+            {
+                var parent = parentCopy.Pop();
+                refs.Add(new ParentNodeInfo
+                {
+                    parent_node_type = parent.GetType().Name,
+                    parent_node_line = parent.StartToken.line,
+                });
+            }
+
+            return refs;
         }
 
     }

@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 from typing import Any
 from logging_config import get_logger
+import random
 
 logger = get_logger(__name__)
 
@@ -48,4 +49,6 @@ class RandomLineOfMethodThatFails(FLTechnique):
 
         start_line = int(match.group(1))
         end_line = int(match.group(2))
-        return list(range(start_line, end_line + 1))
+        l = list(range(start_line, end_line + 1))
+        random.shuffle(l)
+        return l
