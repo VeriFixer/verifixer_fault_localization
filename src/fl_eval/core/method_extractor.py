@@ -28,12 +28,80 @@ from typing import Optional
 from logging_config import get_logger
 import config as gl
 import re
+import json
+import hashlib
 import fl_eval.util.run_external_cmd as run_cmd
 
 logger = get_logger(__name__)
 
 # Module-level cache: filename -> list of (method_name, start_line, end_line)
 _METHOD_CACHE: dict[str, list[tuple[str, int, int]]] = {}
+_METHOD_LINES_CACHE_SUBDIR = "method_lines"
+
+
+def _method_cache_dir() -> Path:
+    return gl.CACHE_DIR / _METHOD_LINES_CACHE_SUBDIR
+
+
+def _method_cache_file(file_path: Path) -> Path:
+    resolved = str(file_path.resolve())
+    digest = hashlib.sha256(resolved.encode("utf-8")).hexdigest()
+    return _method_cache_dir() / f"{digest}.json"
+
+
+def _load_cached_spans(file_path: Path) -> Optional[list[tuple[str, int, int]]]:
+    cache_file = _method_cache_file(file_path)
+    if not cache_file.exists():
+        return None
+
+    try:
+        payload = json.loads(cache_file.read_text(encoding="utf-8"))
+        raw_spans = payload.get("spans", [])
+        if not isinstance(raw_spans, list):
+            return None
+
+        parsed: list[tuple[str, int, int]] = []
+        for item in raw_spans:
+            if not isinstance(item, list) or len(item) != 3:
+                return None
+            method_name, start_line, end_line = item
+            if not isinstance(method_name, str) or not isinstance(start_line, int) or not isinstance(end_line, int):
+                return None
+            parsed.append((method_name, start_line, end_line))
+
+        return parsed
+    except Exception:
+        return None
+
+
+def _save_cached_spans(file_path: Path, spans: list[tuple[str, int, int]]) -> None:
+    cache_file = _method_cache_file(file_path)
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": 1,
+        "file_path": str(file_path.resolve()),
+        "spans": [[name, start, end] for name, start, end in spans],
+    }
+    cache_file.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _find_method_for_line(
+    spans: list[tuple[str, int, int]],
+    fault_line: int,
+    file_path: Path,
+    from_cache: bool,
+) -> Optional[tuple[str, int, int]]:
+    source = "cached" if from_cache else "extracted"
+    for method_name, start_line, end_line in spans:
+        if start_line <= fault_line <= end_line:
+            logger.debug(
+                f"Fault at line {fault_line} is in method '{method_name}' "
+                f"(lines {start_line}-{end_line})"
+            )
+            return (method_name, start_line, end_line)
+
+    logger.debug(f"Fault at line {fault_line} is not within any {source} method span")
+    return None
 
 
 def _find_executable(base_dir: Path, pattern: str) -> Path:
@@ -72,17 +140,14 @@ def extract_method_containing_line(
     if file_key in _METHOD_CACHE:
         logger.debug(f"Using cached method span for {file_path.name}")
         spans = _METHOD_CACHE[file_key]
-        # Find method containing fault_line
-        for method_name, start_line, end_line in spans:
-            if start_line <= fault_line <= end_line:
-                logger.debug(
-                    f"Fault at line {fault_line} is in method '{method_name}' "
-                    f"(lines {start_line}-{end_line})"
-                )
-                return (method_name, start_line, end_line)
-        
-        logger.debug(f"Fault at line {fault_line} is not within any cached method span")
-        return None
+        return _find_method_for_line(spans, fault_line, file_path, from_cache=True)
+
+    # Check dedicated on-disk method cache next (shared across techniques).
+    cached_spans = _load_cached_spans(file_path)
+    if cached_spans is not None:
+        logger.debug(f"Using disk-cached method spans for {file_path.name}")
+        _METHOD_CACHE[file_key] = cached_spans
+        return _find_method_for_line(cached_spans, fault_line, file_path, from_cache=True)
     
     # Not in cache, run binary
     logger.debug(f"Extracting method span from {file_path.name} via ReturnAtRandomAllLinesOfFailingMethod")
@@ -121,24 +186,16 @@ def extract_method_containing_line(
         
         if not spans:
             logger.debug(f"No method spans found in output from {file_path.name}")
-            # Empty list indicates no methods were found
+            # Empty list indicates no methods were found; cache this fact.
             _METHOD_CACHE[file_key] = []
+            _save_cached_spans(file_path, [])
             return None
-        
-        # Cache the spans
+
+        # Cache the spans (in-memory + dedicated on-disk cache).
         _METHOD_CACHE[file_key] = spans
-        
-        # Find method containing fault_line
-        for method_name, start_line, end_line in spans:
-            if start_line <= fault_line <= end_line:
-                logger.debug(
-                    f"Fault at line {fault_line} is in method '{method_name}' "
-                    f"(lines {start_line}-{end_line})"
-                )
-                return (method_name, start_line, end_line)
-        
-        logger.debug(f"Fault at line {fault_line} is not within any extracted method span")
-        return None
+        _save_cached_spans(file_path, spans)
+
+        return _find_method_for_line(spans, fault_line, file_path, from_cache=False)
         
     except FileNotFoundError as e:
         logger.warning(f"ReturnAtRandomAllLinesOfFailingMethod binary not found: {e}")

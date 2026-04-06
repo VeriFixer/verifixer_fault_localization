@@ -20,6 +20,9 @@ class MockGroundTruth:
     ground_truth: int = 1
     startLine: int = 1
     endLine: int = 5
+    method_name: str = "mock_method"
+    method_start: int = 1
+    method_end: int = 5
 
 
 def test_save_load_rich_cache_roundtrip(tmp_path, monkeypatch):

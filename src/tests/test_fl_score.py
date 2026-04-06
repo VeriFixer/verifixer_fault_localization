@@ -17,6 +17,9 @@ class MockGroundTruth:
         self.ground_truth = gt
         self.startLine = start
         self.endLine = end
+        self.method_name = "mock_method"
+        self.method_start = start
+        self.method_end = end
 
 class TestFLCore(unittest.TestCase):
     

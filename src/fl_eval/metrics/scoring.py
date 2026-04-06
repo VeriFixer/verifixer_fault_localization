@@ -43,6 +43,9 @@ class GroundTruthLike(Protocol):
     ground_truth: int
     startLine: int
     endLine: int
+    method_name: str
+    method_start: int
+    method_end: int
 
 @dataclass
 class ExamScore:
@@ -363,23 +366,18 @@ def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir:
         str(Gtruth.mutantfile)
     )
     
-    # Compute method-scoped EXAM score when method metadata exists.
-    raw_method_start = getattr(Gtruth, "method_start", None)
-    raw_method_end = getattr(Gtruth, "method_end", None)
-    raw_method_name = getattr(Gtruth, "method_name", "")
-
-    method_name = raw_method_name if isinstance(raw_method_name, str) else ""
+    # Compute method-scoped EXAM score using mandatory method metadata.
+    method_name = Gtruth.method_name
     method_score = exam_file
 
-    if isinstance(raw_method_start, int) and isinstance(raw_method_end, int):
-        if raw_method_start <= ground_truth <= raw_method_end:
-            method_score = compute_exam_score_method_scope(
-                predictions,
-                ground_truth,
-                raw_method_start,
-                raw_method_end,
-                str(Gtruth.mutantfile)
-            )
+    if Gtruth.method_start <= ground_truth <= Gtruth.method_end:
+        method_score = compute_exam_score_method_scope(
+            predictions,
+            ground_truth,
+            Gtruth.method_start,
+            Gtruth.method_end,
+            str(Gtruth.mutantfile)
+        )
     
     return ExamScoreOutput(
         filename=str(Gtruth.mutantfile),

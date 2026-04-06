@@ -1,7 +1,5 @@
 
 from pathlib import Path
-from typing import Optional
-from fl_eval.util.file_helpers import read_diff_file  # Import helper from the same package
 from fl_eval.core.method_extractor import extract_method_containing_line
 from logging_config import get_logger
 
@@ -31,7 +29,7 @@ class GroundTruthAndLineLimit:
         self.ground_truth: int = -1
         self.startLine : int = -1
         self.endLine : int = -1
-        self.method_name: Optional[str] = None
+        self.method_name: str = ""
         self.method_start: int = -1
         self.method_end: int = -1
         self._parse_ground_truth()
@@ -51,7 +49,7 @@ class GroundTruthAndLineLimit:
         """Helper to count the lines in a given file."""
         try:
             with file_path.open('r', encoding='utf-8') as f:
-                return sum(1 for line in f)
+                return sum(1 for _ in f)
         except FileNotFoundError:
             raise FileNotFoundError(f"Source file not found at {file_path}")
         except Exception as e:
@@ -127,7 +125,7 @@ class GroundTruthAndLineLimit:
                 # Skip if the right side is not a valid number
                 continue
 
-        if self.ground_truth is None:
+        if self.ground_truth < 0:
             raise ValueError(f"Could not extract ground truth line number from diff file: {self.difffile}")
     
     def _parse_method_span(self):
@@ -155,7 +153,7 @@ class GroundTruthAndLineLimit:
                     f"Fault at line {self.ground_truth} not in any method "
                     f"(likely top-level declaration in {self.mutantfile.name})"
                 )
-                # Keep defaults: method_name=None, method_start/end=-1
+                # Keep defaults: method_name="", method_start/end=-1
         except Exception as e:
             logger.warning(
                 f"Failed to extract method span from {self.mutantfile.name}: {e}. "
