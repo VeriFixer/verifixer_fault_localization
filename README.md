@@ -20,6 +20,13 @@ If you already cloned without submodules, run:
 ```shell
 git submodule update --init --recursive
 ```
+
+To make the repository's custom Git hooks active in this clone, run:
+```shell
+./scripts/install-git-hooks.sh
+```
+This configures `core.hooksPath` to use the tracked hooks in `.githooks/`, including the pre-push health check.
+
 ### (Optional) Download Prebuilt Datasets with Git LFS
 
 Some large files (e.g., prebuilt datasets) are stored using Git LFS.

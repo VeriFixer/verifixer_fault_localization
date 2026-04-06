@@ -8,18 +8,31 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 cd "$REPO_ROOT"
 
 IMAGE_TAG="dafny_research:latest"
+HEALTH_CHECK_RAN=0
 
-if ! command -v docker >/dev/null 2>&1; then
-  echo "[pre-push] docker is required but was not found in PATH." >&2
-  exit 1
+if command -v docker >/dev/null 2>&1; then
+  echo "[pre-push] Building Docker image: ${IMAGE_TAG}"
+  if docker build -t "${IMAGE_TAG}" .; then
+    echo "[pre-push] Running repository health check inside container"
+    docker run --rm -w /app "${IMAGE_TAG}" \
+      python src/run_repo_health_check.py --clean-cache
+    HEALTH_CHECK_RAN=1
+  else
+    echo "[pre-push] Docker-based health check failed; falling back to host validation." >&2
+  fi
+else
+  echo "[pre-push] docker was not found in PATH; falling back to host validation." >&2
 fi
 
-echo "[pre-push] Building Docker image: ${IMAGE_TAG}"
-docker build -t "${IMAGE_TAG}" .
+if [[ "${HEALTH_CHECK_RAN}" -eq 0 ]]; then
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "[pre-push] python3 was not found, so the fallback health check cannot run." >&2
+    exit 1
+  fi
 
-echo "[pre-push] Running repository health check inside container"
-docker run --rm -w /app "${IMAGE_TAG}" \
-  python src/run_repo_health_check.py --clean-cache
+  echo "[pre-push] Running repository health check on the host"
+  python3 src/run_repo_health_check.py --clean-cache
+fi
 
 if ! command -v git >/dev/null 2>&1 || ! git lfs version >/dev/null 2>&1; then
   echo "[pre-push] git lfs is required for this repository but was not found." >&2
