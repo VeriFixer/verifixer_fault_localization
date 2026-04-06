@@ -2,32 +2,36 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import ttest_ind, mannwhitneyu, shapiro  # type: ignore
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, cast
 from fl_eval.metrics.scoring import ExamOutput
+from fl_eval.metrics.summary_stats import StatsSummaryEntry
 from logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
-def print_ascii_table(stats: dict[str, dict[str, Any]]):
+def print_ascii_table(stats: dict[str, StatsSummaryEntry]):
     """Print a dual-scope ASCII table."""
     h_tech = "Technique"
     h_count = "Evaluated"
     h_avg_file = "Avg EXAM (File)"
+    h_avg_file_pred = "Avg EXAM (Pred != Empty, File)"
     h_found_file = "Fault Found % (File)"
     h_exist_file = "Empty Answer % (File)"
     h_avg_method = "Avg EXAM (Method)"
+    h_avg_method_pred = "Avg EXAM (Pred != Empty, Method)"
     h_found_method = "Fault Found % (Method)"
     h_exist_method = "Empty Answer % (Method)"
 
     w_tech = 30
     w_count = 12
     w_avg = 17
+    w_avg_pred = 32
     w_found = 21
     w_exist = 21
 
-    header1 = f"| {h_tech:<{w_tech}} | {h_count:<{w_count}} | {h_avg_file:<{w_avg}} | {h_found_file:<{w_found}} | {h_exist_file:<{w_exist}}"
-    header2 = f"| {' ':<{w_tech}} | {' ':<{w_count}} | {h_avg_method:<{w_avg}} | {h_found_method:<{w_found}} | {h_exist_method:<{w_exist}}"
+    header1 = f"| {h_tech:<{w_tech}} | {h_count:<{w_count}} | {h_avg_file:<{w_avg}} | {h_avg_file_pred:<{w_avg_pred}} | {h_found_file:<{w_found}} | {h_exist_file:<{w_exist}}"
+    header2 = f"| {' ':<{w_tech}} | {' ':<{w_count}} | {h_avg_method:<{w_avg}} | {h_avg_method_pred:<{w_avg_pred}} | {h_found_method:<{w_found}} | {h_exist_method:<{w_exist}}"
 
     separator = "-" * max(len(header1), len(header2))
     print("\n" + separator)
@@ -36,35 +40,41 @@ def print_ascii_table(stats: dict[str, dict[str, Any]]):
     print(separator)
 
     for name, data in stats.items():
-        count = str(data["count"])
-        avg_file = f"{data['avg_exam_file']:.4f}"
-        found_file = f"{data['found_rate_file']:.2f}"
-        exist_file = f"{data['exist_rate_file']:.2f}"
+        count = str(data.count)
+        avg_file = f"{data.avg_exam_file:.4f}"
+        avg_file_pred = f"{data.avg_exam_score_pred_not_empty:.4f}"
+        found_file = f"{data.found_rate_file:.2f}"
+        exist_file = f"{data.exist_rate_file:.2f}"
 
-        avg_method = f"{data['avg_exam_method']:.4f}"
-        found_method = f"{data['found_rate_method']:.2f}"
-        exist_method = f"{data['exist_rate_method']:.2f}"
+        avg_method = f"{data.avg_exam_method:.4f}"
+        avg_method_pred = f"{data.avg_exam_score_pred_not_empty_method:.4f}"
+        found_method = f"{data.found_rate_method:.2f}"
+        exist_method = f"{data.exist_rate_method:.2f}"
 
-        print(f"| {name:<{w_tech}} | {count:<{w_count}} | {avg_file:<{w_avg}} | {found_file:<{w_found}} | {exist_file:<{w_exist}}")
-        print(f"| {' ':<{w_tech}} | {' ':<{w_count}} | {avg_method:<{w_avg}} | {found_method:<{w_found}} | {exist_method:<{w_exist}}")
+        print(
+            f"| {name:<{w_tech}} | {count:<{w_count}} | {avg_file:<{w_avg}} | {avg_file_pred:<{w_avg_pred}} | {found_file:<{w_found}} | {exist_file:<{w_exist}}"
+        )
+        print(
+            f"| {' ':<{w_tech}} | {' ':<{w_count}} | {avg_method:<{w_avg}} | {avg_method_pred:<{w_avg_pred}} | {found_method:<{w_found}} | {exist_method:<{w_exist}}"
+        )
 
     print(separator + "\n")
 
 
-def print_latex_table(stats: dict[str, dict[str, Any]]):
+def print_latex_table(stats: dict[str, StatsSummaryEntry]):
     """Print dual-scope LaTeX tables."""
     print("\n--- LaTeX Table Output (File-Wide Scope) ---")
     print(r"\begin{table}[h]")
     print(r"    \centering")
-    print(r"    \begin{tabular}{l|c|c|c}")
+    print(r"    \begin{tabular}{l|c|c|c|c}")
     print(r"        \hline")
-    print(r"        \textbf{Technique} & \textbf{Evaluated} & \textbf{Avg EXAM} & \textbf{Fault Found (\%)} \\")
+    print(r"        \textbf{Technique} & \textbf{Evaluated} & \textbf{Avg EXAM} & \textbf{Avg EXAM (Pred != Empty)} & \textbf{Fault Found (\%)} \\")
     print(r"        \hline")
 
     for name, data in stats.items():
         clean_name = name.replace("_", r"\_")
         print(
-            f"        {clean_name} & {data['count']} & {data['avg_exam_file']:.4f} & {data['found_rate_file']:.2f} \\\\"  # noqa: E501
+            f"        {clean_name} & {data.count} & {data.avg_exam_file:.4f} & {data.avg_exam_score_pred_not_empty:.4f} & {data.found_rate_file:.2f} \\\\"  # noqa: E501
         )
 
     print(r"        \hline")
@@ -76,15 +86,15 @@ def print_latex_table(stats: dict[str, dict[str, Any]]):
     print("\n--- LaTeX Table Output (Method-Scoped Scope) ---")
     print(r"\begin{table}[h]")
     print(r"    \centering")
-    print(r"    \begin{tabular}{l|c|c|c}")
+    print(r"    \begin{tabular}{l|c|c|c|c}")
     print(r"        \hline")
-    print(r"        \textbf{Technique} & \textbf{Evaluated} & \textbf{Avg EXAM} & \textbf{Fault Found (\%)} \\")
+    print(r"        \textbf{Technique} & \textbf{Evaluated} & \textbf{Avg EXAM} & \textbf{Avg EXAM (Pred != Empty)} & \textbf{Fault Found (\%)} \\")
     print(r"        \hline")
 
     for name, data in stats.items():
         clean_name = name.replace("_", r"\_")
         print(
-            f"        {clean_name} & {data['count_method']} & {data['avg_exam_method']:.4f} & {data['found_rate_method']:.2f} \\\\"  # noqa: E501
+            f"        {clean_name} & {data.count_method} & {data.avg_exam_method:.4f} & {data.avg_exam_score_pred_not_empty_method:.4f} & {data.found_rate_method:.2f} \\\\"  # noqa: E501
         )
 
     print(r"        \hline")
@@ -100,9 +110,11 @@ def _plot_scope(raw_results: dict[str, list[ExamOutput]], output_file: Path, sco
     if not labels:
         return
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8))
+    fig, (ax1, ax2) = cast(Any, plt.subplots(1, 2, figsize=(20, 8)))  # type: ignore[reportUnknownMemberType]
     fig.suptitle(title, fontsize=18, fontweight="bold")
 
+    get_score: Callable[[ExamOutput], float]
+    get_found: Callable[[ExamOutput], bool]
     if scope == "file":
         get_score = lambda x: x.score_file
         get_found = lambda x: x.found_file

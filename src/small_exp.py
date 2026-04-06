@@ -1,9 +1,9 @@
 import argparse
 import shutil
 from pathlib import Path
-from typing import Any
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
 from fl_eval.metrics.scoring import ExamOutput
+from fl_eval.metrics.summary_stats import StatsSummaryEntry, build_summary_entry
 import config as gl
 from logging_config import get_logger
 
@@ -20,7 +20,7 @@ def run_benchmark(base_path: Path, sequential: bool = False) -> None:
     logger.info(f"Starting Benchmark on: {base_path}")
     logger.info(f"Techniques to run: {list(TECHNIQUE_MAP.keys())}")
     raw_results: dict[str, list[ExamOutput]] = {}
-    stats_summary: dict[str, dict[str, Any]] = {}
+    stats_summary: dict[str, StatsSummaryEntry] = {}
     
     for tech_name in TECHNIQUE_MAP:
         logger.info(f"\n--- Running {tech_name.upper()} ---")
@@ -42,44 +42,12 @@ def run_benchmark(base_path: Path, sequential: bool = False) -> None:
         )
         scores_clean = [s for s in scores_dirty if s is not None]
         raw_results[tech_name] = scores_clean
-        if scores_clean:
-            # File-wide metrics
-            avg_file = sum([s.score_file for s in scores_clean]) / len(scores_clean)
-            found_pct_file = (sum([s.found_file for s in scores_clean]) / len(scores_clean)) * 100
-            exist_file = sum([s.empty_file for s in scores_clean]) / len(scores_clean)
-            
-            # Method-scoped metrics
-            method_results = scores_clean
-            if method_results:
-                avg_method = sum([s.score_method for s in method_results]) / len(method_results)
-                found_pct_method = (sum([s.found_method for s in method_results]) / len(method_results)) * 100
-                exist_method = sum([s.empty_method for s in method_results]) / len(method_results)
-            else:
-                avg_method = 0.0
-                found_pct_method = 0.0
-                exist_method = 0.0
-        else:
-            avg_file = 0.0
-            found_pct_file = 0.0
-            exist_file = 0.0
-            avg_method = 0.0
-            found_pct_method = 0.0
-            exist_method = 0.0
-        stats_summary[tech_name] = {
-            'count': len(scores_clean),
-            'avg_exam_file': avg_file,
-            'found_rate_file': found_pct_file,
-            'exist_rate_file': exist_file,
-            'avg_exam_method': avg_method,
-            'found_rate_method': found_pct_method,
-            'exist_rate_method': exist_method,
-            'count_method': len(scores_clean)
-        }
+        stats_summary[tech_name] = build_summary_entry(scores_clean)
     if not stats_summary:
         logger.info("No results collected.")
         return
-    print_ascii_table(stats_summary)  # type: ignore
-    print_latex_table(stats_summary)  # type: ignore
+    print_ascii_table(stats_summary)
+    print_latex_table(stats_summary)
     compare_two_methods(raw_results, "counterBase", "counterExampleIf")  # type: ignore
     compare_two_methods(raw_results, "counterExampleIf", "counterExampleIfReassume")  # type: ignore
     try:
