@@ -61,16 +61,16 @@ class TechniqueGuard:
 # Manual quality gates for reuse across runs.
 TECHNIQUE_GUARDS: dict[str, TechniqueGuard] = {
     "random": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
-    "counterBase": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
+    "counterBase": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
     "empty": TechniqueGuard(max_avg_exam=1.0, min_found_count=0, allow_all_empty_predictions=True),
     "randomOnFailingMethod": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
-    "counterExampleIf": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
-    "counterExampleIfReassume": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
+    "counterExampleIf": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
+    "counterExampleIfReassume": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
     "llm_stub_all_lines_ranked": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
     "llm_qwen_480b": TechniqueGuard(max_avg_exam=1.0, min_found_count=0, allow_all_empty_predictions=True),
     # Temporary waiver: AutoFix currently returns empty predictions on pos_test.
     # Remove allow_all_empty_predictions=True when AutoFix becomes reliable.
-    "autofix": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
+    "autofix": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
 }
 
 
@@ -234,7 +234,7 @@ def validate_outputs(repo_root: Path, dataset_dir: Path, expected_mutation_count
             continue
 
         flt = technique_cls(name=technique_name)
-        guard = TECHNIQUE_GUARDS.get(technique_name, TechniqueGuard(1.0, 0, False))
+        guard = TECHNIQUE_GUARDS[technique_name]
 
         evaluated = 0
         found_count = 0
@@ -380,7 +380,7 @@ def main() -> int:
     run_benchmark(run_all_models, dataset_dir, args.clean_cache, args.sequential)
 
     # Output validation is too havy for now not using
-    #validate_outputs(repo_root, dataset_dir, mutation_count)
+    validate_outputs(repo_root, dataset_dir, mutation_count)
 
     print("pos_test safeguard passed.")
     print(f" - dataset: {dataset_dir}")

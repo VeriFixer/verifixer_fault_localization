@@ -24,6 +24,7 @@ from fl_eval.strategies.llm_ranker import LLMRanker
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import compute_exam_score
 from fl_eval.metrics.scoring import ExamOutput
+from fl_eval.metrics.summary_stats import StatsSummaryEntry, build_summary_entry
 
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
 
@@ -154,30 +155,37 @@ def _process_mutation(
 
 # --- Helper 3: Reporting ---
 
-def _generate_report(flt_name: str, all_scores: list[ExamOutput]) -> None:
+def _generate_report(flt_name: str, all_scores: list[ExamOutput]) -> StatsSummaryEntry:
     """
-    Computes the final average and logs the evaluation summary in a neat table.
+    Builds summary stats and logs a detailed dual-scope evaluation report.
     """
+    summary = build_summary_entry(all_scores)
+
     if not all_scores:
         logger.info("\nNo mutations were successfully evaluated.")
-        return
-
-    # Compute metrics
-    total = len(all_scores)
-    average_score = sum(x.score for x in all_scores) / total
-    found_score = sum(x.found for x in all_scores) / total
-    empty_score = sum(x.empty for x in all_scores) / total
+        return summary
 
     # Table formatting
-    logger.info("\n" + "="*60)
-    logger.info(f"{'EVALUATION SUMMARY':^60}")
-    logger.info("="*60)
-    logger.info(f"{'Filter Name':30}: {flt_name.upper():<27}")
-    logger.info(f"{'Total Mutations':30}: {total:<27}")
-    logger.info(f"{'Average EXAM Score':30}: {average_score:.6f}")
-    logger.info(f"{'Fault Found (%)':30}: {found_score:.6f}")
-    logger.info(f"{'Empty Predictions (%)':30}: {empty_score:.6f}")
-    logger.info("="*60 + "\n")
+    logger.info("\n" + "=" * 76)
+    logger.info(f"{'EVALUATION SUMMARY':^76}")
+    logger.info("=" * 76)
+    logger.info(f"{'Technique':38}: {flt_name.upper()}")
+    logger.info(f"{'Evaluated Mutations':38}: {summary.count}")
+    logger.info("-" * 76)
+    logger.info("FILE-SCOPE METRICS")
+    logger.info(f"{'Avg EXAM':38}: {summary.avg_exam_file:.6f}")
+    logger.info(f"{'Avg EXAM (Pred != Empty)':38}: {summary.avg_exam_score_pred_not_empty:.6f}")
+    logger.info(f"{'Fault Found (%)':38}: {summary.found_rate_file:.6f}")
+    logger.info(f"{'Empty Predictions Rate':38}: {summary.exist_rate_file:.6f}")
+    logger.info("-" * 76)
+    logger.info("METHOD-SCOPE METRICS")
+    logger.info(f"{'Evaluated Methods':38}: {summary.count_method}")
+    logger.info(f"{'Avg EXAM':38}: {summary.avg_exam_method:.6f}")
+    logger.info(f"{'Avg EXAM (Pred != Empty)':38}: {summary.avg_exam_score_pred_not_empty_method:.6f}")
+    logger.info(f"{'Fault Found (%)':38}: {summary.found_rate_method:.6f}")
+    logger.info(f"{'Empty Predictions Rate':38}: {summary.exist_rate_method:.6f}")
+    logger.info("=" * 76 + "\n")
+    return summary
 
 # --- Orchestrator Function ---
 def compute_metrics(
