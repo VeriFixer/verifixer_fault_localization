@@ -5,6 +5,8 @@ import time
 from importlib import import_module
 from typing import Any, Protocol, TypedDict, cast
 
+from botocore.config import Config
+
 from logging_config import get_logger
 
 from .llm_configurations import LLM, ModelInfo
@@ -71,9 +73,8 @@ class AmazonBedrock_LLM(LLM):
             )
 
         boto3_module = cast(Any, import_module("boto3"))
-        botocore_config_module = cast(Any, import_module("botocore.config"))
         # Explicitly keep Bedrock requests single-attempt (no SDK retries).
-        config = botocore_config_module.Config(
+        config = Config(
             retries={"total_max_attempts": 1, "mode": "standard"}
         )
         self.client = cast(
