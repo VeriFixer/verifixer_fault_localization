@@ -89,8 +89,8 @@ COPY .repo_verifixer_fault_localization_marker /app/
 # Build DafnyTestGen
 
 # Build SpecTestGenerator
-COPY SpecTestGenerator/ /app/SpecTestGenerator/
-RUN make -C /app/SpecTestGenerator -j"$(nproc)"
+#COPY SpecTestGenerator/ /app/SpecTestGenerator/
+#RUN make -C /app/SpecTestGenerator -j"$(nproc)"
 
 COPY DafnyTestGen/ /app/DafnyTestGen/
 RUN --mount=type=cache,target=/root/.nuget/packages \
