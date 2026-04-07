@@ -8,7 +8,7 @@ import config as gl
 from logging_config import get_logger
 
 from run_1_model import (
-        TECHNIQUE_MAP, 
+        get_techniques_for_all_models,
         _setup_evaluation,  # type: ignore
         _process_mutation  # type: ignore
     )
@@ -18,11 +18,12 @@ logger = get_logger(__name__)
 
 def run_benchmark(base_path: Path, sequential: bool = False) -> None:
     logger.info(f"Starting Benchmark on: {base_path}")
-    logger.info(f"Techniques to run: {list(TECHNIQUE_MAP.keys())}")
     raw_results: dict[str, list[ExamOutput]] = {}
     stats_summary: dict[str, StatsSummaryEntry] = {}
     
-    for tech_name in TECHNIQUE_MAP:
+    techniques_to_run = get_techniques_for_all_models()
+
+    for tech_name in techniques_to_run:
         logger.info(f"\n--- Running {tech_name.upper()} ---")
         setup_res = _setup_evaluation(tech_name, base_path)
         if not setup_res:
