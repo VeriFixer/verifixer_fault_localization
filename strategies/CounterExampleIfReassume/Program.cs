@@ -162,12 +162,19 @@ namespace CounterExampleIfReassume
         private static async Task<CounterExampleTrace> ParseSolutionFileAsync(string solutionFile, int traceId)
         {
             var trace = new CounterExampleTrace { trace_id = traceId };
+            var assumeFalseLines = new List<int>();
             var lines = await File.ReadAllLinesAsync(solutionFile);
             bool suspiciousSection = false;
 
             for (int i = 0; i < lines.Length; i++)
             {
                 string line = lines[i];
+
+                if (!suspiciousSection && IsAssumeFalseCodeLine(line))
+                {
+                    // Keep 1-based indexing to match Dafny token line numbers.
+                    assumeFalseLines.Add(i + 1);
+                }
 
                 if (line.Contains("---- Suspicious nodes ----"))
                 {
@@ -188,6 +195,14 @@ namespace CounterExampleIfReassume
                         var parsed = JsonSerializer.Deserialize<CounterExampleNode>(rawJson);
                         if (parsed != null)
                         {
+                            parsed.line = ShiftLineNumberForInsertedAssumes(parsed.line, assumeFalseLines);
+                            foreach (var parent in parsed.parents)
+                            {
+                                parent.parent_node_line = ShiftLineNumberForInsertedAssumes(
+                                    parent.parent_node_line,
+                                    assumeFalseLines
+                                );
+                            }
                             trace.nodes.Add(parsed);
                         }
                     }
@@ -205,6 +220,31 @@ namespace CounterExampleIfReassume
             }
 
             return trace;
+        }
+
+        private static bool IsAssumeFalseCodeLine(string line)
+        {
+            var trimmed = line.TrimStart();
+            if (trimmed.StartsWith("//"))
+            {
+                return false;
+            }
+
+            return Regex.IsMatch(trimmed, @"\bassume\s+false\b");
+        }
+
+        private static int ShiftLineNumberForInsertedAssumes(int lineNumber, List<int> assumeFalseLines)
+        {
+            int shiftedLine = lineNumber;
+            foreach (var assumeFalseLine in assumeFalseLines)
+            {
+                if (assumeFalseLine < shiftedLine)
+                {
+                    shiftedLine -= 1;
+                }
+            }
+
+            return shiftedLine;
         }
     }
 
