@@ -64,7 +64,7 @@ AUTOFIX_RUNS_DIR: Path = BASE_PATH / "run_artifacts" / "autofix_fl_runs"
 # Can be overridden via environment variables: FL_MAX_RAM_GB, FL_MAX_TIME_SECONDS
 MAX_RAM_EXTERNAL_PROGRAMS: int = 24 # GB
 MAX_TIME_EXTERNAL_PROGRAMS: int = 60 # Seconds
-MAX_TIME_AUTOFIX : int = 60 # Seconds
+MAX_TIME_AUTOFIX : int = 1800 # Seconds
 
 # === Strategy Executable Paths ===
 # These are discovered via BASE_PATH but can be overridden via environment variables
