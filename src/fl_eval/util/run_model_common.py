@@ -24,6 +24,7 @@ logger = get_logger(__name__)
 class TechniqueConfig:
     technique_class: type[FLTechnique]
     run_on_all_models: bool = False
+    autofix_strategy: str = ""
 
 
 TECHNIQUE_CONFIG: dict[str, TechniqueConfig] = {
@@ -33,7 +34,8 @@ TECHNIQUE_CONFIG: dict[str, TechniqueConfig] = {
     "randomOnFailingMethod": TechniqueConfig(RandomLineOfMethodThatFails, run_on_all_models=True),
     "counterExampleIf": TechniqueConfig(CounterExampleIf, run_on_all_models=True),
     "counterExampleIfReassume": TechniqueConfig(CounterExampleIfReassume, run_on_all_models=True),
-    "autofix": TechniqueConfig(AutoFixRanker, run_on_all_models=True),
+    "autofixDefault": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-and-static-score", run_on_all_models=True),
+    "autofixSimplified": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-score-only", run_on_all_models=True),
     "llm_stub_all_lines_ranked": TechniqueConfig(LLMRanker, run_on_all_models=True),
     "llm_without_api": TechniqueConfig(LLMRanker, run_on_all_models=False),
     "llm_qwen_480b": TechniqueConfig(LLMRanker, run_on_all_models=True),
@@ -41,7 +43,7 @@ TECHNIQUE_CONFIG: dict[str, TechniqueConfig] = {
 
 
 TECHNIQUE_MAP: dict[str, type[FLTechnique]] = {
-    name: cfg.technique_class for name, cfg in TECHNIQUE_CONFIG.items()
+    name: (cfg.technique_class, cfg.autofix_strategy) for name, cfg in TECHNIQUE_CONFIG.items()
 }
 
 
@@ -57,7 +59,12 @@ def setup_evaluation(flt_name: str, base_path: Path, to_validate_dataset : bool 
         logger.error(f"Available techniques: {list(TECHNIQUE_MAP.keys())}")
         return None
 
-    fl_technique = TECHNIQUE_MAP[flt_name](name=flt_name)
+    FLT_Class = TECHNIQUE_MAP[flt_name][0]
+    autofix_strategy = TECHNIQUE_MAP[flt_name][1]
+    if FLT_Class == AutoFixRanker:
+        fl_technique = FLT_Class(name=flt_name, autofix_strategy=autofix_strategy)
+    else:
+        fl_technique = FLT_Class(name=flt_name)
 
     if(to_validate_dataset):
         validation_result = validate_dataset(base_path)
