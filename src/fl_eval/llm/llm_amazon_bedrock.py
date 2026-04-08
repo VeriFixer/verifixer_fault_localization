@@ -158,13 +158,15 @@ class AmazonBedrock_LLM(LLM):
                     self.quota_exhausted = True
                     logger.warning(
                         "Bedrock daily token quota exhausted for model '%s'. "
-                        "Disabling further Bedrock calls for this run.",
+                        "Disabling further Bedrock calls for this run. Error: %s",
                         self.model.model_id,
+                        e,
                     )
                 else:
                     logger.warning(
-                        "Bedrock throttling for model '%s'. Returning empty prediction for this call.",
+                        "Bedrock throttling for model '%s'. Returning empty prediction for this call. Error: %s",
                         self.model.model_id,
+                        e,
                     )
                 if self.throttle_delay_seconds > 0:
                     time.sleep(self.throttle_delay_seconds)
@@ -179,4 +181,5 @@ class AmazonBedrock_LLM(LLM):
         self.chat_history.append({"role": "assistant", "content": reply})
         if self.response_delay_seconds > 0:
             time.sleep(self.response_delay_seconds)
+
         return reply

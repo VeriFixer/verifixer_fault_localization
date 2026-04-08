@@ -62,7 +62,7 @@ class AutoFixRanker(FLTechnique):
             str(run_out_dir),
         ]
 
-        status, stdout, stderr = run_cmd.run_external_cmd(command)
+        status, stdout, stderr = run_cmd.run_external_cmd(command, timeout=gl.MAX_TIME_AUTOFIX)
         if status != run_cmd.Status.OK:
             print(
                 f"AutoFix command crashed\n"

@@ -46,7 +46,7 @@ from typing import Any
 import config as gl
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import compute_exam_score_one_file, load_from_file_output
-from run_1_model import TECHNIQUE_MAP, get_techniques_for_all_models
+from fl_eval.util.run_model_common import TECHNIQUE_MAP, get_techniques_for_all_models
 
 REPO_MARKER = ".repo_verifixer_fault_localization_marker"
 

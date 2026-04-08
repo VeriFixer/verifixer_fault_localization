@@ -3,7 +3,7 @@ from pathlib import Path
 import random
 
 class RandomRanker(FLTechnique):
-    def __init__(self, name: str, **kwargs) -> None:
+    def __init__(self, name: str, **kwargs: object) -> None:
         super().__init__(name, **kwargs)
 
     def get_fault_localization(self, file: Path) -> list[int]:

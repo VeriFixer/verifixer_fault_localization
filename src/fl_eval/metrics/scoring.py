@@ -32,7 +32,7 @@ import config as gl
 from pathlib import Path
 import json
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import sys
 from typing import Any, Protocol, cast
 import fl_eval.util.run_external_cmd as run_cmd
@@ -52,6 +52,9 @@ class ExamScore:
     score: float
     found: bool
     prediction: bool
+
+    line_ground_truth: int = -1
+    line_prediction: list[int] = field(default_factory=lambda: cast(list[int], []))
 
     @property
     def empty(self) -> bool:
@@ -143,7 +146,11 @@ def _compute_exam_score_in_scope(
     has_prediction = len(in_scope_predictions) > 0
 
     if total_lines == 1:
-        return ExamScore(score=0.0, found=ground_truth in in_scope_predictions, prediction=has_prediction)
+        return ExamScore(score=0.0, 
+                         found=ground_truth in in_scope_predictions, 
+                         prediction=has_prediction, 
+                         line_ground_truth=ground_truth, 
+                         line_prediction=predictions)
 
     try:
         rank = in_scope_predictions.index(ground_truth)
@@ -158,7 +165,11 @@ def _compute_exam_score_in_scope(
         rank = lines_inspected_so_far + expected_position_in_unranked
 
     exam_score = rank / (total_lines - 1)
-    return ExamScore(score=exam_score, found=found_in_predictions, prediction=has_prediction)
+    return ExamScore(score=exam_score, 
+                     found=found_in_predictions, 
+                     prediction=has_prediction, 
+                     line_ground_truth=ground_truth, 
+                     line_prediction=predictions)
 
 def compute_exam_score_one_file(
     predictions: list[int], 

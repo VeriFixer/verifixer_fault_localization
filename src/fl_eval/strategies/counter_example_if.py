@@ -2,15 +2,16 @@ from fl_eval.core.abstract import FLTechnique
 import fl_eval.util.run_external_cmd as run_cmd
 import config as gl
 import json
+
+from dataclasses import dataclass, field
+
+from typing import cast
 import re
 from pathlib import Path
-from collections import Counter
 from fl_eval.util.ranking_strategy import (
     CounterExampleNode,
     RankingStrategy,
     RANK_BY_FREQUENCY,
-    RANK_BY_DEPTH_DEEPER_FIRST,
-    RANK_BY_ORDER,
     SUPPORTED_RANKING_STRATEGIES,
 )
 
@@ -21,6 +22,13 @@ def _find_executable(base_dir : Path, pattern : str) -> Path:
                 return path
                     
         raise FileNotFoundError(f"Could not find {pattern} executable in {base_dir}")
+
+
+@dataclass
+class LineFrequencyDepth:
+    frequency: int = 0
+    depths: list[int] = field(default_factory=lambda: cast(list[int], []))
+    types: list[str] = field(default_factory=lambda: cast(list[str], []))
 
 
 class CounterExampleIf(FLTechnique):
@@ -37,37 +45,49 @@ class CounterExampleIf(FLTechnique):
         self,
         nodes: list[CounterExampleNode],
     ) -> list[int]:
-        """Rank lines by suspiciousness using configured strategy."""
-        unique_lines: list[int] = []
-        for node in nodes:
-            if node.line not in unique_lines:
-                unique_lines.append(node.line)
-        
-        if self.ranking_strategy == RANK_BY_FREQUENCY:
-            line_counts = Counter(node.line for node in nodes)
-            ranked = sorted(unique_lines, key=lambda l: (-line_counts[l], unique_lines.index(l)))
-            return ranked
-        elif self.ranking_strategy == RANK_BY_DEPTH_DEEPER_FIRST:
-            line_counts = Counter(node.line for node in nodes)
-            max_depth_by_line: dict[int, int] = {}
-            for node in nodes:
-                max_depth_by_line[node.line] = max(max_depth_by_line.get(node.line, 0), node.depth)
-            ranked = sorted(
-                unique_lines,
-                key=lambda l: (
-                    -line_counts[l],
-                    -max_depth_by_line.get(l, 0),
-                    unique_lines.index(l),
-                ),
-            )
-            return ranked
-        elif self.ranking_strategy == RANK_BY_ORDER:
-            return unique_lines
-        else:
+        """Rank lines by frequency, then depth, then control-statement presence."""
+        if self.ranking_strategy not in SUPPORTED_RANKING_STRATEGIES:
             raise ValueError(
                 f"Unknown ranking strategy '{self.ranking_strategy}'. "
                 f"Supported: {[s.name for s in SUPPORTED_RANKING_STRATEGIES]}"
             )
+
+        # Get nodes frequency and collected depths per line.
+        line_freq_depth_map: dict[int, LineFrequencyDepth] = {}
+        first_seen_order: dict[int, int] = {}
+
+        for idx, node in enumerate(nodes):
+            if node.line not in first_seen_order:
+                first_seen_order[node.line] = idx
+
+            if node.line in line_freq_depth_map:
+                line_freq_depth_map[node.line].frequency += 1
+                line_freq_depth_map[node.line].depths.append(node.depth)
+                line_freq_depth_map[node.line].types.append(node.type)
+            else:
+                line_freq_depth_map[node.line] = LineFrequencyDepth(
+                    frequency=1,
+                    depths=[node.depth],
+                    types=[node.type],
+                )
+
+        def has_control_statement_type(types: list[str]) -> bool:
+            for t in types:
+                if t in ("IfStmt", "WhileStmt"):
+                    return True
+            return False
+
+        ranked_lines = sorted(
+            line_freq_depth_map.keys(),
+            key=lambda line: (
+                -line_freq_depth_map[line].frequency,
+                -max(line_freq_depth_map[line].depths),
+                -int(has_control_statement_type(line_freq_depth_map[line].types)),
+                first_seen_order[line],
+            ),
+        )
+
+        return ranked_lines
 
     @staticmethod
     def _parse_output(stdout: str) -> list[CounterExampleNode]:
@@ -119,36 +139,39 @@ class CounterExampleIf(FLTechnique):
         pattern = "**/CounterExampleIf"
         exec = _find_executable(base_dir, pattern)
                # run this command and get the output on a variable
-        command = [
-             exec,
+        command : list[str] = [
+            str(exec),
             str(file),
             "--max-time", str(gl.MAX_TIME_EXTERNAL_PROGRAMS),
             "--max-ram", str(gl.MAX_RAM_EXTERNAL_PROGRAMS)
         ]
 
         (status, stdout, stderr) = run_cmd.run_external_cmd(command)
-        if(status != run_cmd.Status.OK):
-            # If run cmd finished by any reason with error send empty prediction
-            print(command)
-            print(status)
-            print(stdout)
-            print(stderr)
-            print("---------------------")
-            return []
-        
         try:
             parsed_nodes = self._parse_output(stdout)
-        except (json.JSONDecodeError, ValueError) as e:
-            print(f"Failed to parse CounterExampleIf output: {e}")
+        except Exception as e:
+                # If run cmd finished by any reason with error send empty prediction
+            print(
+                f"Command crashed\n"
+                f"Command : {" ".join(command)}\n"
+                f"Status  : {status}\n"
+                f"Stdout  : {stdout}\n"
+                f"Stderr  : {stderr}\n"
+                "---------------------"
+                )
+
+
+            print(f"Failed to parse CounterExampleIfReassume output for file {file}: {e}")
             return []
 
-        lines = [node.line for node in parsed_nodes]
+        nodes: list[CounterExampleNode] = []
+        # Collect all lines from all counter-examples and track frequency/depth
+        for node in parsed_nodes:
+            nodes.append(node)
 
-        if len(lines) == 0:
-            print("No lines found in the output, returning empty prediction.")
-            print(command)
-            print(file)
-            print("---------------------")
+        if len(nodes) == 0:
             return []
+        
+        
+        return self._rank_lines(nodes)
 
-        return self._rank_lines(parsed_nodes)

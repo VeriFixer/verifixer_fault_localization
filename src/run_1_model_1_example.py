@@ -14,14 +14,12 @@ from fl_eval.util.run_model_common import (
     setup_evaluation,
 )
 
-from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
-
 logger = get_logger(__name__)
 
 # --- Orchestrator Function ---
-def compute_metrics(
+def compute_metrics_1_file(
     flt_name: str,
-    base_path: Path,
+    dfy_path: Path,
     sequential: bool = False,
 ) -> None:
     """
@@ -33,19 +31,29 @@ def compute_metrics(
         base_path: Path to the dataset directory containing 'killed' and 'original' subdirectories
         sequential: If True, run evaluations sequentially; otherwise run in parallel
     """
-    setup_result = setup_evaluation(flt_name, base_path)
+    base_path = dfy_path.parent.parent
+    setup_result = setup_evaluation(flt_name, base_path, to_validate_dataset=False)
     if setup_result is None:
         return
         
     fl_technique, killed_dir, original_dir = setup_result
-    all_scores: list[ExamOutput | None] = []
 
-    diff_paths = list(killed_dir.glob("*.txt"))
+    diff_path = killed_dir / Path(dfy_path.name[:-4] + ".txt")
 
-    all_scores = run_parallel_or_seq(diff_paths, process_mutation, f"Get metrics for {flt_name}",
-                                     fl_technique, killed_dir, original_dir, base_path, parallel=not sequential)
-    all_scores_clean: list[ExamOutput] = [x for x in all_scores if x is not None]
-    generate_report(flt_name, all_scores_clean)
+    score = [process_mutation(
+        diff_path,
+        fl_technique, 
+        killed_dir,
+        original_dir,
+        base_path
+    )] 
+
+    scores_clean: list[ExamOutput] = [x for x in score if x is not None]
+    generate_report(flt_name, scores_clean)
+
+    score = scores_clean[0]
+
+    logger.info(f"Ground Trhuth: {score.method.line_ground_truth} \n Prediciton: {score.method.line_prediction}")
 
     if flt_name == "llm_stub_all_lines_ranked" and isinstance(fl_technique, LLMRanker):
         print("LLM expected cost:")
@@ -80,43 +88,28 @@ How to use:
     )
 
     parser.add_argument(
-        "data_path", 
+        "dfy_path", 
         type=Path,
-        help="The path to the parent directory containing the 'killed' and 'original' folders (e.g., datasets/pos_test)."
+        help="The path to the file containing the dfy code (it will extract paths to killed, original folder from there)."
     )
 
-    parser.add_argument(
-      "--clean-cache",
-      action="store_true",
-      help="Clean cached results before running"
-    )
-
-    parser.add_argument(
-      "--sequential",
-      action="store_true",
-      help="Run evaluations sequentially"
-    )
-     
     args = parser.parse_args()
     
 
     # Check if the path exists before proceeding
-    if not args.data_path.exists():
-        logger.error(f"Data path not found: {args.data_path}")
+    if not args.dfy_path.exists():
+        logger.error(f"Data path not found: {args.dfy_path}")
         parser.print_help()
     else:
-        # Compute dataset-specific cache directory
-        dataset_cache_dir = gl.get_dataset_cache_dir(args.data_path)
-        if args.clean_cache:
-            logger.info(f"Cleaning: Results Cache for dataset '{args.data_path.name}'")
-            if dataset_cache_dir.exists():
-                try:
-                    shutil.rmtree(dataset_cache_dir)
-                    logger.info(f"Removed dataset cache directory: {dataset_cache_dir}")
-                except OSError as e:
-                    logger.error(f"Could not remove cache directory {dataset_cache_dir}: {e}")
-            else:
-                logger.warning(f"No cache directory found at: {dataset_cache_dir}")
-        else:
-            logger.info(f"Using cached results if any at {dataset_cache_dir}")
-        compute_metrics(args.technique_name, args.data_path, args.sequential)
+        # Need cache cleaning per default
+        cache = gl.get_file_cache_path(args.dfy_path, args.technique_name)
+        if cache.exists():
+            try:
+                if cache.is_dir():
+                    shutil.rmtree(cache)
+                else:
+                    cache.unlink()
+                logger.info(f"Removed cache entry: {cache}")
+            except OSError as e:
+                logger.error(f"Could not remove cache entry {cache}: {e}")
+        compute_metrics_1_file(args.technique_name, args.dfy_path)

@@ -60,10 +60,11 @@ BASE_PATH: Path = find_repo_root()
 CACHE_DIR: Path = BASE_PATH / "run_artifacts" / "cached_results"
 AUTOFIX_RUNS_DIR: Path = BASE_PATH / "run_artifacts" / "autofix_fl_runs"
 
-# === Performance Limits for External Programs ===
+# === Performance Limrun_external_cmdits for External Programs ===
 # Can be overridden via environment variables: FL_MAX_RAM_GB, FL_MAX_TIME_SECONDS
-MAX_RAM_EXTERNAL_PROGRAMS: int = int(os.environ.get("FL_MAX_RAM_GB", "24"))  # GBytes
-MAX_TIME_EXTERNAL_PROGRAMS: int = int(os.environ.get("FL_MAX_TIME_SECONDS", "60"))  # Seconds
+MAX_RAM_EXTERNAL_PROGRAMS: int = 24 # GB
+MAX_TIME_EXTERNAL_PROGRAMS: int = 180 # Seconds
+MAX_TIME_AUTOFIX : int = 180 # Seconds
 
 # === Strategy Executable Paths ===
 # These are discovered via BASE_PATH but can be overridden via environment variables
@@ -114,6 +115,14 @@ AUTOFIX_DIR: Path = BASE_PATH / "Dafny-AutoFix"
 # Autofix script path
 AUTOFIX_SCRIPT: Path = AUTOFIX_DIR / "run.sh"
 
+def get_file_cache_path(file_path : Path, technique_name : str) -> Path:
+    # Use the absolute path's name to create a dataset-specific cache dir
+
+    dataset_folder = file_path.parent.parent.name
+    file_name = file_path.name + ".json"
+
+    
+    return CACHE_DIR / dataset_folder / technique_name / file_name
 
 def get_dataset_cache_dir(dataset_dir: Path) -> Path:
     """Get the cache directory for a specific dataset.

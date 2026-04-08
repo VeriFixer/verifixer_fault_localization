@@ -4,14 +4,14 @@ from pathlib import Path
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq, shutdown_parallel_executor
 from fl_eval.metrics.scoring import ExamOutput
 from fl_eval.metrics.summary_stats import StatsSummaryEntry
+from fl_eval.util.run_model_common import (
+    generate_report,
+    get_techniques_for_all_models,
+    process_mutation,
+    setup_evaluation,
+)
 import config as gl
 from logging_config import get_logger
-from run_1_model import (
-    get_techniques_for_all_models,
-    _setup_evaluation,  # type: ignore
-    _process_mutation,  # type: ignore
-    _generate_report,  # type: ignore
-)
 from analysis.data_analysis import print_ascii_table, print_latex_table, generate_plots
 
 logger = get_logger(__name__)
@@ -26,7 +26,7 @@ def run_benchmark(base_path: Path, sequential: bool = False) -> None:
 
         for tech_name in techniques_to_run:
             logger.info(f"\n--- Running {tech_name.upper()} ---")
-            setup_res = _setup_evaluation(tech_name, base_path)
+            setup_res = setup_evaluation(tech_name, base_path)
             if not setup_res:
                 logger.warning(f"Skipping {tech_name} due to setup failure.")
                 continue
@@ -34,7 +34,7 @@ def run_benchmark(base_path: Path, sequential: bool = False) -> None:
             diff_paths = list(killed_dir.glob("*.txt"))
             scores_dirty = run_parallel_or_seq(
                 diff_paths,
-                _process_mutation,
+                process_mutation,
                 f"Eval {tech_name}",
                 fl_technique,
                 killed_dir,
@@ -55,7 +55,7 @@ def run_benchmark(base_path: Path, sequential: bool = False) -> None:
             
             scores_clean = [s for s in scores_dirty if s is not None]
             raw_results[tech_name] = scores_clean
-            stats_summary[tech_name] = _generate_report(tech_name, scores_clean)
+            stats_summary[tech_name] = generate_report(tech_name, scores_clean)
         if not stats_summary:
             logger.info("No results collected.")
             return

@@ -20,7 +20,7 @@ Thread Safety:
 Status Codes:
     OK: Successful execution (return_code may still be non-zero)
     TIMEOUT: Exceeded MAX_TIME_EXTERNAL_PROGRAMS + 10 seconds
-    MEMORY_ERROR: Out of memory (future)
+    MEMORY_ERRrun_external_cmdOR: Out of memory (future)
     SYSTEMD_LAUNCH_ERROR: systemd-run not found
     ERROR_EXIT_CODE: Non-zero return code from subprocess
 
@@ -70,7 +70,7 @@ def get_last_execution_metadata() -> dict[str, Any] | None:
         return None
     return dict(_LAST_EXECUTION_METADATA)
 
-def run_external_cmd(cmd: list[str]) -> tuple[Status, str, str]:
+def run_external_cmd(cmd: list[str], timeout : int = gl.MAX_TIME_EXTERNAL_PROGRAMS + 10) -> tuple[Status, str, str]:
     systemd_cmd: list[str] = cmd
 
     try:
@@ -79,7 +79,7 @@ def run_external_cmd(cmd: list[str]) -> tuple[Status, str, str]:
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            timeout=gl.MAX_TIME_EXTERNAL_PROGRAMS + 10
+            timeout=timeout
         )
     except subprocess.TimeoutExpired as e:
         status = Status.TIMEOUT

@@ -5,15 +5,24 @@ import json
 import re
 from pathlib import Path
 from typing import Any
-from collections import Counter
+from typing import cast
+from dataclasses import dataclass, field
+from logging_config import get_logger
 from fl_eval.util.ranking_strategy import (
     CounterExampleNode,
     RankingStrategy,
     RANK_BY_FREQUENCY,
-    RANK_BY_DEPTH_DEEPER_FIRST,
-    RANK_BY_ORDER,
     SUPPORTED_RANKING_STRATEGIES,
 )
+
+logger = get_logger(__name__)
+
+
+@dataclass
+class LineFrequencyDepth:
+    frequency: int = 0
+    depths: list[int] = field(default_factory=lambda: cast(list[int], []))
+    types: list[str] = field(default_factory=lambda: cast(list[str], []))
 
 # This will try to find globs like this base_dir/**pattern see other files for more examples
 def _find_executable(base_dir : Path, pattern : str) -> Path:
@@ -38,37 +47,50 @@ class CounterExampleIfReassume(FLTechnique):
         self,
         nodes: list[CounterExampleNode],
     ) -> list[int]:
-        """Rank lines by suspiciousness using configured strategy."""
-        unique_lines: list[int] = []
-        for node in nodes:
-            if node.line not in unique_lines:
-                unique_lines.append(node.line)
-        
-        if self.ranking_strategy == RANK_BY_FREQUENCY:
-            line_counts = Counter(node.line for node in nodes)
-            ranked = sorted(unique_lines, key=lambda l: (-line_counts.get(l, 1), unique_lines.index(l)))
-            return ranked
-        elif self.ranking_strategy == RANK_BY_DEPTH_DEEPER_FIRST:
-            line_counts = Counter(node.line for node in nodes)
-            max_depth_by_line: dict[int, int] = {}
-            for node in nodes:
-                max_depth_by_line[node.line] = max(max_depth_by_line.get(node.line, 0), node.depth)
-            ranked = sorted(
-                unique_lines,
-                key=lambda l: (
-                    -line_counts.get(l, 1),
-                    -max_depth_by_line.get(l, 0),
-                    unique_lines.index(l),
-                ),
-            )
-            return ranked
-        elif self.ranking_strategy == RANK_BY_ORDER:
-            return unique_lines
-        else:
+        """Rank lines by frequency, then depth, then control-statement presence."""
+        if self.ranking_strategy not in SUPPORTED_RANKING_STRATEGIES:
             raise ValueError(
                 f"Unknown ranking strategy '{self.ranking_strategy}'. "
                 f"Supported: {[s.name for s in SUPPORTED_RANKING_STRATEGIES]}"
             )
+
+        # Get nodes frequency and collected depths per line.
+        line_freq_depth_map: dict[int, LineFrequencyDepth] = {}
+        first_seen_order: dict[int, int] = {}
+
+        for idx, node in enumerate(nodes):
+            if node.line not in first_seen_order:
+                first_seen_order[node.line] = idx
+
+            if node.line in line_freq_depth_map:
+                line_freq_depth_map[node.line].frequency += 1
+                line_freq_depth_map[node.line].depths.append(node.depth)
+                line_freq_depth_map[node.line].types.append(node.type)
+            else:
+                line_freq_depth_map[node.line] = LineFrequencyDepth(
+                    frequency=1,
+                    depths=[node.depth],
+                    types=[node.type],
+                )
+
+        def has_control_statement_type(types: list[str]) -> bool:
+            for t in types:
+                if t in ("IfStmt", "WhileStmt"):
+                    return True
+            return False
+
+        ranked_lines = sorted(
+            line_freq_depth_map.keys(),
+            key=lambda line: (
+                -line_freq_depth_map[line].frequency,
+                -max(line_freq_depth_map[line].depths),
+                -int(has_control_statement_type(line_freq_depth_map[line].types)),
+                first_seen_order[line],
+            ),
+        )
+
+        return ranked_lines
+ 
 
     @staticmethod
     def _parse_output(stdout: str) -> list[CounterExampleNode]:
@@ -117,7 +139,7 @@ class CounterExampleIfReassume(FLTechnique):
     def get_fault_localization(self, file: Path) -> list[int]:
         # Reassume is heavier than CounterExampleIf on some mutants.
         # Give it a technique-specific timeout floor to avoid false empty predictions.
-        reassume_max_time = 2*gl.MAX_TIME_EXTERNAL_PROGRAMS
+        reassume_max_time = gl.MAX_TIME_EXTERNAL_PROGRAMS
 
         # Create command to run 
         base_dir = gl.BASE_PATH / "build_output/CounterExampleIfReassume"
@@ -132,21 +154,20 @@ class CounterExampleIfReassume(FLTechnique):
         ]
 
         (status, stdout, stderr) = run_cmd.run_external_cmd(command)
-        if(status != run_cmd.Status.OK):
-            # If run cmd finished by any reason with error send empty prediction
+        try:
+            parsed_nodes = self._parse_output(stdout)
+        except Exception as e:
+                # If run cmd finished by any reason with error send empty prediction
             print(
                 f"Command crashed\n"
-                f"Command : {command}\n"
+                f"Command : {" ".join(command)}\n"
                 f"Status  : {status}\n"
                 f"Stdout  : {stdout}\n"
                 f"Stderr  : {stderr}\n"
                 "---------------------"
-            )
-            return []
+                )
 
-        try:
-            parsed_nodes = self._parse_output(stdout)
-        except (json.JSONDecodeError, ValueError) as e:
+
             print(f"Failed to parse CounterExampleIfReassume output for file {file}: {e}")
             return []
 

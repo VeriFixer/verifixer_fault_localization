@@ -60,6 +60,7 @@ It contains high-signal entry points, canonical validation commands, cache forma
 
 - `src/` — Main Python evaluation framework.
   - `run_1_model.py` — Run one technique and compute EXAM score.
+  - `run_1_model_1_example.py` — Run one technique on a single mutant file and report its score.
   - `run_all_models.py` — Run all implemented techniques and generate summary tables + plots.
   - `run_repo_health_check.py` — Complete repository health check (type check + tests + safeguard).
   - `pos_mutation/` — Example dataset: contains `killed/` and `original/` subfolders.
@@ -115,6 +116,25 @@ Example:
 ```bash
 python src/run_1_model.py random src/pos_mutation
 ```
+
+### Run a single technique on one example file
+
+```bash
+python src/run_1_model_1_example.py <technique> <dfy_file_path>
+```
+
+Example:
+
+```bash
+python src/run_1_model_1_example.py random datasets/pos_test/killed/absMax__2.dfy
+```
+
+Notes:
+
+- `<dfy_file_path>` must be a mutant `.dfy` file under the dataset `killed/` directory.
+- The dataset root is inferred from that file path.
+- The command clears the corresponding cache entry for that file/technique before recomputing.
+- Output includes the standard summary and the ground-truth/predicted lines for that single example.
 
 ### Run all implemented techniques and generate results
 
