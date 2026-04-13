@@ -34,8 +34,8 @@ TECHNIQUE_CONFIG: dict[str, TechniqueConfig] = {
     "randomOnFailingMethod": TechniqueConfig(RandomLineOfMethodThatFails, run_on_all_models=True),
     "counterExampleIf": TechniqueConfig(CounterExampleIf, run_on_all_models=True),
     "counterExampleIfReassume": TechniqueConfig(CounterExampleIfReassume, run_on_all_models=True),
-    "autofixDefault": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-and-static-score", run_on_all_models=True),
-    "autofixSimplified": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-score-only", run_on_all_models=True),
+    #"autofixDefault": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-and-static-score", run_on_all_models=True),
+    #"autofixSimplified": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-score-only", run_on_all_models=True),
     "llm_stub_all_lines_ranked": TechniqueConfig(LLMRanker, run_on_all_models=True),
     "llm_without_api": TechniqueConfig(LLMRanker, run_on_all_models=False),
     "llm_qwen_480b": TechniqueConfig(LLMRanker, run_on_all_models=True),
@@ -135,16 +135,24 @@ def generate_report(flt_name: str, all_scores: list[ExamOutput]) -> StatsSummary
     logger.info(f"{'Evaluated Mutations':38}: {summary.count}")
     logger.info("-" * 76)
     logger.info("FILE-SCOPE METRICS")
-    logger.info(f"{'Avg EXAM':38}: {summary.avg_exam_file:.6f}")
-    logger.info(f"{'Avg EXAM (Pred != Empty)':38}: {summary.avg_exam_score_pred_not_empty:.6f}")
+    logger.info(f"{'Avg EXAM (All)':38}: {summary.avg_exam_file:.6f}")
+    logger.info(f"{'Avg EXAM (Found Only)':38}: {summary.avg_exam_found_file:.6f}")
+    logger.info(f"{'Avg EXAM (Pred != Empty)':38}: {summary.avg_exam_not_empty_file:.6f}")
     logger.info(f"{'Fault Found (%)':38}: {summary.found_rate_file:.6f}")
     logger.info(f"{'Empty Predictions Rate':38}: {summary.exist_rate_file:.6f}")
+    logger.info(f"{'Top-1 Success (%)':38}: {summary.top1_success_file:.6f}")
+    logger.info(f"{'Top-3 Success (%)':38}: {summary.top3_success_file:.6f}")
+    logger.info(f"{'Top-5 Success (%)':38}: {summary.top5_success_file:.6f}")
     logger.info("-" * 76)
     logger.info("METHOD-SCOPE METRICS")
     logger.info(f"{'Evaluated Methods':38}: {summary.count_method}")
-    logger.info(f"{'Avg EXAM':38}: {summary.avg_exam_method:.6f}")
-    logger.info(f"{'Avg EXAM (Pred != Empty)':38}: {summary.avg_exam_score_pred_not_empty_method:.6f}")
+    logger.info(f"{'Avg EXAM (All)':38}: {summary.avg_exam_method:.6f}")
+    logger.info(f"{'Avg EXAM (Found Only)':38}: {summary.avg_exam_found_method:.6f}")
+    logger.info(f"{'Avg EXAM (Pred != Empty)':38}: {summary.avg_exam_not_empty_method:.6f}")
     logger.info(f"{'Fault Found (%)':38}: {summary.found_rate_method:.6f}")
     logger.info(f"{'Empty Predictions Rate':38}: {summary.exist_rate_method:.6f}")
+    logger.info(f"{'Top-1 Success (%)':38}: {summary.top1_success_method:.6f}")
+    logger.info(f"{'Top-3 Success (%)':38}: {summary.top3_success_method:.6f}")
+    logger.info(f"{'Top-5 Success (%)':38}: {summary.top5_success_method:.6f}")
     logger.info("=" * 76 + "\n")
     return summary

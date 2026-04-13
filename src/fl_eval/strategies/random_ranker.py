@@ -3,6 +3,9 @@ from pathlib import Path
 import random
 
 class RandomRanker(FLTechnique):
+    # Suppress warnings for baseline weak technique that produces random rankings
+    suppress_scope_warnings: bool = True
+    
     def __init__(self, name: str, **kwargs: object) -> None:
         super().__init__(name, **kwargs)
 

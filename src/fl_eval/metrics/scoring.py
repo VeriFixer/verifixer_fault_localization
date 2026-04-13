@@ -36,6 +36,10 @@ from dataclasses import dataclass, field
 import sys
 from typing import Any, Protocol, cast
 import fl_eval.util.run_external_cmd as run_cmd
+from logging_config import get_logger
+
+
+logger = get_logger(__name__)
 
 
 class GroundTruthLike(Protocol):
@@ -117,8 +121,15 @@ def _compute_exam_score_in_scope(
     ground_truth: int,
     scope_start: int,
     scope_end: int,
+    suppress_warnings: bool = False,
 ) -> ExamScore:
-    """Compute EXAM score for an arbitrary [scope_start, scope_end] range."""
+    """Compute EXAM score for an arbitrary [scope_start, scope_end] range.
+    
+    Args:
+        suppress_warnings: If True, suppress logging of filtered out-of-scope predictions.
+                          Used for weak/baseline techniques (e.g., Random, Empty) that cannot
+                          reliably predict in-scope lines.
+    """
     total_lines = scope_end - scope_start + 1
 
     if total_lines <= 0:
@@ -127,20 +138,25 @@ def _compute_exam_score_in_scope(
     if not (scope_start <= ground_truth <= scope_end):
         raise ValueError(f"Ground truth {ground_truth} is out of bounds ({scope_start}-{scope_end})")
 
-    # Normalize predictions to support both absolute line numbers and relative
-    # positions in [1, total_lines] produced by some techniques.
+    # Keep only absolute predictions within the active scope.
     normalized_predictions: list[int] = []
     seen: set[int] = set()
+    out_of_scope_count = 0
     for p in predictions:
-        candidate: int | None = None
         if scope_start <= p <= scope_end:
-            candidate = p
-        elif 1 <= p <= total_lines:
-            candidate = scope_start + p - 1
+            if p not in seen:
+                seen.add(p)
+                normalized_predictions.append(p)
+        else:
+            out_of_scope_count += 1
 
-        if candidate is not None and candidate not in seen:
-            seen.add(candidate)
-            normalized_predictions.append(candidate)
+    if out_of_scope_count > 0 and not suppress_warnings:
+        logger.warning(
+            "Ignored %d out-of-scope predictions outside [%d, %d].",
+            out_of_scope_count,
+            scope_start,
+            scope_end,
+        )
 
     in_scope_predictions = normalized_predictions
     has_prediction = len(in_scope_predictions) > 0
@@ -150,7 +166,7 @@ def _compute_exam_score_in_scope(
                          found=ground_truth in in_scope_predictions, 
                          prediction=has_prediction, 
                          line_ground_truth=ground_truth, 
-                         line_prediction=predictions)
+                         line_prediction=in_scope_predictions)
 
     try:
         rank = in_scope_predictions.index(ground_truth)
@@ -169,14 +185,15 @@ def _compute_exam_score_in_scope(
                      found=found_in_predictions, 
                      prediction=has_prediction, 
                      line_ground_truth=ground_truth, 
-                     line_prediction=predictions)
+                     line_prediction=in_scope_predictions)
 
 def compute_exam_score_one_file(
     predictions: list[int], 
     ground_truth: int, 
     total_line_start: int, 
     total_line_end: int,
-    filename: str
+    filename: str,
+    suppress_warnings: bool = False,
 ) -> ExamScore:
     """
     Evaluates the effectiveness of a fault localization technique by calculating the EXAM score.
@@ -200,6 +217,7 @@ def compute_exam_score_one_file(
         total_line_start (int): The starting line number of the valid code range.
         total_line_end (int): The ending line number of the valid code range.
         filename (str): The filename associated with the score.
+        suppress_warnings (bool): If True, suppress out-of-scope prediction warnings.
 
     Returns:
         ExamScore for file scope.
@@ -213,6 +231,7 @@ def compute_exam_score_one_file(
         ground_truth=ground_truth,
         scope_start=total_line_start,
         scope_end=total_line_end,
+        suppress_warnings=suppress_warnings,
     )
 
 
@@ -221,7 +240,8 @@ def compute_exam_score_method_scope(
     ground_truth: int,
     method_start: int,
     method_end: int,
-    filename: str
+    filename: str,
+    suppress_warnings: bool = False,
 ) -> ExamScore:
     """
     Compute EXAM score within a method scope (not file-wide).
@@ -234,6 +254,7 @@ def compute_exam_score_method_scope(
         method_start (int): The starting line number of the method scope.
         method_end (int): The ending line number of the method scope.
         filename (str): The filename associated with the score.
+        suppress_warnings (bool): If True, suppress out-of-scope prediction warnings.
 
     Returns:
         ExamScore for method scope.
@@ -247,6 +268,7 @@ def compute_exam_score_method_scope(
         ground_truth=ground_truth,
         scope_start=method_start,
         scope_end=method_end,
+        suppress_warnings=suppress_warnings,
     )
 
 
@@ -374,7 +396,8 @@ def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir:
         ground_truth, 
         total_line_start, 
         total_line_end,
-        str(Gtruth.mutantfile)
+        str(Gtruth.mutantfile),
+        suppress_warnings=flt.suppress_scope_warnings,
     )
     
     # Compute method-scoped EXAM score using mandatory method metadata.
@@ -387,7 +410,8 @@ def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir:
             ground_truth,
             Gtruth.method_start,
             Gtruth.method_end,
-            str(Gtruth.mutantfile)
+            str(Gtruth.mutantfile),
+            suppress_warnings=flt.suppress_scope_warnings,
         )
     
     return ExamScoreOutput(

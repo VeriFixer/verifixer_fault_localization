@@ -6,6 +6,9 @@ from pathlib import Path
 # As the score function for the non selected lines returns the expected
 # lines to test from the non tested lines for completness
 class EmptyRanker(FLTechnique):
+    # Suppress warnings for baseline weak technique that produces empty rankings
+    suppress_scope_warnings: bool = True
+    
     def __init__(self, name: str, **kwargs) -> None:
         super().__init__(name, **kwargs)
 

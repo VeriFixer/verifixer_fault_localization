@@ -10,97 +10,185 @@ from logging_config import get_logger
 logger = get_logger(__name__)
 
 
-def print_ascii_table(stats: dict[str, StatsSummaryEntry]):
-    """Print a dual-scope ASCII table."""
+def _print_ascii_scope_table(
+    title: str,
+    stats: dict[str, StatsSummaryEntry],
+    *,
+    get_count: Callable[[StatsSummaryEntry], int],
+    get_exam_1: Callable[[StatsSummaryEntry], float],
+    get_exam_2: Callable[[StatsSummaryEntry], float],
+    get_exam_3: Callable[[StatsSummaryEntry], float],
+    get_found: Callable[[StatsSummaryEntry], float],
+    get_empty: Callable[[StatsSummaryEntry], float],
+    get_top1: Callable[[StatsSummaryEntry], float],
+    get_top3: Callable[[StatsSummaryEntry], float],
+    get_top5: Callable[[StatsSummaryEntry], float],
+) -> None:
     h_tech = "Technique"
     h_count = "Evaluated"
-    h_avg_file = "Avg EXAM (File)"
-    h_avg_file_pred = "Avg EXAM (Pred != Empty, File)"
-    h_found_file = "Fault Found % (File)"
-    h_exist_file = "Empty Answer % (File)"
-    h_avg_method = "Avg EXAM (Method)"
-    h_avg_method_pred = "Avg EXAM (Pred != Empty, Method)"
-    h_found_method = "Fault Found % (Method)"
-    h_exist_method = "Empty Answer % (Method)"
+    h_exam1 = "EXAM_1"
+    h_exam2 = "EXAM_2"
+    h_exam3 = "EXAM_3"
+    h_found = "Found %"
+    h_empty = "Empty %"
+    h_topk = "Top1/Top3/Top5"
 
     w_tech = 30
-    w_count = 12
-    w_avg = 17
-    w_avg_pred = 32
-    w_found = 21
-    w_exist = 21
+    w_count = 10
+    w_exam = 10
+    w_rate = 10
+    w_topk = 16
 
-    header1 = f"| {h_tech:<{w_tech}} | {h_count:<{w_count}} | {h_avg_file:<{w_avg}} | {h_avg_file_pred:<{w_avg_pred}} | {h_found_file:<{w_found}} | {h_exist_file:<{w_exist}}"
-    header2 = f"| {' ':<{w_tech}} | {' ':<{w_count}} | {h_avg_method:<{w_avg}} | {h_avg_method_pred:<{w_avg_pred}} | {h_found_method:<{w_found}} | {h_exist_method:<{w_exist}}"
+    header = (
+        f"| {h_tech:<{w_tech}} | {h_count:<{w_count}} | {h_exam1:<{w_exam}} | {h_exam2:<{w_exam}} | "
+        f"{h_exam3:<{w_exam}} | {h_found:<{w_rate}} | {h_empty:<{w_rate}} | {h_topk:<{w_topk}} |"
+    )
+    separator = "-" * len(header)
 
-    separator = "-" * max(len(header1), len(header2))
-    print("\n" + separator)
-    print(header1)
-    print(header2)
+    print(f"\n{title}")
+    print(separator)
+    print(header)
     print(separator)
 
     for name, data in stats.items():
-        count = str(data.count)
-        avg_file = f"{data.avg_exam_file:.4f}"
-        avg_file_pred = f"{data.avg_exam_score_pred_not_empty:.4f}"
-        found_file = f"{data.found_rate_file:.2f}"
-        exist_file = f"{data.exist_rate_file:.2f}"
-
-        avg_method = f"{data.avg_exam_method:.4f}"
-        avg_method_pred = f"{data.avg_exam_score_pred_not_empty_method:.4f}"
-        found_method = f"{data.found_rate_method:.2f}"
-        exist_method = f"{data.exist_rate_method:.2f}"
+        count = get_count(data)
+        exam1 = get_exam_1(data)
+        exam2 = get_exam_2(data)
+        exam3 = get_exam_3(data)
+        found = get_found(data)
+        empty = get_empty(data)
+        topk = f"{get_top1(data):.1f}/{get_top3(data):.1f}/{get_top5(data):.1f}"
 
         print(
-            f"| {name:<{w_tech}} | {count:<{w_count}} | {avg_file:<{w_avg}} | {avg_file_pred:<{w_avg_pred}} | {found_file:<{w_found}} | {exist_file:<{w_exist}}"
-        )
-        print(
-            f"| {' ':<{w_tech}} | {' ':<{w_count}} | {avg_method:<{w_avg}} | {avg_method_pred:<{w_avg_pred}} | {found_method:<{w_found}} | {exist_method:<{w_exist}}"
+            f"| {name:<{w_tech}} | {count:<{w_count}} | {exam1:<{w_exam}.4f} | {exam2:<{w_exam}.4f} | "
+            f"{exam3:<{w_exam}.4f} | {found:<{w_rate}.2f} | {empty:<{w_rate}.2f} | {topk:<{w_topk}} |"
         )
 
-    print(separator + "\n")
+    print(separator)
+
+
+def print_ascii_table(stats: dict[str, StatsSummaryEntry]):
+    """Print separate ASCII tables for file scope and method scope."""
+    _print_ascii_scope_table(
+        "FILE SCOPE",
+        stats,
+        get_count=lambda d: d.count,
+        get_exam_1=lambda d: d.avg_exam_file,
+        get_exam_2=lambda d: d.avg_exam_found_file,
+        get_exam_3=lambda d: d.avg_exam_not_empty_file,
+        get_found=lambda d: d.found_rate_file,
+        get_empty=lambda d: d.exist_rate_file,
+        get_top1=lambda d: d.top1_success_file,
+        get_top3=lambda d: d.top3_success_file,
+        get_top5=lambda d: d.top5_success_file,
+    )
+    _print_ascii_scope_table(
+        "METHOD SCOPE",
+        stats,
+        get_count=lambda d: d.count_method,
+        get_exam_1=lambda d: d.avg_exam_method,
+        get_exam_2=lambda d: d.avg_exam_found_method,
+        get_exam_3=lambda d: d.avg_exam_not_empty_method,
+        get_found=lambda d: d.found_rate_method,
+        get_empty=lambda d: d.exist_rate_method,
+        get_top1=lambda d: d.top1_success_method,
+        get_top3=lambda d: d.top3_success_method,
+        get_top5=lambda d: d.top5_success_method,
+    )
+    print()
 
 
 def print_latex_table(stats: dict[str, StatsSummaryEntry]):
     """Print dual-scope LaTeX tables."""
+    file_evaluated = next(iter(stats.values())).count if stats else 0
+    method_evaluated = next(iter(stats.values())).count_method if stats else 0
+
     print("\n--- LaTeX Table Output (File-Wide Scope) ---")
     print(r"\begin{table}[h]")
     print(r"    \centering")
-    print(r"    \begin{tabular}{l|c|c|c|c}")
+    print(r"    \begin{tabular}{l|c|c|c|c|c}")
     print(r"        \hline")
-    print(r"        \textbf{Technique} & \textbf{Evaluated} & \textbf{Avg EXAM} & \textbf{Avg EXAM (Pred != Empty)} & \textbf{Fault Found (\%)} \\")
+    print(r"        \textbf{Technique} & \textbf{EXAM$_1$} & \textbf{EXAM$_2$} & \textbf{EXAM$_3$} & \textbf{Found(\%)} & \textbf{Empty(\%)} \\")
     print(r"        \hline")
 
     for name, data in stats.items():
         clean_name = name.replace("_", r"\_")
         print(
-            f"        {clean_name} & {data.count} & {data.avg_exam_file:.4f} & {data.avg_exam_score_pred_not_empty:.4f} & {data.found_rate_file:.2f} \\\\"  # noqa: E501
+            f"        {clean_name} & {data.avg_exam_file:.4f} & {data.avg_exam_found_file:.4f} & {data.avg_exam_not_empty_file:.4f} & {data.found_rate_file:.2f} & {data.exist_rate_file * 100.0:.2f} \\\\"  # noqa: E501
         )
 
     print(r"        \hline")
     print(r"    \end{tabular}")
-    print(r"    \caption{Comparison of Fault Localization Techniques (File-Wide Scope)}")
+    print(
+        f"    \\caption{{Comparison of Fault Localization Techniques (File-Wide Scope). Evaluated on {file_evaluated} examples. EXAM$_1$: all cases; EXAM$_2$: found-only cases; EXAM$_3$: non-empty prediction cases.}}"  # noqa: E501
+    )
     print(r"    \label{tab:fl_results_file}")
     print(r"\end{table}")
 
     print("\n--- LaTeX Table Output (Method-Scoped Scope) ---")
     print(r"\begin{table}[h]")
     print(r"    \centering")
-    print(r"    \begin{tabular}{l|c|c|c|c}")
+    print(r"    \begin{tabular}{l|c|c|c|c|c}")
     print(r"        \hline")
-    print(r"        \textbf{Technique} & \textbf{Evaluated} & \textbf{Avg EXAM} & \textbf{Avg EXAM (Pred != Empty)} & \textbf{Fault Found (\%)} \\")
+    print(r"        \textbf{Technique} & \textbf{EXAM$_1$} & \textbf{EXAM$_2$} & \textbf{EXAM$_3$} & \textbf{Found(\%)} & \textbf{Empty(\%)} \\")
     print(r"        \hline")
 
     for name, data in stats.items():
         clean_name = name.replace("_", r"\_")
         print(
-            f"        {clean_name} & {data.count_method} & {data.avg_exam_method:.4f} & {data.avg_exam_score_pred_not_empty_method:.4f} & {data.found_rate_method:.2f} \\\\"  # noqa: E501
+            f"        {clean_name} & {data.avg_exam_method:.4f} & {data.avg_exam_found_method:.4f} & {data.avg_exam_not_empty_method:.4f} & {data.found_rate_method:.2f} & {data.exist_rate_method * 100.0:.2f} \\\\"  # noqa: E501
         )
 
     print(r"        \hline")
     print(r"    \end{tabular}")
-    print(r"    \caption{Comparison of Fault Localization Techniques (Method-Scoped Scope)}")
+    print(
+        f"    \\caption{{Comparison of Fault Localization Techniques (Method-Scoped Scope). Evaluated on {method_evaluated} examples. EXAM$_1$: all cases; EXAM$_2$: found-only cases; EXAM$_3$: non-empty prediction cases.}}"  # noqa: E501
+    )
     print(r"    \label{tab:fl_results_method}")
+    print(r"\end{table}")
+
+    print("\n--- LaTeX Table Output (Top-k File Scope) ---")
+    print(r"\begin{table}[h]")
+    print(r"    \centering")
+    print(r"    \begin{tabular}{l|c|c|c}")
+    print(r"        \hline")
+    print(r"        \textbf{Technique} & \textbf{Top-1(\%)} & \textbf{Top-3(\%)} & \textbf{Top-5(\%)} \\")
+    print(r"        \hline")
+
+    for name, data in stats.items():
+        clean_name = name.replace("_", r"\_")
+        print(
+            f"        {clean_name} & {data.top1_success_file:.2f} & {data.top3_success_file:.2f} & {data.top5_success_file:.2f} \\\\"  # noqa: E501
+        )
+
+    print(r"        \hline")
+    print(r"    \end{tabular}")
+    print(
+        rf"    \caption{{Top-k localization success in file scope. Evaluated on {file_evaluated} examples.}}"  # noqa: E501
+    )
+    print(r"    \label{tab:fl_topk_file}")
+    print(r"\end{table}")
+
+    print("\n--- LaTeX Table Output (Top-k Method Scope) ---")
+    print(r"\begin{table}[h]")
+    print(r"    \centering")
+    print(r"    \begin{tabular}{l|c|c|c}")
+    print(r"        \hline")
+    print(r"        \textbf{Technique} & \textbf{Top-1(\%)} & \textbf{Top-3(\%)} & \textbf{Top-5(\%)} \\")
+    print(r"        \hline")
+
+    for name, data in stats.items():
+        clean_name = name.replace("_", r"\_")
+        print(
+            f"        {clean_name} & {data.top1_success_method:.2f} & {data.top3_success_method:.2f} & {data.top5_success_method:.2f} \\\\"  # noqa: E501
+        )
+
+    print(r"        \hline")
+    print(r"    \end{tabular}")
+    print(
+        rf"    \caption{{Top-k localization success in method scope. Evaluated on {method_evaluated} examples.}}"  # noqa: E501
+    )
+    print(r"    \label{tab:fl_topk_method}")
     print(r"\end{table}")
     print("--------------------------\n")
 

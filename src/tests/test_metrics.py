@@ -154,3 +154,28 @@ class TestExamMetric(unittest.TestCase):
         exam_out = compute_exam_score_one_file([1, 2, 3], 2, 1, 5, "test.dfy")
         self.assertEqual(exam_out.found, True)
         self.assertAlmostEqual(exam_out.score, 0.25) 
+
+    def test_out_of_scope_predictions_are_ignored(self):
+        preds = [9, 10, 12, 11, 99]
+        truth = 11
+
+        with self.assertLogs("fl_eval.metrics.scoring", level="WARNING") as cm:
+            exam_out = compute_exam_score_one_file(preds, truth, 10, 14, "test.dfy")
+
+        self.assertTrue(any("Ignored 2 out-of-scope predictions" in msg for msg in cm.output))
+        self.assertEqual(exam_out.line_prediction, [10, 12, 11])
+        self.assertTrue(exam_out.found)
+        self.assertAlmostEqual(exam_out.score, 0.5)
+
+    def test_relative_positions_are_not_remapped(self):
+        preds = [1, 2, 3]
+        truth = 11
+
+        with self.assertLogs("fl_eval.metrics.scoring", level="WARNING") as cm:
+            exam_out = compute_exam_score_one_file(preds, truth, 10, 14, "test.dfy")
+
+        self.assertTrue(any("Ignored 3 out-of-scope predictions" in msg for msg in cm.output))
+        self.assertEqual(exam_out.line_prediction, [])
+        self.assertFalse(exam_out.prediction)
+        self.assertFalse(exam_out.found)
+        self.assertAlmostEqual(exam_out.score, 0.5)

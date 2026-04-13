@@ -30,6 +30,8 @@ TECHNIQUE_TO_LLM_MODEL: dict[str, str] = {
 class LLMRanker(FLTechnique):
     def __init__(self, name: str, **kwargs: Any) -> None:
         super().__init__(name, **kwargs)
+        if(name == "llm_stub_all_lines_ranked"):
+            self.suppress_scope_warnings: bool = True
         selected_model = TECHNIQUE_TO_LLM_MODEL.get(name)
         if selected_model is None:
             candidate = kwargs.get("llm_model", "cost_stub_all_lines_ranked")

@@ -123,14 +123,14 @@ def test_print_ascii_table_includes_new_non_empty_prediction_columns():
         "tech1": StatsSummaryEntry(
             count=3,
             avg_exam_file=0.3333,
+            avg_exam_not_empty_file=0.1234,
             found_rate_file=66.67,
             exist_rate_file=0.33,
             avg_exam_method=0.2222,
+            avg_exam_not_empty_method=0.5678,
             found_rate_method=50.0,
             exist_rate_method=0.0,
             count_method=3,
-            avg_exam_score_pred_not_empty=0.1234,
-            avg_exam_score_pred_not_empty_method=0.5678,
         )
     }
 
@@ -138,8 +138,9 @@ def test_print_ascii_table_includes_new_non_empty_prediction_columns():
         print_ascii_table(stats)
 
     calls = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
-    assert any("Avg EXAM (Pred != Empty, File)" in call for call in calls)
-    assert any("Avg EXAM (Pred != Empty, Method)" in call for call in calls)
+    assert any("FILE SCOPE" in call for call in calls)
+    assert any("METHOD SCOPE" in call for call in calls)
+    assert any("EXAM_3" in call for call in calls)
     assert any("0.1234" in call for call in calls)
     assert any("0.5678" in call for call in calls)
 
@@ -149,14 +150,14 @@ def test_print_latex_table_includes_new_non_empty_prediction_columns():
         "tech1": StatsSummaryEntry(
             count=2,
             avg_exam_file=0.5,
+            avg_exam_not_empty_file=0.125,
             found_rate_file=50.0,
             exist_rate_file=0.5,
             avg_exam_method=0.25,
+            avg_exam_not_empty_method=0.875,
             found_rate_method=100.0,
             exist_rate_method=0.0,
             count_method=2,
-            avg_exam_score_pred_not_empty=0.125,
-            avg_exam_score_pred_not_empty_method=0.875,
         )
     }
 
@@ -164,9 +165,11 @@ def test_print_latex_table_includes_new_non_empty_prediction_columns():
         print_latex_table(stats)
 
     calls = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
-    assert any("Avg EXAM (Pred != Empty)" in call for call in calls)
+    assert any("\\textbf{Technique} & \\textbf{EXAM$_1$} & \\textbf{EXAM$_2$} & \\textbf{EXAM$_3$} & \\textbf{Found(\\%)} & \\textbf{Empty(\\%)}" in call for call in calls)
+    assert any("Evaluated on 2 examples." in call for call in calls)
     assert any("0.1250" in call for call in calls)
     assert any("0.8750" in call for call in calls)
+    assert any("50.00" in call for call in calls)
 
 if __name__ == "__main__":
     pytest.main([__file__])
