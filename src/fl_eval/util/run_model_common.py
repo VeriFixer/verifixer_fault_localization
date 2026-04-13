@@ -34,15 +34,15 @@ TECHNIQUE_CONFIG: dict[str, TechniqueConfig] = {
     "randomOnFailingMethod": TechniqueConfig(RandomLineOfMethodThatFails, run_on_all_models=True),
     "counterExampleIf": TechniqueConfig(CounterExampleIf, run_on_all_models=True),
     "counterExampleIfReassume": TechniqueConfig(CounterExampleIfReassume, run_on_all_models=True),
-    #"autofixDefault": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-and-static-score", run_on_all_models=True),
-    #"autofixSimplified": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-score-only", run_on_all_models=True),
+    "autofixDefault": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-and-static-score", run_on_all_models=True),
+    "autofixSimplified": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-score-only", run_on_all_models=True),
     "llm_stub_all_lines_ranked": TechniqueConfig(LLMRanker, run_on_all_models=True),
     "llm_without_api": TechniqueConfig(LLMRanker, run_on_all_models=False),
     "llm_qwen_480b": TechniqueConfig(LLMRanker, run_on_all_models=True),
 }
 
 
-TECHNIQUE_MAP: dict[str, type[FLTechnique]] = {
+TECHNIQUE_MAP: dict[str, tuple[type[FLTechnique], str]] = {
     name: (cfg.technique_class, cfg.autofix_strategy) for name, cfg in TECHNIQUE_CONFIG.items()
 }
 
@@ -50,6 +50,20 @@ TECHNIQUE_MAP: dict[str, type[FLTechnique]] = {
 def get_techniques_for_all_models() -> list[str]:
     """Return techniques explicitly enabled for run_all_models and guard pipelines."""
     return [name for name, cfg in TECHNIQUE_CONFIG.items() if cfg.run_on_all_models]
+
+
+def get_techniques_for_health_check() -> list[str]:
+    """Return fast techniques for lightweight health checks (excludes autofix and LLM).
+    
+    This subset is fast enough for CI/local pre-commit checks without sacrificing
+    core functionality validation.
+    """
+    # Exclude autofix (slow, long-running) and LLM techniques
+    excluded = {"autofixDefault", "autofixSimplified", "llm_stub_all_lines_ranked", "llm_qwen_480b"}
+    return [
+        name for name, cfg in TECHNIQUE_CONFIG.items() 
+        if cfg.run_on_all_models and name not in excluded
+    ]
 
 
 def setup_evaluation(flt_name: str, base_path: Path, to_validate_dataset : bool = True) -> tuple[FLTechnique, Path, Path] | None:

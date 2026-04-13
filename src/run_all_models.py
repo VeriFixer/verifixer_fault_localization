@@ -7,6 +7,7 @@ from fl_eval.metrics.summary_stats import StatsSummaryEntry
 from fl_eval.util.run_model_common import (
     generate_report,
     get_techniques_for_all_models,
+    get_techniques_for_health_check,
     process_mutation,
     setup_evaluation,
 )
@@ -16,9 +17,13 @@ from analysis.data_analysis import print_ascii_table, print_latex_table, generat
 
 logger = get_logger(__name__)
 
-def run_benchmark(base_path: Path, sequential: bool = False) -> None:
+def run_benchmark(base_path: Path, sequential: bool = False, health_check: bool = False) -> None:
     try:
-        techniques_to_run = get_techniques_for_all_models()
+        techniques_to_run = (
+            get_techniques_for_health_check()
+            if health_check
+            else get_techniques_for_all_models()
+        )
         logger.info(f"Starting Benchmark on: {base_path}")
         logger.info(f"Techniques to run: {techniques_to_run}")
         raw_results: dict[str, list[ExamOutput]] = {}
@@ -52,7 +57,7 @@ def run_benchmark(base_path: Path, sequential: bool = False) -> None:
                         logger.info(f"[{tech_name}] costs: {cost_output}")
                 except Exception as e:
                     logger.warning(f"[{tech_name}] failed to retrieve costs: {e}")
-            
+
             scores_clean = [s for s in scores_dirty if s is not None]
             raw_results[tech_name] = scores_clean
             stats_summary[tech_name] = generate_report(tech_name, scores_clean)
@@ -71,7 +76,7 @@ def run_benchmark(base_path: Path, sequential: bool = False) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Benchmark ALL Fault Localization techniques.")
     parser.add_argument(
-        "data_path", 
+        "data_path",
         type=Path,
         help="Path to the directory containing 'killed' and 'original' folders."
     )
@@ -87,7 +92,13 @@ if __name__ == "__main__":
       action="store_true",
       help="Run evaluations sequentially"
     )
-    
+
+    parser.add_argument(
+      "--health-check",
+      action="store_true",
+      help="Run reduced technique set for repository health checks (skips slow techniques)."
+    )
+
     args = parser.parse_args()
     if not args.data_path.exists():
         logger.error(f"Path not found: {args.data_path}")
@@ -106,5 +117,5 @@ if __name__ == "__main__":
             logger.warning(f"No cache directory found at: {dataset_cache_dir}")
     else:
         logger.info(f"Using cached results if any at {dataset_cache_dir}")
-  
-    run_benchmark(args.data_path, args.sequential)
+
+    run_benchmark(args.data_path, args.sequential, args.health_check)

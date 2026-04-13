@@ -21,6 +21,29 @@ from pathlib import Path
 from run_pos_test_guard import find_repo_root
 
 
+# ANSI color codes for terminal output
+class Color:
+    HEADER = "\033[95m"      # Magenta
+    BLUE = "\033[94m"        # Blue
+    CYAN = "\033[96m"        # Cyan
+    GREEN = "\033[92m"       # Green
+    YELLOW = "\033[93m"      # Yellow
+    RED = "\033[91m"         # Red
+    BOLD = "\033[1m"         # Bold
+    UNDERLINE = "\033[4m"    # Underline
+    END = "\033[0m"          # Reset
+
+
+def colored(text: str, color: str) -> str:
+    """Wrap text with ANSI color code."""
+    return f"{color}{text}{Color.END}"
+
+
+def separator(char: str = "=", length: int = 70) -> str:
+    """Return a separator line."""
+    return char * length
+
+
 TYPE_CHECK_CMDS: list[tuple[str, list[str]]] = [
     ("type-check-src", ["pyright", "src"]),
     ("type-check-tests", ["pyright", "src/tests"]),
@@ -36,7 +59,9 @@ class StepResult:
 
 
 def run_step(command: list[str], cwd: Path, step_name: str) -> StepResult:
-    print(f"[repo-health] {step_name}: {' '.join(command)}")
+    """Run a single step and return result."""
+    print(f"\n{colored('▶ Running:', Color.CYAN)} {colored(step_name, Color.BOLD)}")
+    print(f"  {' '.join(command)}")
     result = subprocess.run(command, cwd=cwd)
     return StepResult(name=step_name, command=command, return_code=result.returncode)
 
@@ -93,25 +118,40 @@ def main() -> int:
     repo_root = find_repo_root(Path(__file__))
     step_results: list[StepResult] = []
 
+    # Phase 1: Type checking
+    print("\n" + separator("="))
+    print(colored("PHASE 1: STATIC TYPE CHECKING", Color.HEADER + Color.BOLD))
+    print(separator("="))
+    
     if not args.skip_type_check:
         for step_name, command in TYPE_CHECK_CMDS:
             typecheck_result = run_step(command, repo_root, step_name)
             step_results.append(typecheck_result)
             if args.fail_fast and typecheck_result.return_code != 0:
-                print("[repo-health] stopping early due to --fail-fast")
+                print(colored("✗ Stopping early due to --fail-fast", Color.RED + Color.BOLD))
                 return typecheck_result.return_code
     else:
-        print("[repo-health] skipping type-check step")
+        print(colored("⊘ Skipped (--skip-type-check)", Color.YELLOW))
 
+    # Phase 2: Unit tests
+    print("\n" + separator("="))
+    print(colored("PHASE 2: UNIT TESTS", Color.HEADER + Color.BOLD))
+    print(separator("="))
+    
     if not args.skip_tests:
         pytest_result = run_step(PYTEST_CMD, repo_root, "pytest")
         step_results.append(pytest_result)
         if args.fail_fast and pytest_result.return_code != 0:
-            print("[repo-health] stopping early due to --fail-fast")
+            print(colored("✗ Stopping early due to --fail-fast", Color.RED + Color.BOLD))
             return pytest_result.return_code
     else:
-        print("[repo-health] skipping pytest step")
+        print(colored("⊘ Skipped (--skip-tests)", Color.YELLOW))
 
+    # Phase 3: Integration safeguard
+    print("\n" + separator("="))
+    print(colored("PHASE 3: INTEGRATION SAFEGUARD (pos_test)", Color.HEADER + Color.BOLD))
+    print(separator("="))
+    
     safeguard_cmd: list[str] = [
         sys.executable,
         str(repo_root / "src" / "run_pos_test_guard.py"),
@@ -119,6 +159,7 @@ def main() -> int:
         str(args.dataset_tar),
         "--extracted-name",
         args.extracted_name,
+        "--health-check",  # Always use reduced technique set for repository health checks
     ]
     if args.clean_cache:
         safeguard_cmd.append("--clean-cache")
@@ -128,20 +169,31 @@ def main() -> int:
     safeguard_result = run_step(safeguard_cmd, repo_root, "pos_test-safeguard")
     step_results.append(safeguard_result)
 
+    # Phase 4: Summary/Reporting
     failed = [r for r in step_results if r.return_code != 0]
 
-    print("[repo-health] summary:")
+    print("\n" + separator("="))
+    print(colored("SUMMARY", Color.HEADER + Color.BOLD))
+    print(separator("="))
+    
     for result in step_results:
-        status = "PASS" if result.return_code == 0 else "FAIL"
-        print(
-            f" - {result.name}: {status} (exit={result.return_code}) :: {' '.join(result.command)}"
-        )
+        is_pass = result.return_code == 0
+        status_icon = "✓" if is_pass else "✗"
+        status_color = Color.GREEN if is_pass else Color.RED
+        status_text = colored(f"{status_icon} PASS" if is_pass else f"{status_icon} FAIL", status_color + Color.BOLD)
+        
+        print(f"{status_text} | {result.name} (exit={result.return_code})")
 
+    print(separator("="))
+    
     if failed:
-        print(f"[repo-health] failed ({len(failed)} step(s) failed)", file=sys.stderr)
+        print(colored(f"✗ FAILED: {len(failed)} step(s) failed", Color.RED + Color.BOLD))
+        print(colored("Failed steps:", Color.RED))
+        for result in failed:
+            print(f"  • {result.name}: exit code {result.return_code}")
         return 1
 
-    print("[repo-health] all checks passed")
+    print(colored("✓ ALL CHECKS PASSED", Color.GREEN + Color.BOLD))
     return 0
 
 
@@ -149,5 +201,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except Exception as exc:  # pragma: no cover
-        print(f"[repo-health] failed: {exc}", file=sys.stderr)
+        print(colored(f"✗ FATAL ERROR: {exc}", Color.RED + Color.BOLD), file=sys.stderr)
         raise SystemExit(1)

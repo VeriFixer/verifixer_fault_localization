@@ -46,7 +46,7 @@ from typing import Any
 import config as gl
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import compute_exam_score_one_file, load_from_file_output
-from fl_eval.util.run_model_common import TECHNIQUE_MAP, get_techniques_for_all_models
+from fl_eval.util.run_model_common import TECHNIQUE_MAP, get_techniques_for_all_models, get_techniques_for_health_check
 
 REPO_MARKER = ".repo_verifixer_fault_localization_marker"
 
@@ -70,7 +70,8 @@ TECHNIQUE_GUARDS: dict[str, TechniqueGuard] = {
     "llm_qwen_480b": TechniqueGuard(max_avg_exam=1.0, min_found_count=0, allow_all_empty_predictions=True),
     # Temporary waiver: AutoFix currently returns empty predictions on pos_test.
     # Remove allow_all_empty_predictions=True when AutoFix becomes reliable.
-    "autofix": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
+    "autofixDefault": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
+    "autofixSimplified": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
 }
 
 
@@ -174,22 +175,44 @@ def validate_dataset_layout(dataset_dir: Path) -> int:
     return mutation_count
 
 
-def run_benchmark(run_all_models: Path, dataset_dir: Path, clean_cache: bool, sequential: bool) -> None:
+def run_benchmark(
+    run_all_models: Path,
+    dataset_dir: Path,
+    clean_cache: bool,
+    sequential: bool,
+    health_check: bool,
+) -> None:
     cmd = [sys.executable, str(run_all_models), str(dataset_dir)]
     if clean_cache:
         cmd.append("--clean-cache")
     if sequential:
         cmd.append("--sequential")
+    if health_check:
+        cmd.append("--health-check")
 
     result = subprocess.run(cmd, cwd=run_all_models.parent.parent)
     if result.returncode != 0:
         raise RuntimeError(f"Benchmark command failed with code {result.returncode}: {' '.join(cmd)}")
 
 
-def validate_outputs(repo_root: Path, dataset_dir: Path, expected_mutation_count: int) -> None:
+def validate_outputs(
+    repo_root: Path,
+    dataset_dir: Path,
+    expected_mutation_count: int,
+    health_check: bool = False,
+) -> None:
     print("Validating outpus, created files etc")
     errors: list[str] = []
-    techniques_to_validate = get_techniques_for_all_models()
+    techniques_to_validate = (
+        get_techniques_for_health_check()
+        if health_check
+        else get_techniques_for_all_models()
+    )
+    print(
+        "(using "
+        f"{'health-check' if health_check else 'full'} "
+        f"technique set: {len(techniques_to_validate)} techniques)"
+    )
 
     plot_candidates = [
         dataset_dir.parent / "benchmark_hybrid_analysis_FILE.png",
@@ -202,13 +225,11 @@ def validate_outputs(repo_root: Path, dataset_dir: Path, expected_mutation_count
             + ", ".join(str(p) for p in plot_candidates)
         )
 
-    if set(TECHNIQUE_GUARDS.keys()) != set(techniques_to_validate):
-        missing_cfg = sorted(set(techniques_to_validate) - set(TECHNIQUE_GUARDS.keys()))
-        extra_cfg = sorted(set(TECHNIQUE_GUARDS.keys()) - set(techniques_to_validate))
+    missing_cfg = sorted(set(techniques_to_validate) - set(TECHNIQUE_GUARDS.keys()))
+    if missing_cfg:
         errors.append(
-            "Technique guard config mismatch. "
-            f"Missing: {missing_cfg if missing_cfg else '[]'}; "
-            f"Extra: {extra_cfg if extra_cfg else '[]'}"
+            "Technique guard config missing entries for active techniques. "
+            f"Missing: {missing_cfg}"
         )
 
     killed_dir = dataset_dir / "killed"
@@ -227,7 +248,7 @@ def validate_outputs(repo_root: Path, dataset_dir: Path, expected_mutation_count
     }
 
     for technique_name in techniques_to_validate:
-        technique_cls = TECHNIQUE_MAP[technique_name]
+        technique_cls = TECHNIQUE_MAP[technique_name][0]
         technique_dir = cache_root / technique_name
         if not technique_dir.is_dir():
             errors.append(f"Missing cache folder for technique: {technique_name}")
@@ -361,6 +382,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Pass --sequential to src/run_all_models.py.",
     )
+    parser.add_argument(
+        "--health-check",
+        action="store_true",
+        help="Run reduced technique set for repository health checks (skips slow techniques).",
+    )
     return parser.parse_args()
 
 
@@ -377,15 +403,35 @@ def main() -> int:
     mutation_count = validate_dataset_layout(dataset_dir)
 
     run_all_models = repo_root / "src" / "run_all_models.py"
-    run_benchmark(run_all_models, dataset_dir, args.clean_cache, args.sequential)
+    run_benchmark(
+        run_all_models,
+        dataset_dir,
+        args.clean_cache,
+        args.sequential,
+        args.health_check,
+    )
 
     # Output validation is too havy for now not using
-    validate_outputs(repo_root, dataset_dir, mutation_count)
+    validate_outputs(
+        repo_root,
+        dataset_dir,
+        mutation_count,
+        health_check=args.health_check,
+    )
 
+    techniques_used = (
+        get_techniques_for_health_check()
+        if args.health_check
+        else get_techniques_for_all_models()
+    )
     print("pos_test safeguard passed.")
     print(f" - dataset: {dataset_dir}")
     print(f" - mutations validated: {mutation_count}")
-    print(f" - techniques validated: {len(get_techniques_for_all_models())}")
+    print(
+        " - techniques validated: "
+        f"{len(techniques_used)} "
+        f"({'health-check mode' if args.health_check else 'full mode'})"
+    )
     plot_summary = dataset_dir.parent / "benchmark_hybrid_analysis_FILE.png"
     if not plot_summary.exists():
         plot_summary = dataset_dir.parent / "benchmark_hybrid_analysis.png"
