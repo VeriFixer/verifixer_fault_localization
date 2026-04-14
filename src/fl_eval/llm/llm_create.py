@@ -6,6 +6,7 @@ from .llm_configurations import (
     MODEL_REGISTRY,
 )
 from .llm_amazon_bedrock import AmazonBedrock_LLM
+from .llm_openrounter import OpenRouter_LLM
 
 def create_llm(name: str, model: str, *, verbose: bool = False) -> LLM:
     if model not in MODEL_REGISTRY:
@@ -13,10 +14,13 @@ def create_llm(name: str, model: str, *, verbose: bool = False) -> LLM:
 
     info = MODEL_REGISTRY[model]
 
-    if info.provider == "bedrock":
+    if info.provider.name == "bedrock":
         return AmazonBedrock_LLM(name, info, verbose=verbose)
+
+    if info.provider.name == "openrouter":
+        return OpenRouter_LLM(name, info, verbose=verbose)
     
-    if info.provider == "debug":
+    if info.provider.name == "debug":
         if model == "cost_stub_all_lines_ranked":
             return LLM_COST_STUB_ALL_LINES_RANKED(name, info)
         elif model == "without_api":

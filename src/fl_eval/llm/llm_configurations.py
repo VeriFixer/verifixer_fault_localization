@@ -4,8 +4,18 @@ from dataclasses import dataclass
 from typing import Any
 
 @dataclass(frozen=True)
+class ProviderInfo:
+    name: str
+
+
+PROVIDER_BEDROCK = ProviderInfo(name="bedrock")
+PROVIDER_OPENROUTER = ProviderInfo(name="openrouter")
+PROVIDER_DEBUG = ProviderInfo(name="debug")
+
+
+@dataclass(frozen=True)
 class ModelInfo:
-    provider: str          # "openai" | "bedrock"
+    provider: ProviderInfo
     model_id: str          # provider-specific model id
     max_context: int
     cost_1M_in : float
@@ -17,30 +27,49 @@ MODEL_REGISTRY: dict[str, ModelInfo] = {
     # --- Open-source on Bedrock (On-Demand Pricing) ---
     #https://aws.amazon.com/bedrock/pricing/
     "deepseek-r1": ModelInfo(
-        provider="bedrock",
+        provider=PROVIDER_BEDROCK,
         model_id="us.deepseek.r1-v1:0",
         max_context=64_000, # DeepSeek API documentation suggests 64K context
         cost_1M_in=1.35, # $0.00135 per 1K tokens
         cost_1M_out=5.40  # $0.0054 per 1K tokens
     ),
     "qwen3-coder-480b": ModelInfo(
-        provider="bedrock",
-        model_id="qwen.qwen3-coder-480b-a35b-v1:0",
+        #provider=PROVIDER_BEDROCK,
+        #model_id="qwen.qwen3-coder-480b-a35b-v1:0",
+        provider=PROVIDER_OPENROUTER,
+        model_id="meta-llama/llama-3.1-8b-instruct:free",
         max_context=262_000, # Context window of 262K tokens
         cost_1M_in=0.45,     # Low-end quote from Source 3.2, rounded from $0.22/M to be conservative
         cost_1M_out=1.8
     ),
     # Source: OpenRouter API comparison, often reflecting Bedrock rates: https://openrouter.ai/compare/amazon/nova-premier-v1/qwen/qwen3-coder (Source 3.2, lower quote)
     "qwen3-coder-30b": ModelInfo(
-        provider="bedrock",
+        provider=PROVIDER_BEDROCK,
         model_id="qwen.qwen3-coder-30b-a3b-v1:0",
         max_context=128_000,
         cost_1M_in=0.15,     # Highly competitive pricing, derived from 1K token rates (Source 3.2, lower quote)
         cost_1M_out=0.60
     ),
 
+    # --- OpenRouter open-source models ---
+    # Source: OpenRouter model catalog / free open-source models.
+    "llama-3.1-8b-instruct-free": ModelInfo(
+        provider=PROVIDER_OPENROUTER,
+        model_id="meta-llama/llama-3.1-8b-instruct:free",
+        max_context=128_000,
+        cost_1M_in=0.0,
+        cost_1M_out=0.0,
+    ),
+    "qwen2.5-7b-instruct-free": ModelInfo(
+        provider=PROVIDER_OPENROUTER,
+        model_id="qwen/qwen-2.5-7b-instruct:free",
+        max_context=128_000,
+        cost_1M_in=0.0,
+        cost_1M_out=0.0,
+    ),
+
     "cost_stub_all_lines_ranked": ModelInfo(
-        provider="debug",
+        provider=PROVIDER_DEBUG,
         model_id="all_lines_ranked",
         max_context=128_000,
         cost_1M_in=0.0,
@@ -49,7 +78,7 @@ MODEL_REGISTRY: dict[str, ModelInfo] = {
 
     # Debug Interactive
     "without_api": ModelInfo(
-        provider="debug",
+        provider=PROVIDER_DEBUG,
         model_id="without_api",
         max_context=128_000,
         cost_1M_in=0.0,

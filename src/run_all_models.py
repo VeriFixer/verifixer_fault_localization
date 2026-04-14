@@ -67,7 +67,10 @@ def run_benchmark(base_path: Path, sequential: bool = False, health_check: bool 
         print_ascii_table(stats_summary)
         print_latex_table(stats_summary)
         try:
-            generate_plots(raw_results, base_path.parent)  # type: ignore
+            images_dir = gl.BASE_PATH / "images"
+            images_dir.mkdir(parents=True, exist_ok=True)
+            generate_plots(raw_results, images_dir)  # type: ignore
+            logger.info(f"Plot artifacts saved to: {images_dir}")
         except Exception as e:
             logger.error(f"Could not generate plots: {e}")
     finally:

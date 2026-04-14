@@ -351,6 +351,37 @@ def load_from_file_output(flt: FLTechnique, Gtruth: GroundTruthLike, dataset_dir
     return [int(item) for item in raw_predictions]
 
 
+def load_execution_metadata_from_cache(
+    flt: FLTechnique,
+    Gtruth: GroundTruthLike,
+    dataset_dir: Path,
+) -> dict[str, Any] | None:
+    """Load execution metadata from cache payload for display/debugging.
+
+    Returns None when cache is missing or metadata is unavailable/unreadable.
+    """
+    results_file = _results_file_path(flt, Gtruth, dataset_dir)
+    if not results_file.exists():
+        return None
+
+    try:
+        with results_file.open("r", encoding="utf-8") as f:
+            data: Any = json.load(f)
+    except (PermissionError, OSError, json.JSONDecodeError) as e:
+        logger.warning("Failed to read execution metadata from %s: %s", results_file, e)
+        return None
+
+    if not isinstance(data, dict):
+        return None
+
+    payload = cast(dict[str, Any], data)
+    metadata = payload.get("execution_metadata")
+    if not isinstance(metadata, dict):
+        return None
+
+    return cast(dict[str, Any], metadata)
+
+
 def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir: Path) -> ExamScoreOutput:
     """Compute EXAM score for a mutation in both file-wide and method scopes.
     
@@ -370,10 +401,23 @@ def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir:
     Raises:
         AttributeError: If Gtruth lacks required method fields (method_start, method_end, method_name)
     """
-    # Load or compute predictions (same as before)
-    try:
-        predictions = load_from_file_output(flt, Gtruth, dataset_dir)
-    except (FileNotFoundError, PermissionError, OSError, json.JSONDecodeError, ValueError):
+    # Load from cache when available; compute only if missing or unreadable.
+    results_file = _results_file_path(flt, Gtruth, dataset_dir)
+    loaded_from_cache = False
+    predictions: list[int] = []
+
+    if results_file.exists():
+        try:
+            predictions = load_from_file_output(flt, Gtruth, dataset_dir)
+            loaded_from_cache = True
+        except (PermissionError, OSError, json.JSONDecodeError, ValueError) as e:
+            logger.warning(
+                "Cache read failed for %s (%s). Recomputing predictions.",
+                results_file,
+                e,
+            )
+
+    if not loaded_from_cache:
         execution_metadata: dict[str, Any] | None = None
         try:
             predictions = flt.get_fault_localization(Gtruth.mutantfile) 

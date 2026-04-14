@@ -193,13 +193,17 @@ def print_latex_table(stats: dict[str, StatsSummaryEntry]):
     print("--------------------------\n")
 
 
-def _plot_scope(raw_results: dict[str, list[ExamOutput]], output_file: Path, scope: str, title: str):
+def _plot_scope(raw_results: dict[str, list[ExamOutput]], output_prefix: Path, scope: str, title: str):
     labels = [tech for tech, vals in raw_results.items() if vals]
     if not labels:
         return
 
-    fig, (ax1, ax2) = cast(Any, plt.subplots(1, 2, figsize=(20, 8)))  # type: ignore[reportUnknownMemberType]
-    fig.suptitle(title, fontsize=18, fontweight="bold")
+    # Extra-large typography for legibility in double-column papers
+    title_font = 24
+    label_font = 20
+    tick_font = 17
+    legend_font = 16
+    annotation_font = 16
 
     get_score: Callable[[ExamOutput], float]
     get_found: Callable[[ExamOutput], bool]
@@ -211,6 +215,7 @@ def _plot_scope(raw_results: dict[str, list[ExamOutput]], output_file: Path, sco
         get_found = lambda x: x.found_method
 
     box_data = [np.array([get_score(x) for x in raw_results[tech]]) for tech in labels]
+    fig1, ax1 = cast(Any, plt.subplots(1, 1, figsize=(12, 8)))  # type: ignore[reportUnknownMemberType]
     ax1.boxplot(
         box_data,
         tick_labels=labels,
@@ -219,11 +224,21 @@ def _plot_scope(raw_results: dict[str, list[ExamOutput]], output_file: Path, sco
         showmeans=True,
         widths=0.45,
     )
-    ax1.set_title("Score Distribution")
-    ax1.set_ylabel("EXAM Score (Lower is Better)")
+    ax1.set_title(f"{title} - Score Distribution", fontsize=title_font, fontweight="bold")
+    ax1.set_ylabel("EXAM Score (Lower is Better)", fontsize=label_font)
+    ax1.set_xlabel("Technique", fontsize=label_font)
     ax1.set_ylim(-0.02, 1.05)
     ax1.grid(axis="y", linestyle="--", alpha=0.3)
-    ax1.tick_params(axis="x", rotation=15)
+    ax1.tick_params(axis="x", rotation=20, labelsize=tick_font)
+    ax1.tick_params(axis="y", labelsize=tick_font)
+
+    distribution_file = Path(f"{output_prefix}_distribution.png")
+    plt.tight_layout()
+    plt.savefig(distribution_file, dpi=300, bbox_inches="tight")  # type: ignore
+    plt.close(fig1)
+
+    fig2, ax2 = cast(Any, plt.subplots(1, 1, figsize=(12, 8)))  # type: ignore[reportUnknownMemberType]
+    ax2.set_title(f"{title} - Success vs Inspection Effort", fontsize=title_font, fontweight="bold")
 
     for tech in labels:
         tech_data = sorted(raw_results[tech], key=get_score)
@@ -232,37 +247,39 @@ def _plot_scope(raw_results: dict[str, list[ExamOutput]], output_file: Path, sco
         y_vals = np.cumsum(found_flags) / len(raw_results[tech])
         plot_x = scores + [1.0]
         plot_y = list(y_vals) + [float(y_vals[-1])]
-        line = ax2.step(plot_x, plot_y, where="post", label=tech, lw=2.0)[0]
-        ax2.text(1.01, y_vals[-1], f"{(y_vals[-1] * 100):.1f}%", color=line.get_color(), va="center", fontsize=9)
+        line = ax2.step(plot_x, plot_y, where="post", label=tech, lw=2.8)[0]
+        ax2.text(1.03, y_vals[-1], f"{(y_vals[-1] * 100):.1f}%", color=line.get_color(), va="center", fontsize=annotation_font)
 
     for thresh in [0.01, 0.05, 0.10, 0.25, 0.50]:
         ax2.axvline(x=thresh, color="gray", linestyle="--", alpha=0.3)
 
-    ax2.set_title("Success Rate vs. Inspection Effort")
-    ax2.set_xlabel("EXAM Score Threshold (Effort)")
-    ax2.set_ylabel("% of Total Faults Found")
-    ax2.set_xlim(0, 1.1)
+    ax2.set_xlabel("EXAM Score Threshold (Effort)", fontsize=label_font)
+    ax2.set_ylabel("% of Total Faults Found", fontsize=label_font)
+    ax2.set_xlim(0, 1.18)
     ax2.set_ylim(0, 1.05)
     ax2.grid(True, linestyle=":", alpha=0.6)
-    ax2.legend(loc="lower right")
+    ax2.tick_params(axis="x", labelsize=tick_font)
+    ax2.tick_params(axis="y", labelsize=tick_font)
+    ax2.legend(loc="lower right", fontsize=legend_font)
 
+    success_file = Path(f"{output_prefix}_success.png")
     plt.tight_layout()
-    plt.savefig(output_file)  # type: ignore
-    plt.close(fig)
-    print(f"Final hybrid plots saved to: {output_file}")
+    plt.savefig(success_file, dpi=300, bbox_inches="tight")  # type: ignore
+    plt.close(fig2)
+    print(f"Plots saved to: {distribution_file} and {success_file}")
 
 
 def generate_plots(raw_results: dict[str, list[ExamOutput]], output_path: Path):
     """Generate file-scoped EXAM plots."""
-    filename = output_path / "benchmark_hybrid_analysis_FILE.png"
-    _plot_scope(raw_results, filename, scope="file", title="File-Scoped EXAM: Comprehensive Analysis")
+    file_prefix = output_path / "benchmark_hybrid_analysis_FILE"
+    _plot_scope(raw_results, file_prefix, scope="file", title="File-Scoped EXAM")
 
 
 def generate_dual_scope_plots(raw_results: dict[str, list[ExamOutput]], output_path: Path):
     """Generate file-scoped and method-scoped EXAM plots."""
     generate_plots(raw_results, output_path)
-    method_filename = output_path / "benchmark_hybrid_analysis_METHOD.png"
-    _plot_scope(raw_results, method_filename, scope="method", title="Method-Scoped EXAM: Comprehensive Analysis")
+    method_prefix = output_path / "benchmark_hybrid_analysis_METHOD"
+    _plot_scope(raw_results, method_prefix, scope="method", title="Method-Scoped EXAM")
 
 
 def compare_two_methods(raw_results: dict[str, list[ExamOutput]], tech1: str, tech2: str):

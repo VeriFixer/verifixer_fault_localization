@@ -18,30 +18,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from fl_eval.util.terminal_colors import Color, colored, separator
 from run_pos_test_guard import find_repo_root
-
-
-# ANSI color codes for terminal output
-class Color:
-    HEADER = "\033[95m"      # Magenta
-    BLUE = "\033[94m"        # Blue
-    CYAN = "\033[96m"        # Cyan
-    GREEN = "\033[92m"       # Green
-    YELLOW = "\033[93m"      # Yellow
-    RED = "\033[91m"         # Red
-    BOLD = "\033[1m"         # Bold
-    UNDERLINE = "\033[4m"    # Underline
-    END = "\033[0m"          # Reset
-
-
-def colored(text: str, color: str) -> str:
-    """Wrap text with ANSI color code."""
-    return f"{color}{text}{Color.END}"
-
-
-def separator(char: str = "=", length: int = 70) -> str:
-    """Return a separator line."""
-    return char * length
 
 
 TYPE_CHECK_CMDS: list[tuple[str, list[str]]] = [

@@ -113,7 +113,12 @@ def test_generate_plots_creates_output_file(tmp_path: Path):
     with patch("builtins.print"):
         generate_plots(raw_results, tmp_path)
 
-    out_file = tmp_path / "benchmark_hybrid_analysis_FILE.png"
+    out_file = tmp_path / "benchmark_hybrid_analysis_FILE_success.png"
+    assert out_file.exists()
+    assert out_file.stat().st_size > 0
+
+
+    out_file = tmp_path / "benchmark_hybrid_analysis_FILE_distribution.png"
     assert out_file.exists()
     assert out_file.stat().st_size > 0
 

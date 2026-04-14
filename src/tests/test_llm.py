@@ -8,6 +8,8 @@ from fl_eval.llm.llm_configurations import (
     LLM_YIELD_RESULT_WITHOUT_API,
     MODEL_REGISTRY,
 )
+from fl_eval.llm.llm_create import create_llm
+from fl_eval.llm.llm_openrounter import OpenRouter_LLM
 
 
 def test_without_api_interactive(monkeypatch):
@@ -28,4 +30,22 @@ def test_stub_ranks_all_lines():
 
     assert reply == "[1, 2, 3]"
     assert llm.get_chat_history() == ["line 1\nline 2\nline 3", "[1, 2, 3]"]
+
+
+def test_openrouter_mock_mode_without_key(monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    llm = OpenRouter_LLM("openrouter", MODEL_REGISTRY["llama-3.1-8b-instruct-free"])
+    reply = llm.get_response("Prompt text")
+
+    assert reply == "Mock Reply"
+    assert llm.get_chat_history() == []
+
+
+def test_create_llm_supports_openrouter(monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    llm = create_llm("openrouter-test", "qwen2.5-7b-instruct-free")
+
+    assert isinstance(llm, OpenRouter_LLM)
 

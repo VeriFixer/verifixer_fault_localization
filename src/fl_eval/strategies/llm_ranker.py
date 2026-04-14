@@ -18,6 +18,8 @@ LLM_MODEL_CHOICES = [
     "deepseek-r1",
     "qwen3-coder-480b",
     "qwen3-coder-30b",
+    "llama-3.1-8b-instruct-free",
+    "qwen2.5-7b-instruct-free",
 ]
 
 TECHNIQUE_TO_LLM_MODEL: dict[str, str] = {
