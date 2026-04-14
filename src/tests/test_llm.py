@@ -35,7 +35,7 @@ def test_stub_ranks_all_lines():
 def test_openrouter_mock_mode_without_key(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
-    llm = OpenRouter_LLM("openrouter", MODEL_REGISTRY["llama-3.1-8b-instruct-free"])
+    llm = OpenRouter_LLM("openrouter", MODEL_REGISTRY["qwen3-coder-next"])
     reply = llm.get_response("Prompt text")
 
     assert reply == "Mock Reply"
@@ -45,7 +45,7 @@ def test_openrouter_mock_mode_without_key(monkeypatch):
 def test_create_llm_supports_openrouter(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
 
-    llm = create_llm("openrouter-test", "qwen2.5-7b-instruct-free")
+    llm = create_llm("openrouter-test", "qwen3-coder-next")
 
     assert isinstance(llm, OpenRouter_LLM)
 

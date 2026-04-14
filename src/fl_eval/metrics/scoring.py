@@ -143,12 +143,12 @@ def _compute_exam_score_in_scope(
     seen: set[int] = set()
     out_of_scope_count = 0
     for p in predictions:
-        if scope_start <= p <= scope_end:
-            if p not in seen:
-                seen.add(p)
-                normalized_predictions.append(p)
-        else:
-            out_of_scope_count += 1
+        if p not in seen:
+            seen.add(p)
+            normalized_predictions.append(p)
+            
+            if not(scope_start <= p <= scope_end):
+                out_of_scope_count += 1
 
     if out_of_scope_count > 0 and not suppress_warnings:
         logger.warning(
@@ -168,17 +168,23 @@ def _compute_exam_score_in_scope(
                          line_ground_truth=ground_truth, 
                          line_prediction=in_scope_predictions)
 
-    try:
-        rank = in_scope_predictions.index(ground_truth)
-        found_in_predictions = True
-    except ValueError:
-        found_in_predictions = False
+    rank = -1 
+    found_in_predictions = False
+    for pred in in_scope_predictions:
+        rank += 1
+        if(pred == ground_truth):
+            found_in_predictions = True
+            break 
+
+    if(not found_in_predictions):
         lines_inspected_so_far = len(in_scope_predictions)
         remaining_unranked_lines = total_lines - lines_inspected_so_far
-        if remaining_unranked_lines <= 0:
-            raise ValueError("Predictions cover all lines but ground truth is missing.")
-        expected_position_in_unranked = (remaining_unranked_lines - 1) / 2
-        rank = lines_inspected_so_far + expected_position_in_unranked
+        if(remaining_unranked_lines <= 0 ):
+            rank = total_lines - 1  # Already inspected more lines that the maximum needed so returning 1
+        else:
+            # Comput expected rank
+            expected_position_in_unranked = (remaining_unranked_lines - 1) / 2
+            rank = lines_inspected_so_far + expected_position_in_unranked
 
     exam_score = rank / (total_lines - 1)
     return ExamScore(score=exam_score, 
@@ -428,6 +434,18 @@ def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir:
             print(str(e), file=sys.stderr)
             traceback.print_exc(file=sys.stderr)
             execution_metadata = run_cmd.get_last_execution_metadata()
+
+        get_cost_snapshot = getattr(flt, "get_cost_snapshot", None)
+        if callable(get_cost_snapshot):
+            try:
+                llm_cost_snapshot = get_cost_snapshot()
+                if isinstance(llm_cost_snapshot, dict):
+                    if execution_metadata is None:
+                        execution_metadata = {}
+                    execution_metadata["llm_cost"] = llm_cost_snapshot
+            except Exception as e:
+                logger.warning("Could not capture LLM cost snapshot for %s: %s", flt.name, e)
+
         save_to_file_output(flt, Gtruth, predictions, dataset_dir, execution_metadata)
     
     # Compute file-wide EXAM score

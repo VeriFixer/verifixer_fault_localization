@@ -155,27 +155,25 @@ class TestExamMetric(unittest.TestCase):
         self.assertEqual(exam_out.found, True)
         self.assertAlmostEqual(exam_out.score, 0.25) 
 
-    def test_out_of_scope_predictions_are_ignored(self):
+    def test_out_of_scope_predictions_count_as_missess(self):
         preds = [9, 10, 12, 11, 99]
         truth = 11
+        # 9 out of scope so model will test 4 lines 9,10,12,11 untill rsults 10,11,12,13,14
+        # So it should receive same score of only finding on 4 try
 
         with self.assertLogs("fl_eval.metrics.scoring", level="WARNING") as cm:
             exam_out = compute_exam_score_one_file(preds, truth, 10, 14, "test.dfy")
 
-        self.assertTrue(any("Ignored 2 out-of-scope predictions" in msg for msg in cm.output))
-        self.assertEqual(exam_out.line_prediction, [10, 12, 11])
         self.assertTrue(exam_out.found)
-        self.assertAlmostEqual(exam_out.score, 0.5)
+        self.assertAlmostEqual(exam_out.score, 0.75)
 
     def test_relative_positions_are_not_remapped(self):
-        preds = [1, 2, 3]
+        preds = [1, 2, 3,4, 5,6]
         truth = 11
 
         with self.assertLogs("fl_eval.metrics.scoring", level="WARNING") as cm:
             exam_out = compute_exam_score_one_file(preds, truth, 10, 14, "test.dfy")
-
-        self.assertTrue(any("Ignored 3 out-of-scope predictions" in msg for msg in cm.output))
-        self.assertEqual(exam_out.line_prediction, [])
-        self.assertFalse(exam_out.prediction)
+        self.assertTrue(exam_out.prediction)
         self.assertFalse(exam_out.found)
-        self.assertAlmostEqual(exam_out.score, 0.5)
+        # Here exaclty same lines of the method were already tested but method ended so score 1
+        self.assertAlmostEqual(exam_out.score, 1.0)

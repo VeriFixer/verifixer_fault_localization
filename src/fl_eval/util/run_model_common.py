@@ -47,9 +47,8 @@ TECHNIQUE_CONFIG: dict[str, TechniqueConfig] = {
     "counterExampleIfReassume": TechniqueConfig(CounterExampleIfReassume, run_on_all_models=True),
     "autofixDefault": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-and-static-score", run_on_all_models=True),
     "autofixSimplified": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-score-only", run_on_all_models=True),
-    "llm_stub_all_lines_ranked": TechniqueConfig(LLMRanker, run_on_all_models=True),
     "llm_without_api": TechniqueConfig(LLMRanker, run_on_all_models=False),
-    "llm_qwen_480b": TechniqueConfig(LLMRanker, run_on_all_models=True),
+    "llm_real": TechniqueConfig(LLMRanker, run_on_all_models=True),
 }
 
 

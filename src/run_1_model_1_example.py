@@ -57,8 +57,14 @@ How to use:
     Example 1: Evaluate one mutant with a non-LLM technique
         $ python src/run_1_model_1_example.py random datasets/pos_test/killed/foo__mut1.dfy
 
-    Example 2: Evaluate one mutant with LLM stub and inspect full prompt/response
-        $ python src/run_1_model_1_example.py llm_stub_all_lines_ranked datasets/pos_test/killed/foo__mut1.dfy
+    Example 2: Evaluate one mutant with LLM (interactive, no API calls for debugging)
+        $ python src/run_1_model_1_example.py llm_without_api datasets/pos_test/killed/foo__mut1.dfy
+
+    Example 3: Evaluate one mutant with LLM stub (default cost_stub_all_lines_ranked)
+        $ python src/run_1_model_1_example.py llm_real datasets/pos_test/killed/foo__mut1.dfy
+
+    Example 4: Evaluate one mutant with a specific LLM model (requires LLM_REAL_MODEL_NAME env var)
+        $ LLM_REAL_MODEL_NAME=qwen3-coder-480b python src/run_1_model_1_example.py llm_real datasets/pos_test/killed/foo__mut1.dfy
 """
 
     parser = argparse.ArgumentParser(

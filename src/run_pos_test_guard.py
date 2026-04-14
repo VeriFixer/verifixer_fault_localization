@@ -66,8 +66,8 @@ TECHNIQUE_GUARDS: dict[str, TechniqueGuard] = {
     "randomOnFailingMethod": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
     "counterExampleIf": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
     "counterExampleIfReassume": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
-    "llm_stub_all_lines_ranked": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
-    "llm_qwen_480b": TechniqueGuard(max_avg_exam=1.0, min_found_count=0, allow_all_empty_predictions=True),
+    "llm_without_api": TechniqueGuard(max_avg_exam=1.0, min_found_count=0, allow_all_empty_predictions=True),
+    "llm_real": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
     # Temporary waiver: AutoFix currently returns empty predictions on pos_test.
     # Remove allow_all_empty_predictions=True when AutoFix becomes reliable.
     "autofixDefault": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),

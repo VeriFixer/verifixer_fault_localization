@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import json
+import os
 from pathlib import Path
 from typing import Any, cast
 
@@ -12,20 +13,17 @@ from logging_config import get_logger
 
 logger = get_logger(__name__)
 
-LLM_MODEL_CHOICES = [
-    "cost_stub_all_lines_ranked",
-    "without_api",
-    "deepseek-r1",
-    "qwen3-coder-480b",
-    "qwen3-coder-30b",
-    "llama-3.1-8b-instruct-free",
-    "qwen2.5-7b-instruct-free",
-]
+# Import MODEL_REGISTRY to validate against available models
+from fl_eval.llm.llm_configurations import MODEL_REGISTRY
 
+LLM_MODEL_CHOICES = list(MODEL_REGISTRY.keys())
+
+# Environment variable for model selection in llm_real. Default: cost_stub_all_lines_ranked (stub mode)
+# Usage: LLM_REAL_MODEL_NAME=qwen3-coder-next python src/run_*.py ...
+# To add new models: add them to MODEL_REGISTRY in llm_configurations.py
 TECHNIQUE_TO_LLM_MODEL: dict[str, str] = {
-    "llm_stub_all_lines_ranked": "cost_stub_all_lines_ranked",
-    "llm_without_api": "without_api",
-    "llm_qwen_480b": "qwen3-coder-480b",
+    "llm_without_api": "without_api",  # Fixed: always use interactive API-free mode
+    "llm_real": os.getenv("LLM_REAL_MODEL_NAME", "cost_stub_all_lines_ranked"),  # Swappable via env var
 }
 
 
@@ -52,6 +50,9 @@ class LLMRanker(FLTechnique):
     def get_costs(self) -> None:
         self.llm.get_my_cost_statisitcs()
 
+    def get_cost_snapshot(self) -> dict[str, str | int | float]:
+        return self.llm.get_cost_snapshot().to_metadata_dict()
+
     def _format_prompt(self, file: Path, total_lines: int) -> str:
         lines = file.read_text(encoding="utf-8").splitlines()
         numbered_lines = "\n".join(f"{idx}: {line}" for idx, line in enumerate(lines, start=1))
@@ -59,7 +60,13 @@ class LLMRanker(FLTechnique):
         return (
             "You are a fault-localization model.\n"
             "Rank suspicious lines from most likely fault to least likely fault.\n"
-            "Return only a JSON array of unique 1-based line numbers.\n"
+            "Output contract (strict):\n"
+            "1) Return exactly one JSON array of unique 1-based line numbers.\n"
+            "2) Do not return any explanation, markdown, code fences, labels, or extra text.\n"
+            "3) Use only integers in the inclusive range [1, total_lines].\n"
+            "4) If no suspicious lines are found, return [].\n"
+            "5) Your entire response must match this pattern: ^\\[(?:\\s*\\d+\\s*(?:,\\s*\\d+\\s*)*)?\\]$\n"
+            "Example valid response: [18, 29, 30]\n"
             f"The file has {total_lines} lines.\n"
             "BEGIN_FILE\n"
             f"{numbered_lines}\n"
@@ -88,6 +95,7 @@ class LLMRanker(FLTechnique):
         return ranked_lines
 
     def get_fault_localization(self, file: Path) -> list[int]:
+        self.llm.reset_chat_history() # No retrying will me made
         if not file.is_file():
             raise FileNotFoundError(f"File does not exist: {file}")
 

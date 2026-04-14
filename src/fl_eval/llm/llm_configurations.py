@@ -22,58 +22,62 @@ class ModelInfo:
     cost_1M_out : float
 
 
+@dataclass(frozen=True)
+class LLMCostSnapshot:
+    model_name: str
+    model_id: str
+    total_prompts: int
+    total_chars_prompted: int
+    total_chars_response: int
+    total_tokens_input: float
+    total_tokens_output: float
+    total_tokens_output_reason: float
+    cost_input_usd: float
+    cost_output_usd: float
+    cost_output_reason_usd: float
+    total_cost_usd: float
+
+    def to_metadata_dict(self) -> dict[str, str | int | float]:
+        return {
+            "model_name": self.model_name,
+            "model_id": self.model_id,
+            "total_prompts": self.total_prompts,
+            "total_chars_prompted": self.total_chars_prompted,
+            "total_chars_response": self.total_chars_response,
+            "total_tokens_input": self.total_tokens_input,
+            "total_tokens_output": self.total_tokens_output,
+            "total_tokens_output_reason": self.total_tokens_output_reason,
+            "cost_input_usd": self.cost_input_usd,
+            "cost_output_usd": self.cost_output_usd,
+            "cost_output_reason_usd": self.cost_output_reason_usd,
+            "total_cost_usd": self.total_cost_usd,
+        }
+
+
 MODEL_REGISTRY: dict[str, ModelInfo] = {
 
-    # --- Open-source on Bedrock (On-Demand Pricing) ---
-    #https://aws.amazon.com/bedrock/pricing/
-    "deepseek-r1": ModelInfo(
-        provider=PROVIDER_BEDROCK,
-        model_id="us.deepseek.r1-v1:0",
-        max_context=64_000, # DeepSeek API documentation suggests 64K context
-        cost_1M_in=1.35, # $0.00135 per 1K tokens
-        cost_1M_out=5.40  # $0.0054 per 1K tokens
-    ),
-    "qwen3-coder-480b": ModelInfo(
+
+    "qwen3-coder-next": ModelInfo(
         #provider=PROVIDER_BEDROCK,
         #model_id="qwen.qwen3-coder-480b-a35b-v1:0",
-        provider=PROVIDER_OPENROUTER,
-        model_id="meta-llama/llama-3.1-8b-instruct:free",
+        
+        model_id="qwen/qwen3-coder-next",
+        provider=PROVIDER_OPENROUTER, # COOL TO TEST BUT TRAFFIC BLOCKED
+        #model_id="openrouter/free", # COOL TO TEST BUT TRAFFIC BLOCKED
+
         max_context=262_000, # Context window of 262K tokens
-        cost_1M_in=0.45,     # Low-end quote from Source 3.2, rounded from $0.22/M to be conservative
-        cost_1M_out=1.8
+        cost_1M_in=0.15,     # Low-end quote from Source 3.2, rounded from $0.22/M to be conservative
+        cost_1M_out=0.8
     ),
     # Source: OpenRouter API comparison, often reflecting Bedrock rates: https://openrouter.ai/compare/amazon/nova-premier-v1/qwen/qwen3-coder (Source 3.2, lower quote)
-    "qwen3-coder-30b": ModelInfo(
-        provider=PROVIDER_BEDROCK,
-        model_id="qwen.qwen3-coder-30b-a3b-v1:0",
-        max_context=128_000,
-        cost_1M_in=0.15,     # Highly competitive pricing, derived from 1K token rates (Source 3.2, lower quote)
-        cost_1M_out=0.60
-    ),
-
-    # --- OpenRouter open-source models ---
-    # Source: OpenRouter model catalog / free open-source models.
-    "llama-3.1-8b-instruct-free": ModelInfo(
-        provider=PROVIDER_OPENROUTER,
-        model_id="meta-llama/llama-3.1-8b-instruct:free",
-        max_context=128_000,
-        cost_1M_in=0.0,
-        cost_1M_out=0.0,
-    ),
-    "qwen2.5-7b-instruct-free": ModelInfo(
-        provider=PROVIDER_OPENROUTER,
-        model_id="qwen/qwen-2.5-7b-instruct:free",
-        max_context=128_000,
-        cost_1M_in=0.0,
-        cost_1M_out=0.0,
-    ),
 
     "cost_stub_all_lines_ranked": ModelInfo(
         provider=PROVIDER_DEBUG,
         model_id="all_lines_ranked",
         max_context=128_000,
-        cost_1M_in=0.0,
-        cost_1M_out=0.0
+        # Dummy cost to match quen 
+        cost_1M_in=0.15,   
+        cost_1M_out=0.8
     ),
 
     # Debug Interactive
@@ -142,34 +146,52 @@ class LLM:
     def get_my_cost_statistics(self):
         return self.get_my_cost_statisitcs()
 
-    def get_cost_statistics(self, model : ModelInfo):
-        mi = model
+    def get_cost_snapshot(self, model: ModelInfo | None = None) -> LLMCostSnapshot:
+        mi = self.model if model is None else model
 
+        # Rule of thumb for rough token accounting in plain-text prompts/responses.
         how_many_chars_per_token = 3
         num_tokens_input = self.total_chars_prompted / how_many_chars_per_token
         num_tokens_output = self.total_chars_response / how_many_chars_per_token
-        
+
         cost_input = (num_tokens_input / 1_000_000) * mi.cost_1M_in
         cost_output = (num_tokens_output / 1_000_000) * mi.cost_1M_out
-
         cost_reasoning = (self.reasoning_tokens_output / 1_000_000) * mi.cost_1M_out
-     
         total_cost = cost_input + cost_output + cost_reasoning
 
-        print(f"Expected Prices Model name: {self.name} Model id: {model.model_id}")
+        return LLMCostSnapshot(
+            model_name=self.name,
+            model_id=mi.model_id,
+            total_prompts=self.prompt_number,
+            total_chars_prompted=self.total_chars_prompted,
+            total_chars_response=self.total_chars_response,
+            total_tokens_input=num_tokens_input,
+            total_tokens_output=num_tokens_output,
+            total_tokens_output_reason=float(self.reasoning_tokens_output),
+            cost_input_usd=cost_input,
+            cost_output_usd=cost_output,
+            cost_output_reason_usd=cost_reasoning,
+            total_cost_usd=total_cost,
+        )
+
+    def get_cost_statistics(self, model : ModelInfo):
+        snapshot = self.get_cost_snapshot(model)
+
+        print(f"Expected Prices Model name: {snapshot.model_name} Model id: {snapshot.model_id}")
         print(f"{'Statistic':<40}{'Value':<20}")
         print("=" * 40)
-        print(f"{'Total Prompts ':<40}{self.prompt_number:<20}")
-        print(f"{'Total Chars Prompted ':<40}{self.total_chars_prompted:<20}")
-        print(f"{'Total Chars Response ':<40}{self.total_chars_response:<20}")
-        print(f"{'Total Tokens Input ':<40}{num_tokens_input:<20.2f}")
-        print(f"{'Total Tokens Output ':<40}{num_tokens_output:<20.2f}")
-        print(f"{'Total Tokens Output Reason':<40}{self.reasoning_tokens_output:<20.2f}")
-        print(f"{'Cost Input ($) ':<40}{cost_input:<20.6f}")
-        print(f"{'Cost Output ($) ':<40}{cost_output:<20.6f}")
-        print(f"{'Cost Output Reason($) ':<40}{cost_reasoning:<20.6f}")
-        print(f"{'Total Cost ($) ':<40}{total_cost:<20.6f}")
+        print(f"{'Total Prompts ':<40}{snapshot.total_prompts:<20}")
+        print(f"{'Total Chars Prompted ':<40}{snapshot.total_chars_prompted:<20}")
+        print(f"{'Total Chars Response ':<40}{snapshot.total_chars_response:<20}")
+        print(f"{'Total Tokens Input ':<40}{snapshot.total_tokens_input:<20.2f}")
+        print(f"{'Total Tokens Output ':<40}{snapshot.total_tokens_output:<20.2f}")
+        print(f"{'Total Tokens Output Reason':<40}{snapshot.total_tokens_output_reason:<20.2f}")
+        print(f"{'Cost Input ($) ':<40}{snapshot.cost_input_usd:<20.6f}")
+        print(f"{'Cost Output ($) ':<40}{snapshot.cost_output_usd:<20.6f}")
+        print(f"{'Cost Output Reason($) ':<40}{snapshot.cost_output_reason_usd:<20.6f}")
+        print(f"{'Total Cost ($) ':<40}{snapshot.total_cost_usd:<20.6f}")
         print("=" * 40)
+        return snapshot
 
     def reset_all_measurement(self):
         self.total_chars_prompted = 0

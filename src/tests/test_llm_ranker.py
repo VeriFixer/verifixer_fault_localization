@@ -13,7 +13,7 @@ def test_llm_ranker_with_stub_returns_sequential_ranking(tmp_path: Path):
         encoding="utf-8",
     )
 
-    ranker = LLMRanker(name="llm_stub_all_lines_ranked")
+    ranker = LLMRanker(name="llm_real")
     predictions = ranker.get_fault_localization(source)
 
     assert predictions == [1, 2, 3, 4]
@@ -23,7 +23,7 @@ def test_llm_ranker_builds_numbered_prompt(tmp_path: Path):
     source = tmp_path / "sample.dfy"
     source.write_text("line one\nline two\n", encoding="utf-8")
 
-    ranker = LLMRanker(name="llm_stub_all_lines_ranked")
+    ranker = LLMRanker(name="llm_real")
     ranker.get_fault_localization(source)
 
     prompt, response = ranker.llm.get_chat_history()

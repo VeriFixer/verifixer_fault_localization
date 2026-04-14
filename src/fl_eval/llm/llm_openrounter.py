@@ -100,6 +100,7 @@ class OpenRouter_LLM(LLM):
         return ""
 
     def _get_response(self, prompt: str) -> str:
+        time.sleep(2)
         if self.api_key is None:
             return "Mock Reply"
 
@@ -155,7 +156,5 @@ class OpenRouter_LLM(LLM):
         self.chat_history.append({"role": "user", "content": prompt})
         self.chat_history.append({"role": "assistant", "content": reply})
 
-        if self.response_delay_seconds > 0:
-            time.sleep(self.response_delay_seconds)
 
         return reply

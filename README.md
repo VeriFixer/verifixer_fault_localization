@@ -1,241 +1,140 @@
 # Fault Localization for Dafny Programs
 
-This repository implements and evaluates **fault localization techniques for Dafny programs**. The core evaluation framework computes the **EXAM score** for different ranking strategies, using datasets built from Dafny programs and their mutated variants.
+This repository evaluates **fault localization techniques for Dafny programs** using the **EXAM score** metric on mutated Dafny datasets.
 
 ---
 
-## Getting the Repository
+## Quick Start
 
-To properly set up this repository, you need to clone it with submodules and (optionally) download large dataset files via Git LFS.
+### With Docker (recommended)
+
+See [README_DOCKER.md](README_DOCKER.md) for complete setup.
 
 ### Clone with Submodules
-
-This repository uses submodules, so you must clone it recursively:
 
 ```shell
 git clone --recurse-submodules git@github.com:VeriFixer/verifixer_fault_localization.git
 cd verifixer_fault_localization
-```
-If you already cloned without submodules, run:
-```shell
-git submodule update --init --recursive
-```
-
-To make the repository's custom Git hooks active in this clone, run:
-```shell
 ./scripts/install-git-hooks.sh
 ```
-This configures `core.hooksPath` to use the tracked hooks in `.githooks/`, including the pre-push health check.
 
-### (Optional) Download Prebuilt Datasets with Git LFS
+### Pull Large Dataset Files (Git LFS)
 
-Some large files (e.g., prebuilt datasets) are stored using Git LFS.
+Large dataset files are stored using **Git LFS**. To download them:
 
-First, install Git LFS:
 ```shell
 git lfs install
-```
-Then pull the LFS files:
-```shell
 git lfs pull
 ```
-If you skip this step, the repository will still work, but you may need to regenerate datasets manually.
 
+> **Note:** If you skip this step, Git will store LFS pointers instead of actual files. The repository will still work, but you may need to manually regenerate datasets or download them separately.
 
-## Quick Start with Docker
+### Run Evaluation
 
-For the easiest setup, use the provided Docker environment. This includes Dafny, Python dependencies, and all tools pre-installed. See README_DOCKER.md for how to set up.
+```bash
+# Single technique on dataset
+python src/run_1_model.py random datasets/pos_test
 
-If there is a necessity to not use Docker, all dependencies can be seen also in README_DOCKER.md
+# All techniques
+python src/run_all_models.py datasets/pos_test
 
-## Agent / Contributor Onboarding
-
-If you are using an automated coding agent or you are new to this repo, read:
-
-- [AGENTS.md](AGENTS.md)
-
-It contains high-signal entry points, canonical validation commands, cache format notes, and common pitfalls.
-
-## Project Layout (Quick Overview)
-
-- `src/` — Main Python evaluation framework.
-  - `run_1_model.py` — Run one technique and compute EXAM score.
-  - `run_1_model_1_example.py` — Run one technique on a single mutant file and report its score.
-  - `run_all_models.py` — Run all implemented techniques and generate summary tables + plots.
-  - `run_repo_health_check.py` — Complete repository health check (type check + tests + safeguard).
-  - `pos_mutation/` — Example dataset: contains `killed/` and `original/` subfolders.
-- `strategies/` — (Optional) C# helper projects used by some strategies.
-- `datasets/` — Dataset tarballs (Git LFS tracked) and extracted datasets used at runtime.
-- `mutdafny/` — Mutation tool integration.
-- `dafny/` — Dafny source code and tools.
+# Health check (type check + tests + safeguard)
+python src/run_repo_health_check.py --clean-cache
+```
 
 ---
 
 ## Dataset Structure
 
-The evaluation scripts expect a dataset directory containing **two subfolders**:
-
-- `original/` — the original (passing) Dafny programs
-- `killed/` — mutated versions of the originals that contain failing assertions
-
-Example paths in this repo:
-
-- `src/pos_mutation/` (larger dataset)
-- `datasets/pos_test/` (smaller test dataset, extracted from `datasets/pos_test.tar.gz`)
-
-`pos_test` is stored as a tarball in `datasets/pos_test.tar.gz` (LFS tracked), matching the policy used for other datasets.
-
-Each mutation entry is represented as a `.txt` diff file (`killed/*.txt`) and a corresponding `.dfy` mutant (`killed/*.dfy`).
-
-### Generating Datasets (Optional)
-
-If you need to generate datasets:
-
-```bash
-./src/generate_mutdafny_dataset.sh
-./src/clean_mutdafny_datset.sh
-./src/get_pos.sh
+Expected format:
+```
+<dataset>/
+├── original/     # Passing Dafny programs
+└── killed/       # Mutated versions with failing assertions
 ```
 
-This creates datasets in `datasets/dafnybench_all_mutants` and `datasets/dafnybench_original_can_run`.
-
-> Skip if using provided datasets.
+Example: `datasets/pos_test/` (extracted from `datasets/pos_test.tar.gz`)
 
 ---
 
-## Running the Evaluation
+## Available Techniques
 
-### Run a single technique
+### Standard Techniques
+- `random` — randomly ranks all lines
+- `counterBase` — uses Dafny counterexample output
+- `counterExampleIf` — extends counterexample parsing to include `if` decision points
+- `counterExampleIfReassume` — adds extra paths by assuming false on branches
+- `empty` — baseline returning no predictions
+- `autofixDefault`, `autofixSimplified` — AutoFix-based ranking
 
+### LLM-Based Techniques
+
+#### `llm_without_api` (interactive, no API calls)
+Useful for debugging the complete pipeline without external LLM calls:
 ```bash
-python src/run_1_model.py <technique> <dataset_path>
+python src/run_1_model.py llm_without_api datasets/pos_test
 ```
 
-Example:
-
+#### `llm_real` (pluggable LLM model via environment variable)
+Default uses stub mode (`cost_stub_all_lines_ranked`):
 ```bash
-python src/run_1_model.py random src/pos_mutation
+python src/run_1_model.py llm_real datasets/pos_test
 ```
 
-### Run a single technique on one example file
-
+Swap backing model via `LLM_REAL_MODEL_NAME`:
 ```bash
-python src/run_1_model_1_example.py <technique> <dfy_file_path>
+LLM_REAL_MODEL_NAME=qwen3-coder-next python src/run_1_model.py llm_real datasets/pos_test
 ```
 
-Example:
+Currently supported models:
+- `cost_stub_all_lines_ranked` — stub mode for testing (no API calls)
+- `without_api` — interactive debugging mode
+- `qwen3-coder-next` — Qwen3 Coder Next model via OpenRouter
 
+**To add new models:** Add entries to `MODEL_REGISTRY` in `src/fl_eval/llm/llm_configurations.py` with model configuration (provider, model ID, context window, costs)
+
+---
+
+## Commands Reference
+
+### Run One Example
 ```bash
-python src/run_1_model_1_example.py random datasets/pos_test/killed/absMax__2.dfy
+python src/run_1_model_1_example.py <technique> <dfy_file>
 ```
+Example: `python src/run_1_model_1_example.py random datasets/pos_test/killed/absMax__2.dfy`
 
-Notes:
-
-- `<dfy_file_path>` must be a mutant `.dfy` file under the dataset `killed/` directory.
-- The dataset root is inferred from that file path.
-- The command clears the corresponding cache entry for that file/technique before recomputing.
-- Output includes the standard summary and the ground-truth/predicted lines for that single example.
-
-### Run all implemented techniques and generate results
-
+### Run Tests & Type Checking
 ```bash
-python src/run_all_models.py src/pos_mutation
-```
-
-### Run infrastructure safeguard on `pos_test`
-
-```bash
-python src/run_pos_test_guard.py --dataset-tar datasets/pos_test.tar.gz --clean-cache
-```
-
-This command will:
-
-- extract `datasets/pos_test.tar.gz` into `datasets/pos_test/`
-- run all techniques with `src/run_all_models.py`
-- verify expected artifacts (plot + per-technique cache outputs)
-
-### Run complete repository health check (recommended)
-
-```bash
-python src/run_repo_health_check.py --clean-cache
-```
-
-This command will:
-
-1. run static type checking (`pyright src`, aligned with Pylance diagnostics)
-2. run Python unit tests (`pytest -q src/tests`)
-3. run the `pos_test` safeguard pipeline
-
-> Note: the missing-parameter issue in `src/small_exp.py` is exactly the kind of problem caught by this type-check step.
-> Even when tests pass, run Pylance (or `pyright src`) to confirm the repository is healthy.
-
-### Run Python unit tests
-
-```bash
-pytest -q
-```
-
-This produces:
-
-- Console summary tables (ASCII + LaTeX)
-- A `benchmark_hybrid_analysis.png` plot (saved next to the dataset directory)
-
-### Run static type checking only
-
-```bash
+pytest -q src/tests
 pyright src
 ```
 
-### Cache behavior
+### Cache Management
 
-Results are cached in `run_artifacts/cached_results/<dataset_name>/` with separate caches per dataset.
+Results cached in `run_artifacts/cached_results/<dataset_name>/<technique>/`
 
-To clean the cache for a specific dataset:
-
+Clear cache:
 ```bash
 rm -rf run_artifacts/cached_results/<dataset_name>
 ```
-
-To clean the cache for a specific technique within a dataset:
-
-```bash
-rm -rf run_artifacts/cached_results/<dataset_name>/<technique_name>
-```
-
----
-
-## Available Fault Localization Techniques
-
-The following techniques are implemented and available out-of-the-box (see `src/run_1_model.py`):
-
-- `random` — randomly ranks all lines in the failing program.
-- `randomOnFailingMethod` — randomly ranks lines from the failing method.
-- `counterBase` — uses Dafny counterexample output to rank suspicious lines.
-- `counterExampleIf` — extends counterexample parsing to include `if` decision points.
-- `counterExampleIfReassume` — extends counterexample parsing to include `if` decision points and that gets extra counterexaples by assuming false on branches to find more paths where postconditions were failing.
-- `empty` — baseline that returns no predictions.
-
-> To see the current list at runtime, run `python src/run_1_model.py --help`.
 
 ---
 
 ## Adding a New Technique
 
-1. Create a new Python file in `src/fl_eval/strategies/`.
-2. Implement a class derived from `fl_eval.core.abstract.FLTechnique`.
-3. Implement:
-
-```python
-def get_fault_localization(dafny_file: Path) -> list[int]:
-    ...
-```
-
-4. Register the strategy in `src/run_1_model.py` by adding it to `TECHNIQUE_MAP`.
+1. Create `src/fl_eval/strategies/my_technique.py`
+2. Implement `class MyTechnique(FLTechnique)` with `get_fault_localization(file: Path) -> list[int]`
+3. Register in `src/fl_eval/util/run_model_common.py` → `TECHNIQUE_CONFIG`
 
 ---
 
-## 📌 Notes & Recommendations
+## Repository Structure
 
-- The evaluation measures **EXAM score**, which corresponds to the effort required to find the fault (lower is better).
-- The pipeline expects a consistent `killed/` / `original/` pairing. Missing pairs will be skipped.
-- Dataset generation scripts depend on a working `mutdafny` and Dafny installation.
+- `src/run_1_model_1_example.py` — run one technique per one particular example
+- `src/run_1_model.py` — run one technique
+- `src/run_all_models.py` — benchmark all techniques
+- `src/fl_eval/strategies/` — technique implementations
+- `datasets/` — dataset directories and tarballs
+- `run_artifacts/` — cached results and outputs
+
+For detailed onboarding, see [AGENTS.md](AGENTS.md).
