@@ -1,7 +1,10 @@
+import argparse
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+import config as gl
 from fl_eval.core.abstract import FLTechnique
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import ExamOutput, compute_exam_score
@@ -25,6 +28,14 @@ class TechniqueConfig:
     technique_class: type[FLTechnique]
     run_on_all_models: bool = False
     autofix_strategy: str = ""
+
+
+@dataclass(frozen=True)
+class MutationContext:
+    diff_path: Path
+    mutant_dfy_path: Path
+    original_file: Path
+    gtruth: GroundTruthAndLineLimit
 
 
 TECHNIQUE_CONFIG: dict[str, TechniqueConfig] = {
@@ -102,36 +113,91 @@ def process_mutation(
     dataset_dir: Path,
 ) -> Optional[ExamOutput]:
     """Process one mutation and return EXAM output, or None if it fails."""
-    mutation_name = diff_path.stem
-    mutant_dfy_path = killed_dir / f"{mutation_name}.dfy"
-
-    if not mutant_dfy_path.is_file():
-        logger.warning(f"Corresponding mutant file not found for {diff_path}. Skipping.")
+    context = build_mutation_context(diff_path, killed_dir, original_dir)
+    if context is None:
         return None
 
     try:
-        base_name_raw = "__".join(mutation_name.split("__")[:-1])
-        original_file = original_dir / f"{base_name_raw}.dfy"
-
-        if not original_file.is_file():
-            logger.error(f"Original file '{original_file.name}' not found. Skipping {mutation_name}.")
-            return None
-
-        gtruth_finder = GroundTruthAndLineLimit(
-            originalfile=original_file,
-            mutantfile=mutant_dfy_path,
-            difffile=diff_path,
-        )
-        return compute_exam_score(fl_technique, gtruth_finder, dataset_dir)
+        return compute_exam_score(fl_technique, context.gtruth, dataset_dir)
 
     except ValueError as e:
-        logger.error(f"Error processing {mutation_name} (Value Error): {e}. Skipping.")
+        logger.error(f"Error processing {context.diff_path.stem} (Value Error): {e}. Skipping.")
     except IOError as e:
-        logger.error(f"File error processing {mutation_name}: {e}. Skipping.")
+        logger.error(f"File error processing {context.diff_path.stem}: {e}. Skipping.")
     except Exception as e:
-        logger.error(f"An unexpected error occurred for {mutation_name}: {e}. Skipping.")
+        logger.error(f"An unexpected error occurred for {context.diff_path.stem}: {e}. Skipping.")
 
     return None
+
+
+def build_mutation_context(diff_path: Path, killed_dir: Path, original_dir: Path) -> MutationContext | None:
+    """Resolve a diff path into all mutation files needed for evaluation."""
+    mutation_name = diff_path.stem
+    mutant_candidates = [
+        killed_dir / f"{mutation_name}.dfy",
+        killed_dir / f"{mutation_name}.test.dfy",
+    ]
+    mutant_dfy_path = next((p for p in mutant_candidates if p.is_file()), None)
+
+    if mutant_dfy_path is None:
+        logger.warning(f"Corresponding mutant file not found for {diff_path}. Skipping.")
+        return None
+
+    base_name_raw = "__".join(mutation_name.split("__")[:-1])
+    original_file = original_dir / f"{base_name_raw}.dfy"
+
+    if not original_file.is_file():
+        logger.error(f"Original file '{original_file.name}' not found. Skipping {mutation_name}.")
+        return None
+
+    gtruth = GroundTruthAndLineLimit(
+        originalfile=original_file,
+        mutantfile=mutant_dfy_path,
+        difffile=diff_path,
+    )
+    return MutationContext(
+        diff_path=diff_path,
+        mutant_dfy_path=mutant_dfy_path,
+        original_file=original_file,
+        gtruth=gtruth,
+    )
+
+
+def execute_single_mutation(
+    flt_name: str,
+    mutant_dfy_path: Path,
+    to_validate_dataset: bool = False,
+) -> tuple[FLTechnique, ExamOutput, MutationContext, Path] | None:
+    """Run one technique for one mutant file and return execution output."""
+    base_path = mutant_dfy_path.parent.parent
+    setup_result = setup_evaluation(flt_name, base_path, to_validate_dataset=to_validate_dataset)
+    if setup_result is None:
+        return None
+
+    fl_technique, killed_dir, original_dir = setup_result
+    mutant_stem = mutant_dfy_path.stem
+    diff_candidates: list[Path] = [killed_dir / f"{mutant_stem}.txt"]
+    if mutant_stem.endswith(".test"):
+        diff_candidates.append(killed_dir / f"{mutant_stem[:-5]}.txt")
+
+    diff_path = next((p for p in diff_candidates if p.exists()), None)
+    if diff_path is None:
+        logger.error(
+            "Diff file not found for mutant %s. Tried: %s",
+            mutant_dfy_path.name,
+            ", ".join(str(p) for p in diff_candidates),
+        )
+        return None
+
+    context = build_mutation_context(diff_path, killed_dir, original_dir)
+    if context is None:
+        return None
+
+    score = process_mutation(diff_path, fl_technique, killed_dir, original_dir, base_path)
+    if score is None:
+        return None
+
+    return fl_technique, score, context, base_path
 
 
 def generate_report(flt_name: str, all_scores: list[ExamOutput]) -> StatsSummaryEntry:
@@ -170,3 +236,44 @@ def generate_report(flt_name: str, all_scores: list[ExamOutput]) -> StatsSummary
     logger.info(f"{'Top-5 Success (%)':38}: {summary.top5_success_method:.6f}")
     logger.info("=" * 76 + "\n")
     return summary
+
+
+def add_run_control_args(parser: argparse.ArgumentParser) -> None:
+    """Add shared run-control flags used by runner CLIs."""
+    parser.add_argument(
+        "--clean-cache",
+        action="store_true",
+        help="Clean cached results before running",
+    )
+    parser.add_argument(
+        "--sequential",
+        action="store_true",
+        help="Run evaluations sequentially",
+    )
+
+
+def prepare_dataset_cache(data_path: Path, clean_cache: bool) -> bool:
+    """Validate dataset path and prepare dataset cache directory state.
+
+    Returns:
+        True when the data path is valid and execution can continue.
+    """
+    if not data_path.exists():
+        logger.error(f"Path not found: {data_path}")
+        return False
+
+    dataset_cache_dir = gl.get_dataset_cache_dir(data_path)
+    if clean_cache:
+        logger.info(f"Cleaning: Results Cache for dataset '{data_path.name}'")
+        if dataset_cache_dir.exists():
+            try:
+                shutil.rmtree(dataset_cache_dir)
+                logger.info(f"Removed dataset cache directory: {dataset_cache_dir}")
+            except OSError as e:
+                logger.error(f"Could not remove cache directory {dataset_cache_dir}: {e}")
+        else:
+            logger.warning(f"No cache directory found at: {dataset_cache_dir}")
+    else:
+        logger.info(f"Using cached results if any at {dataset_cache_dir}")
+
+    return True

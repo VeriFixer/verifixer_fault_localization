@@ -1,23 +1,22 @@
 import argparse
-import shutil
 from pathlib import Path
-from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq, shutdown_parallel_executor
+from fl_eval.util.run_parallel_or_seq import shutdown_parallel_executor
 from fl_eval.metrics.scoring import ExamOutput
 from fl_eval.metrics.summary_stats import StatsSummaryEntry
 from fl_eval.util.run_model_common import (
-    generate_report,
+    add_run_control_args,
     get_techniques_for_all_models,
     get_techniques_for_health_check,
-    process_mutation,
-    setup_evaluation,
+    prepare_dataset_cache,
 )
-import config as gl
+from run_1_model import compute_metrics_one_dataset
 from logging_config import get_logger
 from analysis.data_analysis import print_ascii_table, print_latex_table, generate_plots
+import config as gl
 
 logger = get_logger(__name__)
 
-def run_benchmark(base_path: Path, sequential: bool = False, health_check: bool = False) -> None:
+def compute_metrics(base_path: Path, sequential: bool = False, health_check: bool = False) -> None:
     try:
         techniques_to_run = (
             get_techniques_for_health_check()
@@ -31,36 +30,14 @@ def run_benchmark(base_path: Path, sequential: bool = False, health_check: bool 
 
         for tech_name in techniques_to_run:
             logger.info(f"\n--- Running {tech_name.upper()} ---")
-            setup_res = setup_evaluation(tech_name, base_path)
-            if not setup_res:
+            metrics_output = compute_metrics_one_dataset(tech_name, base_path, sequential)
+            if metrics_output is None:
                 logger.warning(f"Skipping {tech_name} due to setup failure.")
                 continue
-            fl_technique, killed_dir, original_dir = setup_res
-            diff_paths = list(killed_dir.glob("*.txt"))
-            scores_dirty = run_parallel_or_seq(
-                diff_paths,
-                process_mutation,
-                f"Eval {tech_name}",
-                fl_technique,
-                killed_dir,
-                original_dir,
-                base_path,
-                parallel=not sequential
-            )
-            get_costs_fn = getattr(fl_technique, "get_costs", None)
-            if callable(get_costs_fn):
-                try:
-                    cost_output = get_costs_fn()
-                    if cost_output is None:
-                        logger.info(f"[{tech_name}] get_costs() executed.")
-                    else:
-                        logger.info(f"[{tech_name}] costs: {cost_output}")
-                except Exception as e:
-                    logger.warning(f"[{tech_name}] failed to retrieve costs: {e}")
 
-            scores_clean = [s for s in scores_dirty if s is not None]
+            summary, scores_clean = metrics_output
             raw_results[tech_name] = scores_clean
-            stats_summary[tech_name] = generate_report(tech_name, scores_clean)
+            stats_summary[tech_name] = summary
         if not stats_summary:
             logger.info("No results collected.")
             return
@@ -83,18 +60,7 @@ if __name__ == "__main__":
         type=Path,
         help="Path to the directory containing 'killed' and 'original' folders."
     )
-
-    parser.add_argument(
-      "--clean-cache",
-      action="store_true",
-      help="Clean cached results before running"
-    )
-
-    parser.add_argument(
-      "--sequential",
-      action="store_true",
-      help="Run evaluations sequentially"
-    )
+    add_run_control_args(parser)
 
     parser.add_argument(
       "--health-check",
@@ -103,22 +69,5 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    if not args.data_path.exists():
-        logger.error(f"Path not found: {args.data_path}")
-
-    # Compute dataset-specific cache directory
-    dataset_cache_dir = gl.get_dataset_cache_dir(args.data_path)
-    if args.clean_cache:
-        logger.info(f"Cleaning: Results Cache for dataset '{args.data_path.name}'")
-        if dataset_cache_dir.exists():
-            try:
-                shutil.rmtree(dataset_cache_dir)
-                logger.info(f"Removed dataset cache directory: {dataset_cache_dir}")
-            except OSError as e:
-                logger.error(f"Could not remove cache directory {dataset_cache_dir}: {e}")
-        else:
-            logger.warning(f"No cache directory found at: {dataset_cache_dir}")
-    else:
-        logger.info(f"Using cached results if any at {dataset_cache_dir}")
-
-    run_benchmark(args.data_path, args.sequential, args.health_check)
+    if prepare_dataset_cache(args.data_path, args.clean_cache):
+        compute_metrics(args.data_path, args.sequential, args.health_check)

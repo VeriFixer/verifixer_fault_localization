@@ -1,29 +1,46 @@
 
 import argparse
 from pathlib import Path
-import shutil
 
-import config as gl
 from logging_config import get_logger
-from fl_eval.strategies.llm_ranker import LLMRanker
 from fl_eval.metrics.scoring import ExamOutput
+from fl_eval.metrics.summary_stats import StatsSummaryEntry
 from fl_eval.util.run_model_common import (
     TECHNIQUE_MAP,
+    add_run_control_args,
     generate_report,
-    process_mutation,
-    setup_evaluation,
+    prepare_dataset_cache,
 )
+from run_1_model_1_example import compute_metrics_one_example
 
 from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
 
 logger = get_logger(__name__)
 
+def _evaluate_single_mutant(
+    mutant_dfy_path: Path,
+    flt_name: str,
+    enable_pretty_output: bool,
+) -> ExamOutput | None:
+    try:
+        _, score, _, _, _ = compute_metrics_one_example(
+            flt_name,
+            mutant_dfy_path,
+            enable_pretty_output=enable_pretty_output,
+        )
+        return score
+    except Exception as e:
+        logger.error("Error processing %s: %s", mutant_dfy_path.name, e)
+        return None
+
+
 # --- Orchestrator Function ---
-def compute_metrics(
+def compute_metrics_one_dataset(
     flt_name: str,
     base_path: Path,
     sequential: bool = False,
-) -> None:
+    enable_pretty_output: bool = False,
+) -> tuple[StatsSummaryEntry, list[ExamOutput]] | None:
     """
     Receives a technique name and directory, iterates through mutation files, 
     computes EXAM scores, and reports the average.
@@ -33,23 +50,50 @@ def compute_metrics(
         base_path: Path to the dataset directory containing 'killed' and 'original' subdirectories
         sequential: If True, run evaluations sequentially; otherwise run in parallel
     """
-    setup_result = setup_evaluation(flt_name, base_path)
-    if setup_result is None:
-        return
-        
-    fl_technique, killed_dir, original_dir = setup_result
-    all_scores: list[ExamOutput | None] = []
+    if flt_name not in TECHNIQUE_MAP:
+        logger.error("Fault Localization Technique '%s' not recognized.", flt_name)
+        logger.error("Available techniques: %s", list(TECHNIQUE_MAP.keys()))
+        return None
 
-    diff_paths = list(killed_dir.glob("*.txt"))
+    killed_dir = base_path / "killed"
+    if not killed_dir.exists():
+        logger.error("Killed directory not found: %s", killed_dir)
+        return None
 
-    all_scores = run_parallel_or_seq(diff_paths, process_mutation, f"Get metrics for {flt_name}",
-                                     fl_technique, killed_dir, original_dir, base_path, parallel=not sequential)
+    if enable_pretty_output and not sequential:
+        logger.warning(
+            "Pretty output requested in parallel mode; disabling to avoid interleaved terminal output. "
+            "Use --sequential with --pretty-output."
+        )
+        enable_pretty_output = False
+
+    diff_paths = sorted(killed_dir.glob("*.txt"))
+    mutant_paths: list[Path] = []
+    for diff_path in diff_paths:
+        canonical_mutant = killed_dir / f"{diff_path.stem}.dfy"
+        if canonical_mutant.exists():
+            mutant_paths.append(canonical_mutant)
+            continue
+
+        fallback_test_mutant = killed_dir / f"{diff_path.stem}.test.dfy"
+        if fallback_test_mutant.exists():
+            mutant_paths.append(fallback_test_mutant)
+            continue
+
+        logger.warning("No mutant .dfy found for diff %s; skipping.", diff_path.name)
+
+    all_scores = run_parallel_or_seq(
+        mutant_paths,
+        _evaluate_single_mutant,
+        f"Get metrics for {flt_name}",
+        flt_name,
+        enable_pretty_output,
+        parallel=not sequential,
+    )
     all_scores_clean: list[ExamOutput] = [x for x in all_scores if x is not None]
-    generate_report(flt_name, all_scores_clean)
+    summary = generate_report(flt_name, all_scores_clean)
 
-    if flt_name == "llm_stub_all_lines_ranked" and isinstance(fl_technique, LLMRanker):
-        print("LLM expected cost:")
-        fl_technique.get_costs()
+    return summary, all_scores_clean
 
 
 
@@ -85,38 +129,23 @@ How to use:
         help="The path to the parent directory containing the 'killed' and 'original' folders (e.g., datasets/pos_test)."
     )
 
-    parser.add_argument(
-      "--clean-cache",
-      action="store_true",
-      help="Clean cached results before running"
-    )
+    add_run_control_args(parser)
 
     parser.add_argument(
-      "--sequential",
-      action="store_true",
-      help="Run evaluations sequentially"
+        "--pretty-output",
+        action="store_true",
+        help="Forward rich single-file trace output; only effective with --sequential.",
     )
      
     args = parser.parse_args()
     
 
-    # Check if the path exists before proceeding
-    if not args.data_path.exists():
-        logger.error(f"Data path not found: {args.data_path}")
+    if not prepare_dataset_cache(args.data_path, args.clean_cache):
         parser.print_help()
     else:
-        # Compute dataset-specific cache directory
-        dataset_cache_dir = gl.get_dataset_cache_dir(args.data_path)
-        if args.clean_cache:
-            logger.info(f"Cleaning: Results Cache for dataset '{args.data_path.name}'")
-            if dataset_cache_dir.exists():
-                try:
-                    shutil.rmtree(dataset_cache_dir)
-                    logger.info(f"Removed dataset cache directory: {dataset_cache_dir}")
-                except OSError as e:
-                    logger.error(f"Could not remove cache directory {dataset_cache_dir}: {e}")
-            else:
-                logger.warning(f"No cache directory found at: {dataset_cache_dir}")
-        else:
-            logger.info(f"Using cached results if any at {dataset_cache_dir}")
-        compute_metrics(args.technique_name, args.data_path, args.sequential)
+        compute_metrics_one_dataset(
+            args.technique_name,
+            args.data_path,
+            args.sequential,
+            enable_pretty_output=args.pretty_output,
+        )
