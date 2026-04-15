@@ -7,6 +7,7 @@ from fl_eval.util.run_model_common import (
     add_run_control_args,
     get_techniques_for_all_models,
     get_techniques_for_health_check,
+    get_techniques_for_paper_only,
     prepare_dataset_cache,
 )
 from run_1_model import compute_metrics_one_dataset
@@ -79,13 +80,30 @@ def _log_benchmark_llm_cost_totals(
     logger.info(f"{'Total Cost ($)':38}: {aggregate.get('total_cost_usd', 0.0):.6f}")
     logger.info("=" * 76)
 
-def compute_metrics(base_path: Path, sequential: bool = False, health_check: bool = False) -> None:
+
+def validate_run_mode_flags(
+    parser: argparse.ArgumentParser,
+    *,
+    paper_only: bool,
+    health_check: bool,
+) -> None:
+    """Validate incompatible run-mode flags for this CLI."""
+    if paper_only and health_check:
+        parser.error("--paper-only cannot be combined with --health-check")
+
+def compute_metrics(
+    base_path: Path,
+    sequential: bool = False,
+    health_check: bool = False,
+    paper_only: bool = False,
+) -> None:
     try:
-        techniques_to_run = (
-            get_techniques_for_health_check()
-            if health_check
-            else get_techniques_for_all_models()
-        )
+        if paper_only:
+            techniques_to_run = get_techniques_for_paper_only()
+        elif health_check:
+            techniques_to_run = get_techniques_for_health_check()
+        else:
+            techniques_to_run = get_techniques_for_all_models()
         logger.info(f"Starting Benchmark on: {base_path}")
         logger.info(f"Techniques to run: {techniques_to_run}")
         raw_results: dict[str, list[ExamOutput]] = {}
@@ -132,11 +150,22 @@ if __name__ == "__main__":
     add_run_control_args(parser)
 
     parser.add_argument(
-      "--health-check",
-      action="store_true",
-      help="Run reduced technique set for repository health checks (skips slow techniques)."
+        "--health-check",
+        action="store_true",
+        help="Run reduced technique set for repository health checks (skips slow techniques)."
+    )
+    parser.add_argument(
+        "--paper-only",
+        action="store_true",
+        help="Run only the final-paper technique subset and use publication aliases in outputs."
     )
 
     args = parser.parse_args()
+    validate_run_mode_flags(
+        parser,
+        paper_only=args.paper_only,
+        health_check=args.health_check,
+    )
+
     if prepare_dataset_cache(args.data_path, args.clean_cache):
-        compute_metrics(args.data_path, args.sequential, args.health_check)
+        compute_metrics(args.data_path, args.sequential, args.health_check, args.paper_only)

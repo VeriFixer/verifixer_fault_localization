@@ -1,10 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from scipy.stats import ttest_ind, mannwhitneyu, shapiro  # type: ignore
 from pathlib import Path
 from typing import Any, Callable, cast
 from fl_eval.metrics.scoring import ExamOutput
 from fl_eval.metrics.summary_stats import StatsSummaryEntry
+from fl_eval.util.run_model_common import get_technique_display_name
 from logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -51,6 +53,7 @@ def _print_ascii_scope_table(
     print(separator)
 
     for name, data in stats.items():
+        display_name = get_technique_display_name(name)
         count = get_count(data)
         exam1 = get_exam_1(data)
         exam2 = get_exam_2(data)
@@ -60,7 +63,7 @@ def _print_ascii_scope_table(
         topk = f"{get_top1(data):.1f}/{get_top3(data):.1f}/{get_top5(data):.1f}"
 
         print(
-            f"| {name:<{w_tech}} | {count:<{w_count}} | {exam1:<{w_exam}.4f} | {exam2:<{w_exam}.4f} | "
+            f"| {display_name:<{w_tech}} | {count:<{w_count}} | {exam1:<{w_exam}.4f} | {exam2:<{w_exam}.4f} | "
             f"{exam3:<{w_exam}.4f} | {found:<{w_rate}.2f} | {empty:<{w_rate}.2f} | {topk:<{w_topk}} |"
         )
 
@@ -112,7 +115,7 @@ def print_latex_table(stats: dict[str, StatsSummaryEntry]):
     print(r"        \hline")
 
     for name, data in stats.items():
-        clean_name = name.replace("_", r"\_")
+        clean_name = get_technique_display_name(name).replace("_", r"\_")
         print(
             f"        {clean_name} & {data.avg_exam_file:.4f} & {data.avg_exam_found_file:.4f} & {data.avg_exam_not_empty_file:.4f} & {data.found_rate_file:.2f} & {data.exist_rate_file * 100.0:.2f} \\\\"  # noqa: E501
         )
@@ -134,7 +137,7 @@ def print_latex_table(stats: dict[str, StatsSummaryEntry]):
     print(r"        \hline")
 
     for name, data in stats.items():
-        clean_name = name.replace("_", r"\_")
+        clean_name = get_technique_display_name(name).replace("_", r"\_")
         print(
             f"        {clean_name} & {data.avg_exam_method:.4f} & {data.avg_exam_found_method:.4f} & {data.avg_exam_not_empty_method:.4f} & {data.found_rate_method:.2f} & {data.exist_rate_method * 100.0:.2f} \\\\"  # noqa: E501
         )
@@ -156,7 +159,7 @@ def print_latex_table(stats: dict[str, StatsSummaryEntry]):
     print(r"        \hline")
 
     for name, data in stats.items():
-        clean_name = name.replace("_", r"\_")
+        clean_name = get_technique_display_name(name).replace("_", r"\_")
         print(
             f"        {clean_name} & {data.top1_success_file:.2f} & {data.top3_success_file:.2f} & {data.top5_success_file:.2f} \\\\"  # noqa: E501
         )
@@ -178,7 +181,7 @@ def print_latex_table(stats: dict[str, StatsSummaryEntry]):
     print(r"        \hline")
 
     for name, data in stats.items():
-        clean_name = name.replace("_", r"\_")
+        clean_name = get_technique_display_name(name).replace("_", r"\_")
         print(
             f"        {clean_name} & {data.top1_success_method:.2f} & {data.top3_success_method:.2f} & {data.top5_success_method:.2f} \\\\"  # noqa: E501
         )
@@ -195,15 +198,26 @@ def print_latex_table(stats: dict[str, StatsSummaryEntry]):
 
 def _plot_scope(raw_results: dict[str, list[ExamOutput]], output_prefix: Path, scope: str, title: str):
     labels = [tech for tech, vals in raw_results.items() if vals]
+    display_labels = [get_technique_display_name(tech) for tech in labels]
     if not labels:
         return
 
-    # Extra-large typography for legibility in double-column papers
-    title_font = 24
-    label_font = 20
-    tick_font = 17
-    legend_font = 16
-    annotation_font = 16
+    # Paper-friendly sizing for two-column layouts.
+    figure_size = (7.0, 3.9)
+    label_font = 10
+    tick_font = 9
+    legend_font = 8
+    # Okabe-Ito palette for color-blind accessibility.
+    palette = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9", "#F0E442", "#000000"]
+    technique_colors = {tech: palette[i % len(palette)] for i, tech in enumerate(labels)}
+    hatch_patterns = ["", "//", "xx", "..", "\\\\", "++", "oo", "--"]
+    technique_hatches = {tech: hatch_patterns[i % len(hatch_patterns)] for i, tech in enumerate(labels)}
+    line_styles: list[Any] = ["-", "--", "-.", ":", (0, (3, 1, 1, 1)), (0, (5, 1)), (0, (1, 1)), (0, (3, 2, 1, 2))]
+    technique_line_styles: dict[str, Any] = {tech: line_styles[i % len(line_styles)] for i, tech in enumerate(labels)}
+    line_widths = [3.4, 3.0, 2.8, 2.6, 2.4, 3.2, 2.2, 2.9]
+    technique_line_widths = {tech: line_widths[i % len(line_widths)] for i, tech in enumerate(labels)}
+    median_color = "#CC79A7"
+    mean_color = "#D55E00"
 
     get_score: Callable[[ExamOutput], float]
     get_found: Callable[[ExamOutput], bool]
@@ -215,30 +229,58 @@ def _plot_scope(raw_results: dict[str, list[ExamOutput]], output_prefix: Path, s
         get_found = lambda x: x.found_method
 
     box_data = [np.array([get_score(x) for x in raw_results[tech]]) for tech in labels]
-    fig1, ax1 = cast(Any, plt.subplots(1, 1, figsize=(12, 8)))  # type: ignore[reportUnknownMemberType]
-    ax1.boxplot(
+    fig1, ax1 = cast(Any, plt.subplots(1, 1, figsize=figure_size))  # type: ignore[reportUnknownMemberType]
+    boxplot_artists = ax1.boxplot(
         box_data,
-        tick_labels=labels,
+        tick_labels=display_labels,
         orientation="vertical",
         showfliers=False,
         showmeans=True,
         widths=0.45,
+        patch_artist=True,
+        whiskerprops={"color": "#4D4D4D", "linewidth": 1.1},
+        capprops={"color": "#4D4D4D", "linewidth": 1.1},
+        meanprops={
+            "marker": "D",
+            "markerfacecolor": mean_color,
+            "markeredgecolor": mean_color,
+            "markersize": 5,
+        },
+        medianprops={"color": median_color, "linewidth": 1.6},
     )
-    ax1.set_title(f"{title} - Score Distribution", fontsize=title_font, fontweight="bold")
-    ax1.set_ylabel("EXAM Score (Lower is Better)", fontsize=label_font)
+    for box, tech in zip(boxplot_artists["boxes"], labels):
+        box.set_facecolor("white")
+        box.set_edgecolor("#4D4D4D")
+        box.set_alpha(1.0)
+    #ax1.set_title(f"{title}", fontsize=title_font, fontweight="bold")
+    ax1.set_ylabel("EXAM Score", fontsize=label_font)
     ax1.set_xlabel("Technique", fontsize=label_font)
     ax1.set_ylim(-0.02, 1.05)
-    ax1.grid(axis="y", linestyle="--", alpha=0.3)
+    ax1.grid(axis="y", linestyle="--", alpha=0.35, color="#9E9E9E")
     ax1.tick_params(axis="x", rotation=20, labelsize=tick_font)
     ax1.tick_params(axis="y", labelsize=tick_font)
+    summary_legend_handles = [
+        Line2D([0], [0], color=median_color, lw=1.8, label="Median"),
+        Line2D(
+            [0],
+            [0],
+            marker="D",
+            linestyle="None",
+            markerfacecolor=mean_color,
+            markeredgecolor=mean_color,
+            markersize=5,
+            label="Mean",
+        ),
+    ]
+    ax1.legend(handles=summary_legend_handles, loc="upper right", fontsize=legend_font)
 
     distribution_file = Path(f"{output_prefix}_distribution.png")
     plt.tight_layout()
     plt.savefig(distribution_file, dpi=300, bbox_inches="tight")  # type: ignore
     plt.close(fig1)
 
-    fig2, ax2 = cast(Any, plt.subplots(1, 1, figsize=(12, 8)))  # type: ignore[reportUnknownMemberType]
-    ax2.set_title(f"{title} - Success vs Inspection Effort", fontsize=title_font, fontweight="bold")
+    fig2, ax2 = cast(Any, plt.subplots(1, 1, figsize=figure_size))  # type: ignore[reportUnknownMemberType]
+    #ax2.set_title(f"{title}", fontsize=title_font, fontweight="bold")
 
     for tech in labels:
         tech_data = sorted(raw_results[tech], key=get_score)
@@ -247,17 +289,26 @@ def _plot_scope(raw_results: dict[str, list[ExamOutput]], output_prefix: Path, s
         y_vals = np.cumsum(found_flags) / len(raw_results[tech])
         plot_x = scores + [1.0]
         plot_y = list(y_vals) + [float(y_vals[-1])]
-        line = ax2.step(plot_x, plot_y, where="post", label=tech, lw=2.8)[0]
-        ax2.text(1.03, y_vals[-1], f"{(y_vals[-1] * 100):.1f}%", color=line.get_color(), va="center", fontsize=annotation_font)
+        ax2.step(
+            plot_x,
+            plot_y,
+            where="post",
+            label=get_technique_display_name(tech),
+            lw=technique_line_widths[tech],
+            color=technique_colors[tech],
+            linestyle=technique_line_styles[tech],
+        )[0]
+        #ax2.text(1.03, y_vals[-1], f"{(y_vals[-1] * 100):.1f}%", color=line.get_color(), va="center", fontsize=annotation_font)
 
     for thresh in [0.01, 0.05, 0.10, 0.25, 0.50]:
-        ax2.axvline(x=thresh, color="gray", linestyle="--", alpha=0.3)
+        ax2.axvline(x=thresh, color="#7F7F7F", linestyle="--", alpha=0.35)
 
-    ax2.set_xlabel("EXAM Score Threshold (Effort)", fontsize=label_font)
-    ax2.set_ylabel("% of Total Faults Found", fontsize=label_font)
-    ax2.set_xlim(0, 1.18)
+    ax2.set_xlabel("EXAM Score Threshold", fontsize=label_font)
+    ax2.set_ylabel("Faults Found (%)", fontsize=label_font)
+    ax2.set_xlim(0, 1.0)
+    ax2.margins(x=0)
     ax2.set_ylim(0, 1.05)
-    ax2.grid(True, linestyle=":", alpha=0.6)
+    ax2.grid(True, linestyle=":", alpha=0.45, color="#9E9E9E")
     ax2.tick_params(axis="x", labelsize=tick_font)
     ax2.tick_params(axis="y", labelsize=tick_font)
     ax2.legend(loc="lower right", fontsize=legend_font)

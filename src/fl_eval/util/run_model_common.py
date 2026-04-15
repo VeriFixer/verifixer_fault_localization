@@ -45,7 +45,7 @@ TECHNIQUE_CONFIG: dict[str, TechniqueConfig] = {
     "randomOnFailingMethod": TechniqueConfig(RandomLineOfMethodThatFails, run_on_all_models=True),
     "counterExampleIf": TechniqueConfig(CounterExampleIf, run_on_all_models=True),
     "counterExampleIfReassume": TechniqueConfig(CounterExampleIfReassume, run_on_all_models=True),
-    #"autofixDefault": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-and-static-score", run_on_all_models=True),
+    "autofixDefault": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-and-static-score", run_on_all_models=False),
     #"autofixSimplified": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-score-only", run_on_all_models=True),
     "llm_without_api": TechniqueConfig(LLMRanker, run_on_all_models=False),
     "llm_real": TechniqueConfig(LLMRanker, run_on_all_models=True),
@@ -56,10 +56,40 @@ TECHNIQUE_MAP: dict[str, tuple[type[FLTechnique], str]] = {
     name: (cfg.technique_class, cfg.autofix_strategy) for name, cfg in TECHNIQUE_CONFIG.items()
 }
 
+PAPER_ONLY_TECHNIQUES: list[str] = [
+    "randomOnFailingMethod",
+    "counterBase",
+    "counterExampleIfReassume",
+    "llm_real",
+    "autofixDefault",
+]
+
+PAPER_TECHNIQUE_ALIASES: dict[str, str] = {
+    "randomOnFailingMethod": "RAND",
+    "counterBase": "CNTS",
+    "counterExampleIfReassume": "CNTM",
+    "llm_real": "LLM",
+    "autofixDefault": "SNAP",
+}
+
 
 def get_techniques_for_all_models() -> list[str]:
     """Return techniques explicitly enabled for run_all_models and guard pipelines."""
     return [name for name, cfg in TECHNIQUE_CONFIG.items() if cfg.run_on_all_models]
+
+
+def get_techniques_for_paper_only() -> list[str]:
+    """Return final-paper technique subset.
+
+    Missing techniques are skipped so this remains resilient if a strategy is
+    temporarily unavailable in local environments.
+    """
+    return [name for name in PAPER_ONLY_TECHNIQUES if name in TECHNIQUE_MAP]
+
+
+def get_technique_display_name(name: str) -> str:
+    """Return publication-friendly display name for a technique key."""
+    return PAPER_TECHNIQUE_ALIASES.get(name, name)
 
 
 def get_techniques_for_health_check() -> list[str]:

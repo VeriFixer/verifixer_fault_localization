@@ -125,7 +125,7 @@ def test_generate_plots_creates_output_file(tmp_path: Path):
 
 def test_print_ascii_table_includes_new_non_empty_prediction_columns():
     stats = {
-        "tech1": StatsSummaryEntry(
+        "randomOnFailingMethod": StatsSummaryEntry(
             count=3,
             avg_exam_file=0.3333,
             avg_exam_not_empty_file=0.1234,
@@ -146,13 +146,14 @@ def test_print_ascii_table_includes_new_non_empty_prediction_columns():
     assert any("FILE SCOPE" in call for call in calls)
     assert any("METHOD SCOPE" in call for call in calls)
     assert any("EXAM_3" in call for call in calls)
+    assert any("RAND" in call for call in calls)
     assert any("0.1234" in call for call in calls)
     assert any("0.5678" in call for call in calls)
 
 
 def test_print_latex_table_includes_new_non_empty_prediction_columns():
     stats = {
-        "tech1": StatsSummaryEntry(
+        "counterBase": StatsSummaryEntry(
             count=2,
             avg_exam_file=0.5,
             avg_exam_not_empty_file=0.125,
@@ -172,6 +173,7 @@ def test_print_latex_table_includes_new_non_empty_prediction_columns():
     calls = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
     assert any("\\textbf{Technique} & \\textbf{EXAM$_1$} & \\textbf{EXAM$_2$} & \\textbf{EXAM$_3$} & \\textbf{Found(\\%)} & \\textbf{Empty(\\%)}" in call for call in calls)
     assert any("Evaluated on 2 examples." in call for call in calls)
+    assert any("CNTS" in call for call in calls)
     assert any("0.1250" in call for call in calls)
     assert any("0.8750" in call for call in calls)
     assert any("50.00" in call for call in calls)

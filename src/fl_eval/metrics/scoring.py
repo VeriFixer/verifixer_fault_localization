@@ -185,7 +185,11 @@ def _compute_exam_score_in_scope(
             # Comput expected rank
             expected_position_in_unranked = (remaining_unranked_lines - 1) / 2
             rank = lines_inspected_so_far + expected_position_in_unranked
-
+    else:
+        # if found but basically saw more lines that the method has
+        # consider simply worse case
+        if(rank >= (total_lines -1)):
+            rank = total_lines -1
     exam_score = rank / (total_lines - 1)
     return ExamScore(score=exam_score, 
                      found=found_in_predictions, 
