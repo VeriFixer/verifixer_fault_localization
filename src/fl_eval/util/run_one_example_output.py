@@ -1,3 +1,4 @@
+import json
 import shutil
 from pathlib import Path
 from typing import Any, cast
@@ -136,7 +137,7 @@ def print_counterexample_trace_if_available(
     print(colored(f"Nodes Parsed: {summary.node_count}", Color.CYAN))
     print(colored(f"Unique Lines: {summary.unique_line_count}", Color.CYAN))
     print(colored("Raw:", Color.CYAN))
-    print(summary.raw)
+    print(json.dumps(summary.raw, indent=2))
 
     print("\n" + colored("TOP SUSPICIOUS LINES (frequency)", Color.BLUE + Color.BOLD))
     print(separator("-"))

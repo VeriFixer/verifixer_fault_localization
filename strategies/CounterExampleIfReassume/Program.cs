@@ -74,8 +74,8 @@ namespace CounterExampleIfReassume
             var report = await CollectSuspiciousLinesAsync(TempWorkDir);
 
             WriteJsonOutput(report);
-            
-            Directory.Delete(TempWorkDir, true); 
+
+            Directory.Delete(TempWorkDir, true);
             return 0;
         }
 
@@ -137,7 +137,7 @@ namespace CounterExampleIfReassume
 
         private static void WriteJsonOutput(CounterExampleReport report)
         {
-            var json = JsonSerializer.Serialize(report);
+            var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true });
             Console.WriteLine("JSON_OUTPUT_START");
             Console.WriteLine(json);
             Console.WriteLine("JSON_OUTPUT_END");
@@ -250,9 +250,10 @@ namespace CounterExampleIfReassume
 
     class VerificationConfig
     {
-        public string ProgramFile { get; init; }
-        public string MethodName { get; init; }
-        public string PostCondition { get; init; }
+        public string ProgramFile { get; init; } = string.Empty;
+        public string MethodName { get; init; } = string.Empty;
+        public string PostCondition { get; init; } = string.Empty;
+        public int PostConditionLine { get; init; } = -1;
     }
 
 
@@ -308,7 +309,7 @@ namespace CounterExampleIfReassume
 
             foreach (var fail in failedResults)
             {
-                var (nextFiles, _) = await handler.Handle(fail, currentConfig, options, TempWorkDir);
+                var (nextFiles, _) = await handler.Handle(fail, currentConfig, TempWorkDir);
                 nextConfigurations.AddRange(nextFiles);
             }
 
@@ -334,7 +335,6 @@ namespace CounterExampleIfReassume
     {
         private readonly VerificationConfig config;
         private readonly Microsoft.Dafny.Program program;
-        private readonly Microsoft.Dafny.Program TempFolder;
 
         public VerificationFailureHandler(
             VerificationConfig config,
@@ -344,7 +344,7 @@ namespace CounterExampleIfReassume
             this.program = program;
         }
 
-        public async Task<(List<VerificationConfig>, Boolean)> Handle(CanVerifyResult fail, VerificationConfig programConfig, DafnyOptions options, string TempWorkDir)
+        public async Task<(List<VerificationConfig>, Boolean)> Handle(CanVerifyResult fail, VerificationConfig programConfig, string TempWorkDir)
         {
             List<VerificationConfig> next_files = new();
             Boolean createdWrites = false;
@@ -357,79 +357,78 @@ namespace CounterExampleIfReassume
                 method.Name != config.MethodName)
                 return (next_files, createdWrites);
 
-            // Only extract and analyze state positions on the original program file,
-            // not on recursively-generated variants.
-            bool isOriginalProgram = Path.GetFileName(config.ProgramFile) == Path.GetFileName(programConfig.ProgramFile);
-            AnalysisResult analysis = AnalysisResult.Empty;
+            var counterExamples = analyzer.ExtractCounterExamplesFromCli(programConfig.ProgramFile);
 
-            var statePositions = analyzer.ExtractStatePositionsFromCli(programConfig.ProgramFile);
-            analysis = analyzer.Analyze(statePositions, method.Body);
-            
-            if (isOriginalProgram)
+            foreach (var counterExample in counterExamples)
             {
-
-                // Baseline guarantee: emit at least CLI-extracted state lines even if Dafny task
-                // counterexamples are absent for this failing method.
-                if (analysis.RawStateLines.Count > 0)
-                {
-                    var baselineMutator = new ProgramMutator(TempWorkDir);
-                    baselineMutator.writeSolutionNode(program, analysis, "unknown", -1);
-                    createdWrites = true;
-                }
-            }
-
-
-            foreach (var taskResult in fail.Results)
-            {
-                bool hasCounterexamples = taskResult.Result.CounterExamples.Any();
-                if (!hasCounterexamples)
+                if (!ShouldProcessCounterExample(programConfig, counterExample))
                 {
                     continue;
                 }
 
-                foreach (var ce in taskResult.Result.CounterExamples)
+                var analysis = analyzer.Analyze(counterExample.StatePositions, method.Body);
+
+                if (analysis.SuspiciousNodes.Count == 0 && analysis.RawStateLines.Count == 0)
                 {
-                    if (analysis.SuspiciousNodes.Count == 0 && analysis.RawStateLines.Count == 0)
-                    {
-                        continue; // If we cannot find any suspicious node we cannot do much with this counterexample
-                    }
+                    continue;
+                }
 
-                    var postcondition = ce.FailingAssert.ToString();
-                    var postconditionLine = ce.FailingAssert.Line;
+                if (counterExample.PostconditionLine <= 0)
+                {
+                    Console.Error.WriteLine("[Handle] Skipping counterexample because Dafny did not provide a valid postcondition line.");
+                    continue;
+                }
 
-                    if (programConfig.PostCondition != "" && programConfig.PostCondition != postcondition)
-                    {
-                        continue; // We only want to expand the same type of error (same failed postcondition)
-                    }
+                var postcondition = counterExample.PostconditionText;
+                var mutator = new ProgramMutator(TempWorkDir);
 
-                    var mutator = new ProgramMutator(TempWorkDir);
+                mutator.writeSolutionNode(
+                    program,
+                    analysis,
+                    postcondition,
+                    counterExample.PostconditionLine);
+                createdWrites = true;
 
-                    mutator.writeSolutionNode(
-                        program,
-                        analysis,
-                        postcondition,
-                        postconditionLine);
-                    createdWrites = true;
-                    
-                    if (!analysis.ShouldInject)
-                        continue;
+                if (!analysis.ShouldInject)
+                    continue;
 
+                var nextConfig = await mutator.WriteAssumeFalse(
+                    program,
+                    programConfig.ProgramFile,
+                    analysis,
+                    postcondition,
+                    counterExample.PostconditionLine);
 
-                    var nextConfig = await mutator.WriteAssumeFalse(
-                        program,
-                        programConfig.ProgramFile,
-                        analysis,
-                        postcondition,
-                        postconditionLine);
-
-                    if (nextConfig != null)
-                    {
-                        next_files.Add(nextConfig);
-                    }
+                if (nextConfig != null)
+                {
+                    next_files.Add(nextConfig);
                 }
             }
 
             return (next_files, createdWrites);
+        }
+
+        private static bool ShouldProcessCounterExample(
+            VerificationConfig programConfig,
+            CounterexampleAnalyzer.CliCounterExample counterExample)
+        {
+            if (programConfig.PostConditionLine > 0)
+            {
+                return programConfig.PostConditionLine == counterExample.PostconditionLine;
+            }
+
+            if (string.IsNullOrWhiteSpace(programConfig.PostCondition))
+            {
+                return true;
+            }
+
+            return NormalizePostCondition(programConfig.PostCondition) ==
+                NormalizePostCondition(counterExample.PostconditionText);
+        }
+
+        private static string NormalizePostCondition(string text)
+        {
+            return Regex.Replace(text ?? string.Empty, @"\s+", " ").Trim();
         }
     }
 
@@ -442,12 +441,31 @@ namespace CounterExampleIfReassume
             public string Raw { get; init; } = "";
         }
 
-        public List<StatePosition> ExtractStatePositionsFromCli(string filePath)
+        private static string ReadSourceLine(string[] sourceLines, int lineNumber)
+        {
+            if (lineNumber <= 0 || lineNumber > sourceLines.Length)
+            {
+                return string.Empty;
+            }
+
+            return sourceLines[lineNumber - 1].Trim();
+        }
+
+        public sealed class CliCounterExample
+        {
+            public int PostconditionLine { get; init; }
+            public string PostconditionText { get; init; } = string.Empty;
+            public List<StatePosition> StatePositions { get; init; } = new();
+        }
+
+        public List<CliCounterExample> ExtractCounterExamplesFromCli(string filePath)
         {
             string repoRoot = PathHelper.FindRepoRoot();
             string dafnyBinary = Path.Combine(repoRoot, "dafny", "Binaries", "Dafny");
+            var sourceLines = File.ReadAllLines(filePath);
 
-            var psi = new ProcessStartInfo {
+            var psi = new ProcessStartInfo
+            {
                 FileName = dafnyBinary,
                 Arguments = $"verify --extract-counterexample \"{filePath}\"",
                 RedirectStandardOutput = true,
@@ -467,19 +485,67 @@ namespace CounterExampleIfReassume
             process.WaitForExit();
 
             string output = string.IsNullOrWhiteSpace(stderr) ? stdout : stdout + "\n" + stderr;
-            var result = new List<StatePosition>();
+            var result = new List<CliCounterExample>();
+            var currentStates = new List<StatePosition>();
             var seen = new HashSet<string>();
+            int currentPostconditionLine = -1;
+            string currentPostconditionText = string.Empty;
 
             bool insideCounterexample = false;
+            bool sawRelatedCounterexample = false;
+            bool sawPostconditionLocation = false;
             var positionRegex = new Regex(@"\.dfy\((?<line>\d+),(?<col>\d+)\):", RegexOptions.Compiled);
+            var postconditionRegex = new Regex(@"\.dfy\((?<line>\d+),(?<col>\d+)\):\s*Related location:", RegexOptions.Compiled);
+
+            void FinalizeCurrentRecord()
+            {
+                if (currentPostconditionLine <= 0 && currentStates.Count > 0)
+                {
+                    // Fallback for verifier outputs that omit an explicit
+                    // postcondition location but still provide state locations.
+                    currentPostconditionLine = currentStates[0].Line;
+                    currentPostconditionText = ReadSourceLine(sourceLines, currentPostconditionLine);
+                }
+
+                if (currentPostconditionLine <= 0)
+                {
+                    currentStates.Clear();
+                    currentPostconditionText = string.Empty;
+                    sawRelatedCounterexample = false;
+                    sawPostconditionLocation = false;
+                    return;
+                }
+
+                result.Add(new CliCounterExample
+                {
+                    PostconditionLine = currentPostconditionLine,
+                    PostconditionText = currentPostconditionText,
+                    StatePositions = new List<StatePosition>(currentStates)
+                });
+
+                currentStates.Clear();
+                currentPostconditionLine = -1;
+                currentPostconditionText = string.Empty;
+                sawRelatedCounterexample = false;
+                sawPostconditionLocation = false;
+                seen.Clear();
+            }
 
             foreach (string rawLine in output.Split('\n'))
             {
                 string line = rawLine.TrimEnd();
 
+                if (line.Contains("Error: a postcondition could not be proved on this return path"))
+                {
+                    FinalizeCurrentRecord();
+                    insideCounterexample = false;
+                    continue;
+                }
+
                 if (line.Contains("Related counterexample:"))
                 {
                     insideCounterexample = true;
+                    sawRelatedCounterexample = true;
                     continue;
                 }
 
@@ -488,31 +554,47 @@ namespace CounterExampleIfReassume
                     continue;
                 }
 
-                if (line.Contains("Error:") || line.StartsWith("   |") || line.StartsWith("Dafny program verifier finished"))
+                if (line.StartsWith("Dafny program verifier finished"))
                 {
+                    FinalizeCurrentRecord();
                     insideCounterexample = false;
                     continue;
                 }
 
-                var match = positionRegex.Match(line);
-                if (!match.Success)
+                if (postconditionRegex.IsMatch(line))
+                {
+                    var postconditionMatch = postconditionRegex.Match(line);
+                    currentPostconditionLine = int.Parse(postconditionMatch.Groups["line"].Value);
+                    currentPostconditionText = ReadSourceLine(sourceLines, currentPostconditionLine);
+                    sawPostconditionLocation = true;
+                    continue;
+                }
+
+                var positionMatch = positionRegex.Match(line);
+                if (!positionMatch.Success)
                 {
                     continue;
                 }
 
-                int parsedLine = int.Parse(match.Groups["line"].Value);
-                int parsedCol = int.Parse(match.Groups["col"].Value);
+                int parsedLine = int.Parse(positionMatch.Groups["line"].Value);
+                int parsedCol = int.Parse(positionMatch.Groups["col"].Value);
                 string key = $"{parsedLine}:{parsedCol}";
                 if (!seen.Add(key))
                 {
                     continue;
                 }
 
-                result.Add(new StatePosition {
+                currentStates.Add(new StatePosition
+                {
                     Line = parsedLine,
                     Col = parsedCol,
                     Raw = line.Trim()
                 });
+            }
+
+            if (sawRelatedCounterexample && sawPostconditionLocation)
+            {
+                FinalizeCurrentRecord();
             }
 
             return result;
@@ -536,7 +618,11 @@ namespace CounterExampleIfReassume
                 var visitor = new FindExpressionAndParentByTokenVisitor(line, col);
                 visitor.VisitManual(body);
 
-                if (!visitor.MatchingStatementWithAllParent.Any()) continue;
+                if (!visitor.MatchingStatementWithAllParent.Any())
+                {
+                    AppendStateNodeIfMissing(state, seenSuspicious, suspiciousNodes);
+                    continue;
+                }
 
                 var (stmt, parents) = visitor.MatchingStatementWithAllParent[0];
                 int matchedDepth = parents.Count + 1;
@@ -584,10 +670,9 @@ namespace CounterExampleIfReassume
                                 Parents = parentRefs,
                             });
                         }
-                        break;
                     }
 
-                    if (parent is WhileStmt whileStmt)
+                    else if (parent is WhileStmt whileStmt)
                     {
                         insideIf = true;
                         firstBlockStmt ??= whileStmt.Body as BlockStmt;
@@ -604,28 +689,37 @@ namespace CounterExampleIfReassume
                                 Parents = parentRefs,
                             });
                         }
-                        break;
                     }
                     ancestorDepth -= 1;
                 }
 
-                string stateKey = $"{state.Line}:0:counterexample_state:State";
-                if (seenSuspicious.Add(stateKey))
-                {
-                    suspiciousNodes.Add(new AnalysisResult.SuspiciousNodeInfo
-                    {
-                        Line = state.Line,
-                        Depth = 0,
-                        Type = "State",
-                        Source = "counterexample_state",
-                        Content = state.Raw,
-                        Parents = new List<Program.ParentNodeInfo>(),
-                    });
-                }
+                AppendStateNodeIfMissing(state, seenSuspicious, suspiciousNodes);
             }
 
             var rawStateLines = statePositions.Select(p => p.Line).Distinct().OrderBy(x => x).ToList();
             return new AnalysisResult(insideIf, firstBlockStmt, suspiciousNodes, rawStateLines);
+        }
+
+        private static void AppendStateNodeIfMissing(
+            StatePosition state,
+            HashSet<string> seenSuspicious,
+            List<AnalysisResult.SuspiciousNodeInfo> suspiciousNodes)
+        {
+            string stateKey = $"{state.Line}:0:counterexample_state:State";
+            if (!seenSuspicious.Add(stateKey))
+            {
+                return;
+            }
+
+            suspiciousNodes.Add(new AnalysisResult.SuspiciousNodeInfo
+            {
+                Line = state.Line,
+                Depth = 0,
+                Type = "State",
+                Source = "counterexample_state",
+                Content = state.Raw,
+                Parents = new List<Program.ParentNodeInfo>(),
+            });
         }
 
         private static BlockStmt? ResolveIfTargetBlock(IfStmt ifStmt, Statement matchedStatement)
@@ -715,6 +809,12 @@ namespace CounterExampleIfReassume
             string postcondition,
             int postconditionLine)
         {
+            if (postconditionLine <= 0)
+            {
+                Console.Error.WriteLine("[writeSolutionNode] Refusing to write solution node with invalid postcondition line.");
+                return;
+            }
+
             var solutionFile = Path.Combine(TempWorkDir, $"postLine_{postconditionLine}_iter_{Guid.NewGuid()}_solution.dfy");
             ProgramWriter.Write(program, solutionFile, analysis, postcondition, postconditionLine);
         }
@@ -785,6 +885,7 @@ namespace CounterExampleIfReassume
                 ProgramFile = nextFile,
                 MethodName = "",
                 PostCondition = postcondition,
+                PostConditionLine = postconditionLine,
             };
         }
 
@@ -839,7 +940,7 @@ namespace CounterExampleIfReassume
         }
     }
 
-class FindExpressionAndParentByTokenVisitor : ASTVisitor<IASTVisitorContext>
+    class FindExpressionAndParentByTokenVisitor : ASTVisitor<IASTVisitorContext>
     {
         public readonly List<(Statement Stmt, Stack<INode> Parents)> MatchingStatementWithAllParent = new();
         private readonly int targetLine;
@@ -854,23 +955,24 @@ class FindExpressionAndParentByTokenVisitor : ASTVisitor<IASTVisitorContext>
 
         public override IASTVisitorContext GetContext(IASTVisitorContext context, bool inFunctionPostcondition) => context;
 
-        public void VisitManual(Statement stmt) => VisitStatement(stmt, null);
+        public void VisitManual(Statement stmt) => VisitStatement(stmt, null!);
 
         protected override void VisitStatement(Statement stmt, IASTVisitorContext context)
         {
             if (IsTargetInStatement(stmt.StartToken, stmt.EndToken))
             {
-                if(IsTargetStatement(stmt.StartToken, stmt.EndToken)) {
+                if (IsTargetStatement(stmt.StartToken, stmt.EndToken))
+                {
                     var parentsCopy = new Stack<INode>(parents.Reverse());
                     MatchingStatementWithAllParent.Add((stmt, parentsCopy));
                 }
 
-                if(stmt is WhileStmt whilestmt)
+                if (stmt is WhileStmt whilestmt)
                 {
-                   if(IsTargetInLine(whilestmt.Guard.StartToken, whilestmt.Guard.EndToken))
+                    if (whilestmt.Guard != null && IsTargetInLine(whilestmt.Guard.StartToken, whilestmt.Guard.EndToken))
                     {
-                       // Guard want Expressions, but i am working with statements, this breaks things
-                       // Woraround will add two times the smtm expresion (and postprocess afterwoards) 
+                        // Guard want Expressions, but i am working with statements, this breaks things
+                        // Woraround will add two times the smtm expresion (and postprocess afterwoards) 
                         var parentsCopy = new Stack<INode>(parents.Reverse());
                         MatchingStatementWithAllParent.Add((stmt, parentsCopy));
                     }
@@ -894,7 +996,7 @@ class FindExpressionAndParentByTokenVisitor : ASTVisitor<IASTVisitorContext>
                 return false;
             }
 
-            if(startToken.line == endToken.line)
+            if (startToken.line == endToken.line)
             {
                 bool colMatch = startToken.col <= targetCol && targetCol <= endToken.col;
                 return colMatch;
@@ -908,7 +1010,7 @@ class FindExpressionAndParentByTokenVisitor : ASTVisitor<IASTVisitorContext>
             {
                 return false;
             }
-            if(startToken.line == endToken.line)
+            if (startToken.line == endToken.line)
             {
                 bool colMatch = startToken.col <= targetCol && targetCol <= endToken.col;
                 return colMatch;
@@ -953,9 +1055,9 @@ class FindExpressionAndParentByTokenVisitor : ASTVisitor<IASTVisitorContext>
 
             // Set time and memory limits
             options.TimeLimit = (uint)maxTime;
-            options.ProverOptions.Add($"O:memory_max_size={maxRam*1000}");
+            options.ProverOptions.Add($"O:memory_max_size={maxRam * 1000}");
 
-            options.DefiniteAssignmentLevel = 2 ;
+            options.DefiniteAssignmentLevel = 2;
 
             options.Set(CommonOptionBag.AllowWarnings, true);
             options.Set(CommonOptionBag.ExtractCounterexample, true);

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
+from fl_eval.util.counterexample_trace_utils import parse_counterexample_trace_report
+
 
 @dataclass(frozen=True)
 class CounterExampleTraceSummary:
@@ -15,7 +17,7 @@ class CounterExampleTraceSummary:
     node_count: int
     unique_line_count: int
     top_lines: list[tuple[int, int]]
-    raw : str
+    raw: Any
 
 
 @dataclass(frozen=True)
@@ -32,51 +34,47 @@ _LINE_COLUMN_PATTERN = re.compile(r"dfy\((\d+),\s*\d+\)")
 
 
 def extract_counterexample_trace_summary(stdout: str, top_n: int = 10) -> CounterExampleTraceSummary | None:
-    """Extract a line-frequency summary from CounterExampleIf/CounterExampleIfReassume JSON output."""
-    match = re.search(r"JSON_OUTPUT_START\s*(.*?)\s*JSON_OUTPUT_END", stdout, re.S)
-    if not match:
+    """Extract a line-frequency summary from CounterExampleIf/CounterExampleIfReassume JSON output.
+    
+    Post-processing rules:
+    1. Disregard nodes that are initial states
+    2. For each trace, count each line only once (deduplicate per trace)
+    3. When duplicate lines exist in a trace, prefer a node whose source is not counterexample_state
+    4. Filter the raw output to remove initial state nodes and keep one representative node per line
+    """
+    report = parse_counterexample_trace_report(stdout)
+    if report is None:
         return None
 
-    payload = json.loads(match.group(1))
-    raw = payload
-    if not isinstance(payload, dict):
+    payload_dict: dict[str, Any] = report.payload
+    traces_obj = payload_dict.get("traces")
+    if not isinstance(traces_obj, list):
         return None
-    payload_dict = cast(dict[str, Any], payload)
-    traces = payload_dict.get("traces")
-    if not isinstance(traces, list):
-        return None
+    traces = cast(list[dict[str, Any]], traces_obj)
 
     all_lines: list[int] = []
-    trace_count = 0
-    node_count = 0
-    for trace in cast(list[Any], traces):
-        if not isinstance(trace, dict):
+    for trace_dict in traces:
+        trace_nodes_obj = trace_dict.get("nodes", [])
+        if not isinstance(trace_nodes_obj, list):
             continue
-        trace_dict = cast(dict[str, Any], trace)
-        trace_nodes = trace_dict.get("nodes", [])
-        if not isinstance(trace_nodes, list):
-            continue
-        trace_count += 1
-        for node in cast(list[Any], trace_nodes):
-            if not isinstance(node, dict):
-                continue
-            node_dict = cast(dict[str, Any], node)
-            line = node_dict.get("line")
+        trace_nodes = cast(list[dict[str, Any]], trace_nodes_obj)
+        for node in trace_nodes:
+            line = node.get("line")
             if isinstance(line, int):
                 all_lines.append(line)
-                node_count += 1
 
     line_counts = Counter(all_lines)
     top_lines = [(line, freq) for line, freq in line_counts.most_common(top_n)]
 
     return CounterExampleTraceSummary(
         source="counterexample-json",
-        trace_count=trace_count,
-        node_count=node_count,
+        trace_count=len(traces),
+        node_count=len(report.nodes),
         unique_line_count=len(line_counts),
         top_lines=top_lines,
-        raw=raw
+        raw=report.payload
     )
+
 
 
 def extract_counterexample_base_summary(stdout: str, top_n: int = 10) -> CounterExampleTraceSummary | None:
@@ -85,7 +83,6 @@ def extract_counterexample_base_summary(stdout: str, top_n: int = 10) -> Counter
     result_changed_stdout = stdout.replace("\\n", placeholder)
     lines = [r for r in result_changed_stdout.split("\n") if r]
     results_json_list = [r.replace(placeholder, "\\n") for r in lines]
-    raw = stdout
     diagnostics: list[dict[str, Any]] = []
     for result in results_json_list:
         try:

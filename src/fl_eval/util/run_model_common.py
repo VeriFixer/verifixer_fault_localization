@@ -45,8 +45,8 @@ TECHNIQUE_CONFIG: dict[str, TechniqueConfig] = {
     "randomOnFailingMethod": TechniqueConfig(RandomLineOfMethodThatFails, run_on_all_models=True),
     "counterExampleIf": TechniqueConfig(CounterExampleIf, run_on_all_models=True),
     "counterExampleIfReassume": TechniqueConfig(CounterExampleIfReassume, run_on_all_models=True),
-    "autofixDefault": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-and-static-score", run_on_all_models=True),
-    "autofixSimplified": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-score-only", run_on_all_models=True),
+    #"autofixDefault": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-and-static-score", run_on_all_models=True),
+    #"autofixSimplified": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-score-only", run_on_all_models=True),
     "llm_without_api": TechniqueConfig(LLMRanker, run_on_all_models=False),
     "llm_real": TechniqueConfig(LLMRanker, run_on_all_models=True),
 }
