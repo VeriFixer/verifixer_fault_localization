@@ -59,6 +59,7 @@ TECHNIQUE_MAP: dict[str, tuple[type[FLTechnique], str]] = {
 PAPER_ONLY_TECHNIQUES: list[str] = [
     "randomOnFailingMethod",
     "counterBase",
+    "counterExampleIf",
     "counterExampleIfReassume",
     "llm_real",
     "autofixDefault",
@@ -66,7 +67,8 @@ PAPER_ONLY_TECHNIQUES: list[str] = [
 
 PAPER_TECHNIQUE_ALIASES: dict[str, str] = {
     "randomOnFailingMethod": "RAND",
-    "counterBase": "CNTS",
+    "counterBase": "CNTB",
+    "counterExampleIf": "CNTS",
     "counterExampleIfReassume": "CNTM",
     "llm_real": "LLM",
     "autofixDefault": "SNAP",
@@ -87,9 +89,15 @@ def get_techniques_for_paper_only() -> list[str]:
     return [name for name in PAPER_ONLY_TECHNIQUES if name in TECHNIQUE_MAP]
 
 
-def get_technique_display_name(name: str) -> str:
-    """Return publication-friendly display name for a technique key."""
-    return PAPER_TECHNIQUE_ALIASES.get(name, name)
+def get_technique_display_name(name: str, paper_only: bool = False) -> str:
+    """Return publication-friendly display name for a technique key.
+    
+    If paper_only=True, applies short paper aliases (e.g., CNTS for counterExampleIf).
+    Otherwise, returns the internal technique name.
+    """
+    if paper_only:
+        return PAPER_TECHNIQUE_ALIASES.get(name, name)
+    return name
 
 
 def get_techniques_for_health_check() -> list[str]:

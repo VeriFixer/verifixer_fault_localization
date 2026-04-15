@@ -14,6 +14,7 @@ def test_get_techniques_for_paper_only_exact_subset() -> None:
     assert get_techniques_for_paper_only() == [
         "randomOnFailingMethod",
         "counterBase",
+        "counterExampleIf",
         "counterExampleIfReassume",
         "llm_real",
         "autofixDefault",
@@ -22,12 +23,14 @@ def test_get_techniques_for_paper_only_exact_subset() -> None:
 
 
 def test_paper_alias_mapping() -> None:
-    assert get_technique_display_name("randomOnFailingMethod") == "RAND"
-    assert get_technique_display_name("counterBase") == "CNTS"
-    assert get_technique_display_name("counterExampleIfReassume") == "CNTM"
-    assert get_technique_display_name("llm_real") == "LLM"
-    assert get_technique_display_name("autofixDefault") == "SNAP"
-    assert get_technique_display_name("counterExampleIf") == "counterExampleIf"
+    assert get_technique_display_name("randomOnFailingMethod", paper_only=True) == "RAND"
+    assert get_technique_display_name("counterBase", paper_only=True) == "CNTB"
+    assert get_technique_display_name("counterExampleIf", paper_only=True) == "CNTS"
+    assert get_technique_display_name("counterExampleIfReassume", paper_only=True) == "CNTM"
+    assert get_technique_display_name("llm_real", paper_only=True) == "LLM"
+    assert get_technique_display_name("autofixDefault", paper_only=True) == "SNAP"
+    assert get_technique_display_name("counterExampleIf", paper_only=False) == "counterExampleIf"
+    assert get_technique_display_name("counterBase", paper_only=False) == "counterBase"
 
 
 

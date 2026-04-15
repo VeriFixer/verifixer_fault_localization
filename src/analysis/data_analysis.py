@@ -25,14 +25,15 @@ def _print_ascii_scope_table(
     get_top1: Callable[[StatsSummaryEntry], float],
     get_top3: Callable[[StatsSummaryEntry], float],
     get_top5: Callable[[StatsSummaryEntry], float],
+    paper_only: bool = False,
 ) -> None:
-    h_tech = "Technique"
+    h_tech = "Method"
     h_count = "Evaluated"
     h_exam1 = "EXAM_1"
     h_exam2 = "EXAM_2"
     h_exam3 = "EXAM_3"
-    h_found = "Found %"
-    h_empty = "Empty %"
+    h_found = "Found"
+    h_empty = "Empty"
     h_topk = "Top1/Top3/Top5"
 
     w_tech = 30
@@ -53,7 +54,7 @@ def _print_ascii_scope_table(
     print(separator)
 
     for name, data in stats.items():
-        display_name = get_technique_display_name(name)
+        display_name = get_technique_display_name(name, paper_only=paper_only)
         count = get_count(data)
         exam1 = get_exam_1(data)
         exam2 = get_exam_2(data)
@@ -70,7 +71,7 @@ def _print_ascii_scope_table(
     print(separator)
 
 
-def print_ascii_table(stats: dict[str, StatsSummaryEntry]):
+def print_ascii_table(stats: dict[str, StatsSummaryEntry], paper_only: bool = False):
     """Print separate ASCII tables for file scope and method scope."""
     _print_ascii_scope_table(
         "FILE SCOPE",
@@ -84,6 +85,7 @@ def print_ascii_table(stats: dict[str, StatsSummaryEntry]):
         get_top1=lambda d: d.top1_success_file,
         get_top3=lambda d: d.top3_success_file,
         get_top5=lambda d: d.top5_success_file,
+        paper_only=paper_only,
     )
     _print_ascii_scope_table(
         "METHOD SCOPE",
@@ -97,11 +99,12 @@ def print_ascii_table(stats: dict[str, StatsSummaryEntry]):
         get_top1=lambda d: d.top1_success_method,
         get_top3=lambda d: d.top3_success_method,
         get_top5=lambda d: d.top5_success_method,
+        paper_only=paper_only,
     )
     print()
 
 
-def print_latex_table(stats: dict[str, StatsSummaryEntry]):
+def print_latex_table(stats: dict[str, StatsSummaryEntry], paper_only: bool = False):
     """Print dual-scope LaTeX tables."""
     file_evaluated = next(iter(stats.values())).count if stats else 0
     method_evaluated = next(iter(stats.values())).count_method if stats else 0
@@ -111,11 +114,11 @@ def print_latex_table(stats: dict[str, StatsSummaryEntry]):
     print(r"    \centering")
     print(r"    \begin{tabular}{l|c|c|c|c|c}")
     print(r"        \hline")
-    print(r"        \textbf{Technique} & \textbf{EXAM$_1$} & \textbf{EXAM$_2$} & \textbf{EXAM$_3$} & \textbf{Found(\%)} & \textbf{Empty(\%)} \\")
+    print(r"        \textbf{Method} & \textbf{EXAM$_1$} & \textbf{EXAM$_2$} & \textbf{EXAM$_3$} & \textbf{Found} & \textbf{Empty} \\")
     print(r"        \hline")
 
     for name, data in stats.items():
-        clean_name = get_technique_display_name(name).replace("_", r"\_")
+        clean_name = get_technique_display_name(name, paper_only=paper_only).replace("_", r"\_")
         print(
             f"        {clean_name} & {data.avg_exam_file:.4f} & {data.avg_exam_found_file:.4f} & {data.avg_exam_not_empty_file:.4f} & {data.found_rate_file:.2f} & {data.exist_rate_file * 100.0:.2f} \\\\"  # noqa: E501
         )
@@ -133,11 +136,11 @@ def print_latex_table(stats: dict[str, StatsSummaryEntry]):
     print(r"    \centering")
     print(r"    \begin{tabular}{l|c|c|c|c|c}")
     print(r"        \hline")
-    print(r"        \textbf{Technique} & \textbf{EXAM$_1$} & \textbf{EXAM$_2$} & \textbf{EXAM$_3$} & \textbf{Found(\%)} & \textbf{Empty(\%)} \\")
+    print(r"        \textbf{Method} & \textbf{EXAM$_1$} & \textbf{EXAM$_2$} & \textbf{EXAM$_3$} & \textbf{Found} & \textbf{Empty} \\")
     print(r"        \hline")
 
     for name, data in stats.items():
-        clean_name = get_technique_display_name(name).replace("_", r"\_")
+        clean_name = get_technique_display_name(name, paper_only=paper_only).replace("_", r"\_")
         print(
             f"        {clean_name} & {data.avg_exam_method:.4f} & {data.avg_exam_found_method:.4f} & {data.avg_exam_not_empty_method:.4f} & {data.found_rate_method:.2f} & {data.exist_rate_method * 100.0:.2f} \\\\"  # noqa: E501
         )
@@ -159,7 +162,7 @@ def print_latex_table(stats: dict[str, StatsSummaryEntry]):
     print(r"        \hline")
 
     for name, data in stats.items():
-        clean_name = get_technique_display_name(name).replace("_", r"\_")
+        clean_name = get_technique_display_name(name, paper_only=paper_only).replace("_", r"\_")
         print(
             f"        {clean_name} & {data.top1_success_file:.2f} & {data.top3_success_file:.2f} & {data.top5_success_file:.2f} \\\\"  # noqa: E501
         )
@@ -181,7 +184,7 @@ def print_latex_table(stats: dict[str, StatsSummaryEntry]):
     print(r"        \hline")
 
     for name, data in stats.items():
-        clean_name = get_technique_display_name(name).replace("_", r"\_")
+        clean_name = get_technique_display_name(name, paper_only=paper_only).replace("_", r"\_")
         print(
             f"        {clean_name} & {data.top1_success_method:.2f} & {data.top3_success_method:.2f} & {data.top5_success_method:.2f} \\\\"  # noqa: E501
         )
@@ -196,22 +199,20 @@ def print_latex_table(stats: dict[str, StatsSummaryEntry]):
     print("--------------------------\n")
 
 
-def _plot_scope(raw_results: dict[str, list[ExamOutput]], output_prefix: Path, scope: str, title: str):
+def _plot_scope(raw_results: dict[str, list[ExamOutput]], output_prefix: Path, scope: str, title: str, paper_only: bool = False):
     labels = [tech for tech, vals in raw_results.items() if vals]
-    display_labels = [get_technique_display_name(tech) for tech in labels]
+    display_labels = [get_technique_display_name(tech, paper_only=paper_only) for tech in labels]
     if not labels:
         return
 
     # Paper-friendly sizing for two-column layouts.
     figure_size = (7.0, 3.9)
-    label_font = 10
-    tick_font = 9
-    legend_font = 8
+    label_font = 14
+    tick_font = 14
+    legend_font = 14
     # Okabe-Ito palette for color-blind accessibility.
     palette = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#D55E00", "#56B4E9", "#F0E442", "#000000"]
     technique_colors = {tech: palette[i % len(palette)] for i, tech in enumerate(labels)}
-    hatch_patterns = ["", "//", "xx", "..", "\\\\", "++", "oo", "--"]
-    technique_hatches = {tech: hatch_patterns[i % len(hatch_patterns)] for i, tech in enumerate(labels)}
     line_styles: list[Any] = ["-", "--", "-.", ":", (0, (3, 1, 1, 1)), (0, (5, 1)), (0, (1, 1)), (0, (3, 2, 1, 2))]
     technique_line_styles: dict[str, Any] = {tech: line_styles[i % len(line_styles)] for i, tech in enumerate(labels)}
     line_widths = [3.4, 3.0, 2.8, 2.6, 2.4, 3.2, 2.2, 2.9]
@@ -274,9 +275,11 @@ def _plot_scope(raw_results: dict[str, list[ExamOutput]], output_prefix: Path, s
     ]
     ax1.legend(handles=summary_legend_handles, loc="upper right", fontsize=legend_font)
 
-    distribution_file = Path(f"{output_prefix}_distribution.png")
+    distribution_png_file = Path(f"{output_prefix}_distribution.png")
+    distribution_pdf_file = Path(f"{output_prefix}_distribution.pdf")
     plt.tight_layout()
-    plt.savefig(distribution_file, dpi=300, bbox_inches="tight")  # type: ignore
+    fig1.savefig(distribution_png_file, dpi=300, bbox_inches="tight")
+    fig1.savefig(distribution_pdf_file, bbox_inches="tight")
     plt.close(fig1)
 
     fig2, ax2 = cast(Any, plt.subplots(1, 1, figsize=figure_size))  # type: ignore[reportUnknownMemberType]
@@ -293,7 +296,7 @@ def _plot_scope(raw_results: dict[str, list[ExamOutput]], output_prefix: Path, s
             plot_x,
             plot_y,
             where="post",
-            label=get_technique_display_name(tech),
+            label=get_technique_display_name(tech, paper_only=paper_only),
             lw=technique_line_widths[tech],
             color=technique_colors[tech],
             linestyle=technique_line_styles[tech],
@@ -313,24 +316,29 @@ def _plot_scope(raw_results: dict[str, list[ExamOutput]], output_prefix: Path, s
     ax2.tick_params(axis="y", labelsize=tick_font)
     ax2.legend(loc="lower right", fontsize=legend_font)
 
-    success_file = Path(f"{output_prefix}_success.png")
+    success_png_file = Path(f"{output_prefix}_success.png")
+    success_pdf_file = Path(f"{output_prefix}_success.pdf")
     plt.tight_layout()
-    plt.savefig(success_file, dpi=300, bbox_inches="tight")  # type: ignore
+    fig2.savefig(success_png_file, dpi=300, bbox_inches="tight")
+    fig2.savefig(success_pdf_file, bbox_inches="tight")
     plt.close(fig2)
-    print(f"Plots saved to: {distribution_file} and {success_file}")
+    print(
+        "Plots saved to: "
+        f"{distribution_png_file}, {distribution_pdf_file}, {success_png_file}, and {success_pdf_file}"
+    )
 
 
-def generate_plots(raw_results: dict[str, list[ExamOutput]], output_path: Path):
+def generate_plots(raw_results: dict[str, list[ExamOutput]], output_path: Path, paper_only: bool = False):
     """Generate file-scoped EXAM plots."""
     file_prefix = output_path / "benchmark_hybrid_analysis_FILE"
-    _plot_scope(raw_results, file_prefix, scope="file", title="File-Scoped EXAM")
+    _plot_scope(raw_results, file_prefix, scope="file", title="File-Scoped EXAM", paper_only=paper_only)
 
 
-def generate_dual_scope_plots(raw_results: dict[str, list[ExamOutput]], output_path: Path):
+def generate_dual_scope_plots(raw_results: dict[str, list[ExamOutput]], output_path: Path, paper_only: bool = False):
     """Generate file-scoped and method-scoped EXAM plots."""
-    generate_plots(raw_results, output_path)
+    generate_plots(raw_results, output_path, paper_only=paper_only)
     method_prefix = output_path / "benchmark_hybrid_analysis_METHOD"
-    _plot_scope(raw_results, method_prefix, scope="method", title="Method-Scoped EXAM")
+    _plot_scope(raw_results, method_prefix, scope="method", title="Method-Scoped EXAM", paper_only=paper_only)
 
 
 def compare_two_methods(raw_results: dict[str, list[ExamOutput]], tech1: str, tech2: str):

@@ -125,13 +125,13 @@ def compute_metrics(
         if not stats_summary:
             logger.info("No results collected.")
             return
-        print_ascii_table(stats_summary)
-        print_latex_table(stats_summary)
+        print_ascii_table(stats_summary, paper_only=paper_only)
+        print_latex_table(stats_summary, paper_only=paper_only)
         _log_benchmark_llm_cost_totals(llm_cost_totals_by_technique)
         try:
             images_dir = gl.BASE_PATH / "images"
             images_dir.mkdir(parents=True, exist_ok=True)
-            generate_plots(raw_results, images_dir)  # type: ignore
+            generate_plots(raw_results, images_dir, paper_only=paper_only)  # type: ignore
             logger.info(f"Plot artifacts saved to: {images_dir}")
         except Exception as e:
             logger.error(f"Could not generate plots: {e}")
