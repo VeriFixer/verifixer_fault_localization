@@ -6,17 +6,22 @@ from dataclasses import dataclass, field
 from typing import Any, cast
 
 from fl_eval.util.ranking_strategy import (
+    DEFAULT_COUNTEREXAMPLE_RANKING_CONTROLS,
+    CounterExampleRankingControls,
     CounterExampleNode,
+    NODE_SELECTION_POLICY_PURE_STATE,
+    NODE_SELECTION_POLICY_REGULAR,
     RANK_BY_FREQUENCY,
     RankingStrategy,
-    SUPPORTED_RANKING_STRATEGIES,
+    RANK_BY_ORDER,
+    SUPPORTED_NODE_SELECTION_POLICIES,
 )
 
 
 @dataclass(frozen=True)
 class CounterExampleTraceReport:
     payload: dict[str, Any]
-    nodes: list[CounterExampleNode]
+    traces: list[list[CounterExampleNode]]
 
 
 @dataclass
@@ -77,7 +82,7 @@ def parse_counterexample_trace_report(stdout: str) -> CounterExampleTraceReport 
         return None
 
     filtered_traces: list[dict[str, Any]] = []
-    nodes: list[CounterExampleNode] = []
+    parsed_traces: list[list[CounterExampleNode]] = []
 
     for trace in cast(list[Any], traces):
         if not isinstance(trace, dict):
@@ -90,7 +95,8 @@ def parse_counterexample_trace_report(stdout: str) -> CounterExampleTraceReport 
 
         trace_id_raw = trace_dict.get("trace_id", 0)
         trace_id = int(trace_id_raw) if isinstance(trace_id_raw, int) else 0
-        representatives: dict[int, tuple[CounterExampleNode, dict[str, Any]]] = {}
+        parsed_trace_nodes: list[CounterExampleNode] = []
+        filtered_nodes_for_payload: list[dict[str, Any]] = []
 
         for node in cast(list[Any], trace_nodes):
             if not isinstance(node, dict):
@@ -104,36 +110,39 @@ def parse_counterexample_trace_report(stdout: str) -> CounterExampleTraceReport 
             if parsed_node is None:
                 continue
 
-            line = parsed_node.line
-            current = representatives.get(line)
-            if current is None or (current[0].source == "counterexample_state" and parsed_node.source != "counterexample_state"):
-                representatives[line] = (parsed_node, node_dict)
+            parsed_trace_nodes.append(parsed_node)
+            filtered_nodes_for_payload.append(node_dict)
 
         filtered_trace = dict(trace_dict)
-        filtered_trace["nodes"] = [node_dict for _, node_dict in representatives.values()]
+        filtered_trace["nodes"] = filtered_nodes_for_payload
         filtered_traces.append(filtered_trace)
-        nodes.extend(node for node, _ in representatives.values())
+        parsed_traces.append(parsed_trace_nodes)
 
     filtered_payload = dict(payload_dict)
     filtered_payload["traces"] = filtered_traces
 
-    return CounterExampleTraceReport(payload=filtered_payload, nodes=nodes)
+    return CounterExampleTraceReport(payload=filtered_payload, traces=parsed_traces)
 
 
 def rank_counterexample_nodes(
-    nodes: list[CounterExampleNode],
+    traces: list[list[CounterExampleNode]],
     ranking_strategy: RankingStrategy = RANK_BY_FREQUENCY,
+    ranking_controls: CounterExampleRankingControls = DEFAULT_COUNTEREXAMPLE_RANKING_CONTROLS,
 ) -> list[int]:
-    if ranking_strategy not in SUPPORTED_RANKING_STRATEGIES:
+    if ranking_controls.node_selection_policy not in SUPPORTED_NODE_SELECTION_POLICIES:
         raise ValueError(
-            f"Unknown ranking strategy '{ranking_strategy}'. "
-            f"Supported: {[s.name for s in SUPPORTED_RANKING_STRATEGIES]}"
+            f"Unknown node selection policy '{ranking_controls.node_selection_policy}'. "
+            f"Supported: {[s.name for s in SUPPORTED_NODE_SELECTION_POLICIES]}"
         )
+
+    selected_nodes = _select_nodes_for_ranking(traces, ranking_controls)
+    if not selected_nodes:
+        return []
 
     line_freq_depth_map: dict[int, LineFrequencyDepth] = {}
     first_seen_order: dict[int, int] = {}
 
-    for idx, node in enumerate(nodes):
+    for idx, node in enumerate(selected_nodes):
         if node.line not in first_seen_order:
             first_seen_order[node.line] = idx
 
@@ -154,12 +163,69 @@ def rank_counterexample_nodes(
                 return True
         return False
 
+    def ranking_key(line: int) -> tuple[int, ...]:
+        line_data = line_freq_depth_map[line]
+
+        if ranking_strategy == RANK_BY_ORDER:
+            return (first_seen_order[line],)
+
+        criteria: list[int] = []
+        if ranking_controls.use_frequency:
+            criteria.append(-line_data.frequency)
+        if ranking_controls.use_depth:
+            criteria.append(-max(line_data.depths))
+        if ranking_controls.use_control_statement:
+            criteria.append(-int(has_control_statement_type(line_data.types)))
+
+        criteria.append(first_seen_order[line])
+        return tuple(criteria)
+
     return sorted(
         line_freq_depth_map.keys(),
-        key=lambda line: (
-            -line_freq_depth_map[line].frequency,
-            -max(line_freq_depth_map[line].depths),
-            -int(has_control_statement_type(line_freq_depth_map[line].types)),
-            first_seen_order[line],
-        ),
+        key=ranking_key,
     )
+
+
+def _select_nodes_for_ranking(
+    traces: list[list[CounterExampleNode]],
+    ranking_controls: CounterExampleRankingControls,
+) -> list[CounterExampleNode]:
+    selected_nodes: list[CounterExampleNode] = []
+    for trace_nodes in traces:
+        grouped_by_line: dict[int, list[CounterExampleNode]] = {}
+        line_order: list[int] = []
+
+        for node in trace_nodes:
+            if node.line not in grouped_by_line:
+                grouped_by_line[node.line] = []
+                line_order.append(node.line)
+            grouped_by_line[node.line].append(node)
+
+        for line in line_order:
+            representative = _pick_representative_node(
+                grouped_by_line[line],
+                ranking_controls,
+            )
+            if representative is not None:
+                selected_nodes.append(representative)
+
+    return selected_nodes
+
+
+def _pick_representative_node(
+    candidates: list[CounterExampleNode],
+    ranking_controls: CounterExampleRankingControls,
+) -> CounterExampleNode | None:
+    if ranking_controls.node_selection_policy == NODE_SELECTION_POLICY_PURE_STATE:
+        for candidate in candidates:
+            if candidate.source == "counterexample_state":
+                return candidate
+        return None
+
+    if ranking_controls.node_selection_policy == NODE_SELECTION_POLICY_REGULAR:
+        for candidate in candidates:
+            if candidate.source != "counterexample_state":
+                return candidate
+        return candidates[0] if candidates else None
+
+    return candidates[0] if candidates else None

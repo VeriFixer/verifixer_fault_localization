@@ -36,7 +36,7 @@ git lfs pull
 python src/run_1_model.py random datasets/pos_test
 
 # All techniques
-python src/run_all_models.py datasets/pos_test
+python src/run_all_models_raw_name.py datasets/pos_test
 
 # Health check (type check + tests + safeguard)
 python src/run_repo_health_check.py --clean-cache
@@ -132,7 +132,8 @@ rm -rf run_artifacts/cached_results/<dataset_name>
 
 - `src/run_1_model_1_example.py` — run one technique per one particular example
 - `src/run_1_model.py` — run one technique
-- `src/run_all_models.py` — benchmark all techniques
+- `src/run_models.py` — generic benchmark runner for explicit model lists
+- `src/run_all_models_raw_name.py` — run full technique set with raw names
 - `src/fl_eval/strategies/` — technique implementations
 - `datasets/` — dataset directories and tarballs
 - `run_artifacts/` — cached results and outputs

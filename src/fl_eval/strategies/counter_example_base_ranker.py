@@ -11,7 +11,6 @@ from fl_eval.util.ranking_strategy import (
     RankingStrategy,
     RANK_BY_FREQUENCY,
     RANK_BY_ORDER,
-    SUPPORTED_RANKING_STRATEGIES,
 )
 
 class CounterExampleBaseRanker(FLTechnique):
@@ -70,7 +69,7 @@ class CounterExampleBaseRanker(FLTechnique):
         else:
             raise ValueError(
                 f"Unknown ranking strategy '{self.ranking_strategy}'. "
-                f"Supported: {[s.name for s in SUPPORTED_RANKING_STRATEGIES]}"
+                f"Supported: {[RANK_BY_FREQUENCY.name, RANK_BY_ORDER.name]}"
             )
 
     def get_fault_localization(self, file: Path) -> list[int]:

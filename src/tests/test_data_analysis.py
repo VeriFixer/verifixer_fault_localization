@@ -173,7 +173,7 @@ def test_print_latex_table_includes_new_non_empty_prediction_columns():
     calls = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
     assert any("\\textbf{Technique} & \\textbf{EXAM$_1$} & \\textbf{EXAM$_2$} & \\textbf{EXAM$_3$} & \\textbf{Found(\\%)} & \\textbf{Empty(\\%)}" in call for call in calls)
     assert any("Evaluated on 2 examples." in call for call in calls)
-    assert any("CNTS" in call for call in calls)
+    assert any("CNTB" in call for call in calls)
     assert any("0.1250" in call for call in calls)
     assert any("0.8750" in call for call in calls)
     assert any("50.00" in call for call in calls)

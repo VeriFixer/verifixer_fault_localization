@@ -1,19 +1,20 @@
 import argparse
 from pathlib import Path
-from fl_eval.util.run_parallel_or_seq import shutdown_parallel_executor
+
+import config as gl
+from analysis.data_analysis import generate_plots, print_ascii_table, print_latex_table
 from fl_eval.metrics.scoring import ExamOutput
 from fl_eval.metrics.summary_stats import StatsSummaryEntry
 from fl_eval.util.run_model_common import (
-    add_run_control_args,
     get_techniques_for_all_models,
+    get_techniques_for_cntm_ablation,
     get_techniques_for_health_check,
     get_techniques_for_paper_only,
     prepare_dataset_cache,
 )
-from run_1_model import compute_metrics_one_dataset
+from fl_eval.util.run_parallel_or_seq import shutdown_parallel_executor
 from logging_config import get_logger
-from analysis.data_analysis import print_ascii_table, print_latex_table, generate_plots
-import config as gl
+from run_1_model import compute_metrics_one_dataset
 
 logger = get_logger(__name__)
 
@@ -81,29 +82,13 @@ def _log_benchmark_llm_cost_totals(
     logger.info("=" * 76)
 
 
-def validate_run_mode_flags(
-    parser: argparse.ArgumentParser,
-    *,
-    paper_only: bool,
-    health_check: bool,
-) -> None:
-    """Validate incompatible run-mode flags for this CLI."""
-    if paper_only and health_check:
-        parser.error("--paper-only cannot be combined with --health-check")
-
-def compute_metrics(
+def run_models_for_techniques(
     base_path: Path,
+    techniques_to_run: list[str],
     sequential: bool = False,
-    health_check: bool = False,
-    paper_only: bool = False,
+    use_paper_names: bool = False,
 ) -> None:
     try:
-        if paper_only:
-            techniques_to_run = get_techniques_for_paper_only()
-        elif health_check:
-            techniques_to_run = get_techniques_for_health_check()
-        else:
-            techniques_to_run = get_techniques_for_all_models()
         logger.info(f"Starting Benchmark on: {base_path}")
         logger.info(f"Techniques to run: {techniques_to_run}")
         raw_results: dict[str, list[ExamOutput]] = {}
@@ -122,50 +107,83 @@ def compute_metrics(
             stats_summary[tech_name] = summary
             if llm_cost_totals is not None:
                 llm_cost_totals_by_technique[tech_name] = llm_cost_totals
+
         if not stats_summary:
             logger.info("No results collected.")
             return
-        print_ascii_table(stats_summary, paper_only=paper_only)
-        print_latex_table(stats_summary, paper_only=paper_only)
+
+        print_ascii_table(stats_summary, paper_only=use_paper_names)
+        print_latex_table(stats_summary, paper_only=use_paper_names)
         _log_benchmark_llm_cost_totals(llm_cost_totals_by_technique)
+
         try:
             images_dir = gl.BASE_PATH / "images"
             images_dir.mkdir(parents=True, exist_ok=True)
-            generate_plots(raw_results, images_dir, paper_only=paper_only)  # type: ignore
+            generate_plots(raw_results, images_dir, paper_only=use_paper_names)  # type: ignore[arg-type]
             logger.info(f"Plot artifacts saved to: {images_dir}")
         except Exception as e:
             logger.error(f"Could not generate plots: {e}")
     finally:
         shutdown_parallel_executor(wait=True)
 
-if __name__ == "__main__":
+
+def _get_techniques_for_set(models_set: str) -> list[str]:
+    if models_set == "all":
+        return get_techniques_for_all_models()
+    if models_set == "paper":
+        return get_techniques_for_paper_only()
+    if models_set == "health-check":
+        return get_techniques_for_health_check()
+    if models_set == "cntm-ablation":
+        return get_techniques_for_cntm_ablation()
+    raise ValueError(f"Unsupported models set: {models_set}")
+
+
+def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Benchmark ALL Fault Localization techniques. For LLM-based techniques, set LLM_REAL_MODEL_NAME env var to select model (e.g., 'qwen3-coder-480b')."
+        description="Run selected Fault Localization technique sets on a dataset."
     )
     parser.add_argument(
         "data_path",
         type=Path,
-        help="Path to dataset directory (containing 'killed' and 'original' folders). For LLM: set LLM_REAL_MODEL_NAME env var to select model."
-    )
-    add_run_control_args(parser)
-
-    parser.add_argument(
-        "--health-check",
-        action="store_true",
-        help="Run reduced technique set for repository health checks (skips slow techniques)."
+        help="Path to dataset directory (containing 'killed' and 'original' folders).",
     )
     parser.add_argument(
-        "--paper-only",
+        "--models-set",
+        type=str,
+        default="all",
+        choices=["all", "paper", "health-check", "cntm-ablation"],
+        help="Predefined technique set to run.",
+    )
+    parser.add_argument(
+        "--clean-cache",
         action="store_true",
-        help="Run only the final-paper technique subset and use publication aliases in outputs."
+        help="Clean cached results before running",
+    )
+    parser.add_argument(
+        "--sequential",
+        action="store_true",
+        help="Run evaluations sequentially",
+    )
+    parser.add_argument(
+        "--use-paper-names",
+        action="store_true",
+        help="Use publication aliases in tables/plots.",
     )
 
     args = parser.parse_args()
-    validate_run_mode_flags(
-        parser,
-        paper_only=args.paper_only,
-        health_check=args.health_check,
-    )
+    if not prepare_dataset_cache(args.data_path, args.clean_cache):
+        return 1
 
-    if prepare_dataset_cache(args.data_path, args.clean_cache):
-        compute_metrics(args.data_path, args.sequential, args.health_check, args.paper_only)
+    techniques_to_run = _get_techniques_for_set(args.models_set)
+    run_models_for_techniques(
+        args.data_path,
+        techniques_to_run,
+        sequential=args.sequential,
+        use_paper_names=args.use_paper_names,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

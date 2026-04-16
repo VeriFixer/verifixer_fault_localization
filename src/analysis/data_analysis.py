@@ -71,7 +71,7 @@ def _print_ascii_scope_table(
     print(separator)
 
 
-def print_ascii_table(stats: dict[str, StatsSummaryEntry], paper_only: bool = False):
+def print_ascii_table(stats: dict[str, StatsSummaryEntry], paper_only: bool = True):
     """Print separate ASCII tables for file scope and method scope."""
     _print_ascii_scope_table(
         "FILE SCOPE",
@@ -104,7 +104,7 @@ def print_ascii_table(stats: dict[str, StatsSummaryEntry], paper_only: bool = Fa
     print()
 
 
-def print_latex_table(stats: dict[str, StatsSummaryEntry], paper_only: bool = False):
+def print_latex_table(stats: dict[str, StatsSummaryEntry], paper_only: bool = True):
     """Print dual-scope LaTeX tables."""
     file_evaluated = next(iter(stats.values())).count if stats else 0
     method_evaluated = next(iter(stats.values())).count_method if stats else 0
@@ -114,7 +114,7 @@ def print_latex_table(stats: dict[str, StatsSummaryEntry], paper_only: bool = Fa
     print(r"    \centering")
     print(r"    \begin{tabular}{l|c|c|c|c|c}")
     print(r"        \hline")
-    print(r"        \textbf{Method} & \textbf{EXAM$_1$} & \textbf{EXAM$_2$} & \textbf{EXAM$_3$} & \textbf{Found} & \textbf{Empty} \\")
+    print(r"        \textbf{Technique} & \textbf{EXAM$_1$} & \textbf{EXAM$_2$} & \textbf{EXAM$_3$} & \textbf{Found(\%)} & \textbf{Empty(\%)} \\")
     print(r"        \hline")
 
     for name, data in stats.items():
@@ -136,7 +136,7 @@ def print_latex_table(stats: dict[str, StatsSummaryEntry], paper_only: bool = Fa
     print(r"    \centering")
     print(r"    \begin{tabular}{l|c|c|c|c|c}")
     print(r"        \hline")
-    print(r"        \textbf{Method} & \textbf{EXAM$_1$} & \textbf{EXAM$_2$} & \textbf{EXAM$_3$} & \textbf{Found} & \textbf{Empty} \\")
+    print(r"        \textbf{Technique} & \textbf{EXAM$_1$} & \textbf{EXAM$_2$} & \textbf{EXAM$_3$} & \textbf{Found(\%)} & \textbf{Empty(\%)} \\")
     print(r"        \hline")
 
     for name, data in stats.items():

@@ -17,6 +17,13 @@ from fl_eval.strategies.empty_ranker import EmptyRanker
 from fl_eval.strategies.llm_ranker import LLMRanker
 from fl_eval.strategies.random_line_of_method_that_fails import RandomLineOfMethodThatFails
 from fl_eval.strategies.random_ranker import RandomRanker
+from fl_eval.util.ranking_strategy import (
+    CNTM_ABLATION_NO_CONTROL,
+    CNTM_ABLATION_NO_DEPTH,
+    CNTM_ABLATION_NO_FREQUENCY,
+    CNTM_ABLATION_PURE_STATE,
+    CounterExampleRankingControls,
+)
 from fl_eval.util.dataset_validation import log_validation_result, validate_dataset
 from logging_config import get_logger
 
@@ -28,6 +35,7 @@ class TechniqueConfig:
     technique_class: type[FLTechnique]
     run_on_all_models: bool = False
     autofix_strategy: str = ""
+    ranking_controls: CounterExampleRankingControls | None = None
 
 
 @dataclass(frozen=True)
@@ -45,6 +53,26 @@ TECHNIQUE_CONFIG: dict[str, TechniqueConfig] = {
     "randomOnFailingMethod": TechniqueConfig(RandomLineOfMethodThatFails, run_on_all_models=True),
     "counterExampleIf": TechniqueConfig(CounterExampleIf, run_on_all_models=True),
     "counterExampleIfReassume": TechniqueConfig(CounterExampleIfReassume, run_on_all_models=True),
+    "CNTM_pure_state": TechniqueConfig(
+        CounterExampleIfReassume,
+        run_on_all_models=False,
+        ranking_controls=CNTM_ABLATION_PURE_STATE,
+    ),
+    "CNTM_no_frequency": TechniqueConfig(
+        CounterExampleIfReassume,
+        run_on_all_models=False,
+        ranking_controls=CNTM_ABLATION_NO_FREQUENCY,
+    ),
+    "CNTM_no_depth": TechniqueConfig(
+        CounterExampleIfReassume,
+        run_on_all_models=False,
+        ranking_controls=CNTM_ABLATION_NO_DEPTH,
+    ),
+    "CNTM_no_control": TechniqueConfig(
+        CounterExampleIfReassume,
+        run_on_all_models=False,
+        ranking_controls=CNTM_ABLATION_NO_CONTROL,
+    ),
     "autofixDefault": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-and-static-score", run_on_all_models=False),
     #"autofixSimplified": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-score-only", run_on_all_models=True),
     "llm_without_api": TechniqueConfig(LLMRanker, run_on_all_models=False),
@@ -76,8 +104,18 @@ PAPER_TECHNIQUE_ALIASES: dict[str, str] = {
 
 
 def get_techniques_for_all_models() -> list[str]:
-    """Return techniques explicitly enabled for run_all_models and guard pipelines."""
+    """Return techniques explicitly enabled for general benchmark and guard pipelines."""
     return [name for name, cfg in TECHNIQUE_CONFIG.items() if cfg.run_on_all_models]
+
+
+def get_techniques_for_cntm_ablation() -> list[str]:
+    return [
+        "counterExampleIfReassume",
+        "CNTM_pure_state",
+        "CNTM_no_frequency",
+        "CNTM_no_depth",
+        "CNTM_no_control",
+    ]
 
 
 def get_techniques_for_paper_only() -> list[str]:
@@ -121,10 +159,13 @@ def setup_evaluation(flt_name: str, base_path: Path, to_validate_dataset : bool 
         logger.error(f"Available techniques: {list(TECHNIQUE_MAP.keys())}")
         return None
 
-    FLT_Class = TECHNIQUE_MAP[flt_name][0]
-    autofix_strategy = TECHNIQUE_MAP[flt_name][1]
+    tech_config = TECHNIQUE_CONFIG[flt_name]
+    FLT_Class = tech_config.technique_class
+    autofix_strategy = tech_config.autofix_strategy
     if FLT_Class == AutoFixRanker:
         fl_technique = FLT_Class(name=flt_name, autofix_strategy=autofix_strategy)
+    elif tech_config.ranking_controls is not None:
+        fl_technique = FLT_Class(name=flt_name, ranking_controls=tech_config.ranking_controls)
     else:
         fl_technique = FLT_Class(name=flt_name)
 

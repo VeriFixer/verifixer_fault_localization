@@ -9,7 +9,7 @@ For a complete repository validation (type check + tests + safeguard), use
 
 Flow:
     1) Extract datasets/pos_test.tar.gz → datasets/pos_test
-    2) Execute src/run_all_models.py on that dataset
+    2) Execute src/run_models.py on that dataset
     3) Validate key outputs:
        - Plot files: run_artifacts/plots_<mutant>.png per FL technique
        - Cache files: run_artifacts/cached_results/<technique>/<mutant>.json
@@ -175,21 +175,20 @@ def validate_dataset_layout(dataset_dir: Path) -> int:
 
 
 def run_benchmark(
-    run_all_models: Path,
+    run_models: Path,
     dataset_dir: Path,
     clean_cache: bool,
     sequential: bool,
     health_check: bool,
 ) -> None:
-    cmd = [sys.executable, str(run_all_models), str(dataset_dir)]
+    cmd = [sys.executable, str(run_models), str(dataset_dir)]
+    cmd.extend(["--models-set", "health-check" if health_check else "all"])
     if clean_cache:
         cmd.append("--clean-cache")
     if sequential:
         cmd.append("--sequential")
-    if health_check:
-        cmd.append("--health-check")
 
-    result = subprocess.run(cmd, cwd=run_all_models.parent.parent)
+    result = subprocess.run(cmd, cwd=run_models.parent.parent)
     if result.returncode != 0:
         raise RuntimeError(f"Benchmark command failed with code {result.returncode}: {' '.join(cmd)}")
 
@@ -388,12 +387,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--clean-cache",
         action="store_true",
-        help="Pass --clean-cache to src/run_all_models.py.",
+        help="Pass --clean-cache to src/run_models.py.",
     )
     parser.add_argument(
         "--sequential",
         action="store_true",
-        help="Pass --sequential to src/run_all_models.py.",
+        help="Pass --sequential to src/run_models.py.",
     )
     parser.add_argument(
         "--health-check",
@@ -415,9 +414,9 @@ def main() -> int:
     dataset_dir = extract_dataset(dataset_tar, datasets_dir, args.extracted_name)
     mutation_count = validate_dataset_layout(dataset_dir)
 
-    run_all_models = repo_root / "src" / "run_all_models.py"
+    run_models = repo_root / "src" / "run_models.py"
     run_benchmark(
-        run_all_models,
+        run_models,
         dataset_dir,
         args.clean_cache,
         args.sequential,

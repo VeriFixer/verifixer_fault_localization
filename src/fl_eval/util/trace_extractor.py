@@ -53,15 +53,19 @@ def extract_counterexample_trace_summary(stdout: str, top_n: int = 10) -> Counte
     traces = cast(list[dict[str, Any]], traces_obj)
 
     all_lines: list[int] = []
+    representative_node_count = 0
     for trace_dict in traces:
         trace_nodes_obj = trace_dict.get("nodes", [])
         if not isinstance(trace_nodes_obj, list):
             continue
         trace_nodes = cast(list[dict[str, Any]], trace_nodes_obj)
+        seen_lines: set[int] = set()
         for node in trace_nodes:
             line = node.get("line")
-            if isinstance(line, int):
+            if isinstance(line, int) and line not in seen_lines:
+                seen_lines.add(line)
                 all_lines.append(line)
+        representative_node_count += len(seen_lines)
 
     line_counts = Counter(all_lines)
     top_lines = [(line, freq) for line, freq in line_counts.most_common(top_n)]
@@ -69,7 +73,7 @@ def extract_counterexample_trace_summary(stdout: str, top_n: int = 10) -> Counte
     return CounterExampleTraceSummary(
         source="counterexample-json",
         trace_count=len(traces),
-        node_count=len(report.nodes),
+        node_count=representative_node_count,
         unique_line_count=len(line_counts),
         top_lines=top_lines,
         raw=report.payload

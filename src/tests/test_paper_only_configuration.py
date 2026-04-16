@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import argparse
-import unittest
 
-from fl_eval.util.run_model_common import get_technique_display_name, get_techniques_for_paper_only
-from run_all_models import validate_run_mode_flags
+from fl_eval.util.run_model_common import (
+    get_technique_display_name,
+    get_techniques_for_cntm_ablation,
+    get_techniques_for_paper_only,
+)
+from run_common import build_common_runner_parser
 
 
 
@@ -34,22 +37,18 @@ def test_paper_alias_mapping() -> None:
 
 
 
-def test_run_all_models_rejects_health_check_with_paper_only() -> None:
-    parser = argparse.ArgumentParser()
-
-    with unittest.TestCase().assertRaises(SystemExit):
-        validate_run_mode_flags(
-            parser,
-            paper_only=True,
-            health_check=True,
-        )
+def test_get_techniques_for_cntm_ablation_exact_subset() -> None:
+    assert get_techniques_for_cntm_ablation() == [
+        "CNTM_pure_state",
+        "CNTM_no_frequency",
+        "CNTM_no_depth",
+        "CNTM_no_control",
+    ]
 
 
-def test_run_all_models_accepts_paper_only_without_health_check() -> None:
-    parser = argparse.ArgumentParser()
+def test_common_runner_parser_includes_use_paper_names_flag() -> None:
+    parser = build_common_runner_parser("test parser")
 
-    validate_run_mode_flags(
-        parser,
-        paper_only=True,
-        health_check=False,
-    )
+    args = parser.parse_args(["datasets/pos_test", "--use-paper-names"])
+    assert isinstance(parser, argparse.ArgumentParser)
+    assert args.use_paper_names is True

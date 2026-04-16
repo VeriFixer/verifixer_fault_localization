@@ -17,7 +17,8 @@ Core flow:
 ## 2) High-signal entry points
 
 - `src/run_1_model.py`: run one technique on one dataset
-- `src/run_all_models.py`: run all techniques + summarize
+- `src/run_models.py`: generic benchmark runner for explicit technique sets
+- `src/run_all_models_raw_name.py`: run all techniques + summarize with raw/internal names
 - `src/run_repo_health_check.py`: complete repository health check (type check + tests + safeguard)
 - `src/run_pos_test_guard.py`: integration safeguard pipeline (preferred integration validation)
 - `src/fl_eval/metrics/scoring.py`: EXAM computation + cache serialization
