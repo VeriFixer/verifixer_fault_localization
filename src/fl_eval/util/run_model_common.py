@@ -47,12 +47,12 @@ class MutationContext:
 
 
 TECHNIQUE_CONFIG: dict[str, TechniqueConfig] = {
-    "random": TechniqueConfig(RandomRanker, run_on_all_models=True),
-    "counterBase": TechniqueConfig(CounterExampleBaseRanker, run_on_all_models=True),
-    "empty": TechniqueConfig(EmptyRanker, run_on_all_models=True),
-    "randomOnFailingMethod": TechniqueConfig(RandomLineOfMethodThatFails, run_on_all_models=True),
-    "counterExampleIf": TechniqueConfig(CounterExampleIf, run_on_all_models=True),
-    "counterExampleIfReassume": TechniqueConfig(CounterExampleIfReassume, run_on_all_models=True),
+    "RANDFILE": TechniqueConfig(RandomRanker, run_on_all_models=True),
+    "CNTB": TechniqueConfig(CounterExampleBaseRanker, run_on_all_models=True),
+    "EMPTY": TechniqueConfig(EmptyRanker, run_on_all_models=True),
+    "RAND": TechniqueConfig(RandomLineOfMethodThatFails, run_on_all_models=True),
+    "CNTS": TechniqueConfig(CounterExampleIf, run_on_all_models=True),
+    "CNTM": TechniqueConfig(CounterExampleIfReassume, run_on_all_models=True),
     "CNTM_pure_state": TechniqueConfig(
         CounterExampleIfReassume,
         run_on_all_models=False,
@@ -73,10 +73,10 @@ TECHNIQUE_CONFIG: dict[str, TechniqueConfig] = {
         run_on_all_models=False,
         ranking_controls=CNTM_ABLATION_NO_CONTROL,
     ),
-    "autofixDefault": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-and-static-score", run_on_all_models=False),
-    #"autofixSimplified": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-score-only", run_on_all_models=True),
-    "llm_without_api": TechniqueConfig(LLMRanker, run_on_all_models=False),
-    "llm_real": TechniqueConfig(LLMRanker, run_on_all_models=True),
+    "SNAP": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-and-static-score", run_on_all_models=False),
+    "SNAP_SIMPLIFIED": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-score-only", run_on_all_models=False),
+    "LLM_NO_API": TechniqueConfig(LLMRanker, run_on_all_models=False),
+    "LLM": TechniqueConfig(LLMRanker, run_on_all_models=True),
 }
 
 
@@ -85,23 +85,13 @@ TECHNIQUE_MAP: dict[str, tuple[type[FLTechnique], str]] = {
 }
 
 PAPER_ONLY_TECHNIQUES: list[str] = [
-    "randomOnFailingMethod",
-    "counterBase",
-    "counterExampleIf",
-    "counterExampleIfReassume",
-    "llm_real",
-    "autofixDefault",
+    "RAND",
+    "CNTB",
+    "CNTS",
+    "CNTM",
+    "LLM",
+    "SNAP",
 ]
-
-PAPER_TECHNIQUE_ALIASES: dict[str, str] = {
-    "randomOnFailingMethod": "RAND",
-    "counterBase": "CNTB",
-    "counterExampleIf": "CNTS",
-    "counterExampleIfReassume": "CNTM",
-    "llm_real": "LLM",
-    "autofixDefault": "SNAP",
-}
-
 
 def get_techniques_for_all_models() -> list[str]:
     """Return techniques explicitly enabled for general benchmark and guard pipelines."""
@@ -110,7 +100,7 @@ def get_techniques_for_all_models() -> list[str]:
 
 def get_techniques_for_cntm_ablation() -> list[str]:
     return [
-        "counterExampleIfReassume",
+        "CNTM",
         "CNTM_pure_state",
         "CNTM_no_frequency",
         "CNTM_no_depth",
@@ -129,12 +119,7 @@ def get_techniques_for_paper_only() -> list[str]:
 
 def get_technique_display_name(name: str, paper_only: bool = False) -> str:
     """Return publication-friendly display name for a technique key.
-    
-    If paper_only=True, applies short paper aliases (e.g., CNTS for counterExampleIf).
-    Otherwise, returns the internal technique name.
     """
-    if paper_only:
-        return PAPER_TECHNIQUE_ALIASES.get(name, name)
     return name
 
 

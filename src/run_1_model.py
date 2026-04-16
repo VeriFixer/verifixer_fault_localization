@@ -21,7 +21,7 @@ from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
 
 logger = get_logger(__name__)
 
-LLM_TECHNIQUE_PREFIXES = ["llm_"]
+LLM_TECHNIQUES = {"LLM", "LLM_NO_API"}
 
 
 def _enable_model_file_logging(technique_name: str) -> None:
@@ -57,7 +57,7 @@ def _enable_model_file_logging(technique_name: str) -> None:
 
 def _is_llm_technique(flt_name: str) -> bool:
     """Check if a technique is LLM-based and requires sequential execution."""
-    return any(flt_name.startswith(prefix) for prefix in LLM_TECHNIQUE_PREFIXES)
+    return  flt_name in  LLM_TECHNIQUES
 
 
 LLM_COST_NUMERIC_FIELDS = [
@@ -288,11 +288,11 @@ if __name__ == "__main__":
 How to use:
   Run the script from the project root directory.
 
-    Example 1: Evaluate the 'random' technique using data in 'datasets/pos_test'
-        $ python src/run_1_model.py random datasets/pos_test
+    Example 1: Evaluate the 'RANDFILE' technique using data in 'datasets/pos_test'
+        $ python src/run_1_model.py RANDFILE datasets/pos_test
 
     Example 2: Evaluate one mutant with a specific LLM model (requires LLM_REAL_MODEL_NAME env var)
-        $ LLM_REAL_MODEL_NAME=qwen3-coder-480b python src/run_1_model.py llm_real datasets/pos_test/killed/foo__mut1.dfy
+        $ LLM_REAL_MODEL_NAME=qwen3-coder-480b python src/run_1_model.py LLM datasets/pos_test/killed/foo__mut1.dfy
 
 """
     
@@ -306,7 +306,7 @@ How to use:
         "technique_name", 
         type=str, 
         choices=TECHNIQUE_MAP.keys(),
-        help="Fault Localization technique (e.g., 'random'). For LLM: use 'llm_real' or 'llm_without_api'. Set LLM_REAL_MODEL_NAME env var to swap models (e.g., 'qwen3-coder-480b')."
+        help="Fault Localization technique (e.g., 'RANDFILE'). For LLM: use 'LLM' or 'LLM_NO_API'. Set LLM_REAL_MODEL_NAME env var to swap models (e.g., 'qwen3-coder-480b')."
     )
 
     parser.add_argument(

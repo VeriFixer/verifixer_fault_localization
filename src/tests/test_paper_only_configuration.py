@@ -15,31 +15,31 @@ from run_common import build_common_runner_parser
 
 def test_get_techniques_for_paper_only_exact_subset() -> None:
     assert get_techniques_for_paper_only() == [
-        "randomOnFailingMethod",
-        "counterBase",
-        "counterExampleIf",
-        "counterExampleIfReassume",
-        "llm_real",
-        "autofixDefault",
+        "RAND",
+        "CNTB",
+        "CNTS",
+        "CNTM",
+        "LLM",
+        "SNAP",
     ]
 
 
 
 def test_paper_alias_mapping() -> None:
-    assert get_technique_display_name("randomOnFailingMethod", paper_only=True) == "RAND"
-    assert get_technique_display_name("counterBase", paper_only=True) == "CNTB"
-    assert get_technique_display_name("counterExampleIf", paper_only=True) == "CNTS"
-    assert get_technique_display_name("counterExampleIfReassume", paper_only=True) == "CNTM"
-    assert get_technique_display_name("llm_real", paper_only=True) == "LLM"
-    assert get_technique_display_name("autofixDefault", paper_only=True) == "SNAP"
-    assert get_technique_display_name("counterExampleIf", paper_only=False) == "counterExampleIf"
-    assert get_technique_display_name("counterBase", paper_only=False) == "counterBase"
+    assert get_technique_display_name("RAND", paper_only=True) == "RAND"
+    assert get_technique_display_name("CNTB", paper_only=True) == "CNTB"
+    assert get_technique_display_name("CNTS", paper_only=True) == "CNTS"
+    assert get_technique_display_name("CNTM", paper_only=True) == "CNTM"
+    assert get_technique_display_name("LLM", paper_only=True) == "LLM"
+    assert get_technique_display_name("SNAP", paper_only=True) == "SNAP"
+    assert get_technique_display_name("CNTS", paper_only=False) == "CNTS"
+    assert get_technique_display_name("CNTB", paper_only=False) == "CNTB"
 
 
 
 def test_get_techniques_for_cntm_ablation_exact_subset() -> None:
     assert get_techniques_for_cntm_ablation() == [
-        "counterExampleIfReassume",
+        "CNTM",
         "CNTM_pure_state",
         "CNTM_no_frequency",
         "CNTM_no_depth",

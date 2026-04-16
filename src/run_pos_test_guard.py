@@ -60,18 +60,18 @@ class TechniqueGuard:
 
 # Manual quality gates for reuse across runs.
 TECHNIQUE_GUARDS: dict[str, TechniqueGuard] = {
-    "random": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
-    "counterBase": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
-    "empty": TechniqueGuard(max_avg_exam=1.0, min_found_count=0, allow_all_empty_predictions=True),
-    "randomOnFailingMethod": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
-    "counterExampleIf": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
-    "counterExampleIfReassume": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
-    "llm_without_api": TechniqueGuard(max_avg_exam=1.0, min_found_count=0, allow_all_empty_predictions=True),
-    "llm_real": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
+    "RANDFILE": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
+    "CNTB": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
+    "EMPTY": TechniqueGuard(max_avg_exam=1.0, min_found_count=0, allow_all_empty_predictions=True),
+    "RAND": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
+    "CNTS": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
+    "CNTM": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
+    "LLM_NO_API": TechniqueGuard(max_avg_exam=1.0, min_found_count=0, allow_all_empty_predictions=True),
+    "LLM": TechniqueGuard(max_avg_exam=1.0, min_found_count=0),
     # Temporary waiver: AutoFix currently returns empty predictions on pos_test.
     # Remove allow_all_empty_predictions=True when AutoFix becomes reliable.
-    "autofixDefault": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
-    "autofixSimplified": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
+    "SNAP": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
+    "SNAP_SIMPLIFIED": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
 }
 
 
@@ -81,17 +81,17 @@ def check_prediction_guarantees(
     """Validate cross-technique monotonic guarantees.
 
     Guarantees:
-        1) Every line predicted by counterBase for a mutation must also be
-            predicted by counterExampleIf for that mutation.
-      2) Every line predicted by counterExampleIf for a mutation must also be
-         predicted by counterExampleIfReassume for that mutation.
+        1) Every line predicted by CNTB for a mutation must also be
+            predicted by CNTS for that mutation.
+      2) Every line predicted by CNTS for a mutation must also be
+         predicted by CNTM for that mutation.
     """
 
     errors: list[str] = []
 
-    counter_base = per_technique_predictions.get("counterBase", {})
-    counter_if = per_technique_predictions.get("counterExampleIf", {})
-    counter_reassume = per_technique_predictions.get("counterExampleIfReassume", {})
+    counter_base = per_technique_predictions.get("CNTB", {})
+    counter_if = per_technique_predictions.get("CNTS", {})
+    counter_reassume = per_technique_predictions.get("CNTM", {})
 
     all_mutations = sorted(
         set(counter_base.keys())
@@ -108,8 +108,8 @@ def check_prediction_guarantees(
         if missing_from_if:
             errors.append(
                 "Guarantee failed for mutation "
-                f"'{mutation_name}': counterBase lines {sorted(set(base_preds))} "
-                "must be included in counterExampleIf, but missing "
+                f"'{mutation_name}': CNTB lines {sorted(set(base_preds))} "
+                "must be included in CNTS, but missing "
                 f"lines are {missing_from_if}."
             )
 
@@ -117,8 +117,8 @@ def check_prediction_guarantees(
         if missing_from_reassume:
             errors.append(
                 "Guarantee failed for mutation "
-                f"'{mutation_name}': counterExampleIf lines {sorted(set(if_preds))} "
-                "must be included in counterExampleIfReassume, but missing "
+                f"'{mutation_name}': CNTS lines {sorted(set(if_preds))} "
+                "must be included in CNTM, but missing "
                 f"lines are {missing_from_reassume}."
             )
     return errors

@@ -22,15 +22,15 @@ LLM_MODEL_CHOICES = list(MODEL_REGISTRY.keys())
 # Usage: LLM_REAL_MODEL_NAME=qwen3-coder-next python src/run_*.py ...
 # To add new models: add them to MODEL_REGISTRY in llm_configurations.py
 TECHNIQUE_TO_LLM_MODEL: dict[str, str] = {
-    "llm_without_api": "without_api",  # Fixed: always use interactive API-free mode
-    "llm_real": os.getenv("LLM_REAL_MODEL_NAME", "cost_stub_all_lines_ranked"),  # Swappable via env var
+    "LLM_NO_API": "without_api",  # Fixed: always use interactive API-free mode
+    "LLM": os.getenv("LLM_REAL_MODEL_NAME", "cost_stub_all_lines_ranked"),  # Swappable via env var
 }
 
 
 class LLMRanker(FLTechnique):
     def __init__(self, name: str, **kwargs: Any) -> None:
         super().__init__(name, **kwargs)
-        if(name == "llm_stub_all_lines_ranked"):
+        if(name == "LLM_NO_API"):
             self.suppress_scope_warnings: bool = True
         selected_model = TECHNIQUE_TO_LLM_MODEL.get(name)
         if selected_model is None:

@@ -125,7 +125,7 @@ def test_generate_plots_creates_output_file(tmp_path: Path):
 
 def test_print_ascii_table_includes_new_non_empty_prediction_columns():
     stats = {
-        "randomOnFailingMethod": StatsSummaryEntry(
+        "RAND": StatsSummaryEntry(
             count=3,
             avg_exam_file=0.3333,
             avg_exam_not_empty_file=0.1234,
@@ -153,7 +153,7 @@ def test_print_ascii_table_includes_new_non_empty_prediction_columns():
 
 def test_print_latex_table_includes_new_non_empty_prediction_columns():
     stats = {
-        "counterBase": StatsSummaryEntry(
+        "CNTB": StatsSummaryEntry(
             count=2,
             avg_exam_file=0.5,
             avg_exam_not_empty_file=0.125,
