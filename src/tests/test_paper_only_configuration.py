@@ -39,6 +39,7 @@ def test_paper_alias_mapping() -> None:
 
 def test_get_techniques_for_cntm_ablation_exact_subset() -> None:
     assert get_techniques_for_cntm_ablation() == [
+        "counterExampleIfReassume",
         "CNTM_pure_state",
         "CNTM_no_frequency",
         "CNTM_no_depth",
