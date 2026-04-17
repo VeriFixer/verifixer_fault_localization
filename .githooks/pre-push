@@ -15,7 +15,7 @@ if command -v docker >/dev/null 2>&1; then
   if docker build -t "${IMAGE_TAG}" .; then
     echo "[pre-push] Running repository health check inside container"
     docker run --rm -w /app "${IMAGE_TAG}" \
-      python src/run_repo_health_check.py --clean-cache
+      python src/integration_tests/health_check.py --clean-cache
     HEALTH_CHECK_RAN=1
   else
     echo "[pre-push] Docker-based health check failed; falling back to host validation." >&2
@@ -31,7 +31,7 @@ if [[ "${HEALTH_CHECK_RAN}" -eq 0 ]]; then
   fi
 
   echo "[pre-push] Running repository health check on the host"
-  python3 src/run_repo_health_check.py --clean-cache
+  python3 src/integration_tests/health_check.py --clean-cache
 fi
 
 if ! command -v git >/dev/null 2>&1 || ! git lfs version >/dev/null 2>&1; then
