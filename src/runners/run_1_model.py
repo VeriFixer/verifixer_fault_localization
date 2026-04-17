@@ -3,21 +3,21 @@ import argparse
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import config as gl
 from logging_config import get_logger
 from fl_eval.metrics.scoring import ExamOutput
 from fl_eval.metrics.summary_stats import StatsSummaryEntry
-from fl_eval.util.run_model_common import (
+from runners.run_model_common import (
     TECHNIQUE_MAP,
     add_run_control_args,
     generate_report,
     prepare_dataset_cache,
 )
-from run_1_model_1_example import compute_metrics_one_example
+from runners.run_1_model_1_example import compute_metrics_one_example
 
-from fl_eval.util.run_parallel_or_seq import run_parallel_or_seq
+from fl_eval.execution.parallel_executor import run_parallel_or_seq
 
 logger = get_logger(__name__)
 
@@ -25,8 +25,8 @@ LLM_TECHNIQUES = {"LLM", "LLM_NO_API"}
 
 
 def _enable_model_file_logging(technique_name: str) -> None:
-    """Mirror logs to run_artifacts/models_log/<technique_name>.log."""
-    logs_dir = gl.BASE_PATH / "run_artifacts" / "models_log"
+    """Mirror logs to tmp/run_artifacts/models_log/<technique_name>.log."""
+    logs_dir = gl.MODELS_LOG_DIR
     log_file = logs_dir / f"{technique_name}.log"
 
     try:
@@ -101,25 +101,28 @@ def _sum_llm_costs_from_cache(
 
         if not isinstance(payload, dict):
             continue
+        payload_dict = cast(dict[str, Any], payload)
 
-        execution_metadata = payload.get("execution_metadata")
+        execution_metadata = payload_dict.get("execution_metadata")
         if not isinstance(execution_metadata, dict):
             continue
+        execution_metadata_dict = cast(dict[str, Any], execution_metadata)
 
-        llm_cost = execution_metadata.get("llm_cost")
+        llm_cost = execution_metadata_dict.get("llm_cost")
         if not isinstance(llm_cost, dict):
             continue
+        llm_cost_dict = cast(dict[str, Any], llm_cost)
 
         mutants_with_llm_cost += 1
-        raw_model_name = llm_cost.get("model_name")
-        raw_model_id = llm_cost.get("model_id")
+        raw_model_name = llm_cost_dict.get("model_name")
+        raw_model_id = llm_cost_dict.get("model_id")
         if isinstance(raw_model_name, str) and raw_model_name:
             model_name = raw_model_name
         if isinstance(raw_model_id, str) and raw_model_id:
             model_id = raw_model_id
 
         for key in LLM_COST_NUMERIC_FIELDS:
-            value = llm_cost.get(key)
+            value = llm_cost_dict.get(key)
             if isinstance(value, (int, float)) and not isinstance(value, bool):
                 totals[key] += float(value)
 
@@ -288,11 +291,11 @@ if __name__ == "__main__":
 How to use:
   Run the script from the project root directory.
 
-    Example 1: Evaluate the 'RANDFILE' technique using data in 'datasets/pos_test'
-        $ python src/run_1_model.py RANDFILE datasets/pos_test
+    Example 1: Evaluate the 'RANDFILE' technique using data in 'dataset/data/pos_test'
+        $ python src/run_1_model.py RANDFILE dataset/data/pos_test
 
     Example 2: Evaluate one mutant with a specific LLM model (requires LLM_REAL_MODEL_NAME env var)
-        $ LLM_REAL_MODEL_NAME=qwen3-coder-480b python src/run_1_model.py LLM datasets/pos_test/killed/foo__mut1.dfy
+        $ LLM_REAL_MODEL_NAME=qwen3-coder-480b python src/run_1_model.py LLM dataset/data/pos_test/killed/foo__mut1.dfy
 
 """
     
@@ -312,7 +315,7 @@ How to use:
     parser.add_argument(
         "data_path", 
         type=Path,
-        help="The path to the parent directory containing the 'killed' and 'original' folders (e.g., datasets/pos_test)."
+        help="The path to the parent directory containing the 'killed' and 'original' folders (e.g., dataset/data/pos_test)."
     )
 
     add_run_control_args(parser)

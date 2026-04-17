@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
-from fl_eval.util.counterexample_trace_utils import parse_counterexample_trace_report
+from fl_eval.tracing.counterexample_trace_utils import parse_counterexample_trace_report
 
 
 @dataclass(frozen=True)

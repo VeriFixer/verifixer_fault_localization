@@ -8,7 +8,7 @@ from fl_eval.metrics.scoring import ExamOutput, load_execution_metadata_from_cac
 from fl_eval.strategies.autofix_ranker import AutoFixRanker
 from fl_eval.strategies.llm_ranker import LLMRanker
 from fl_eval.util.terminal_colors import Color, colored, separator
-from fl_eval.util.trace_extractor import (
+from fl_eval.tracing.trace_extractor import (
     extract_autofix_summary,
     extract_counterexample_base_summary,
     extract_counterexample_trace_summary,

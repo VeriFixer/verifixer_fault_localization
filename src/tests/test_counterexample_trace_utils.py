@@ -1,4 +1,4 @@
-from fl_eval.util.counterexample_trace_utils import parse_counterexample_trace_report, rank_counterexample_nodes
+from fl_eval.tracing.counterexample_trace_utils import parse_counterexample_trace_report, rank_counterexample_nodes
 from fl_eval.util.ranking_strategy import (
     CounterExampleRankingControls,
     NODE_SELECTION_POLICY_PURE_STATE,

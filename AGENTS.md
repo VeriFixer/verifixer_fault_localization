@@ -16,13 +16,13 @@ Core flow:
 
 ## 2) High-signal entry points
 
-- `src/run_1_model.py`: run one technique on one dataset
-- `src/run_models.py`: generic benchmark runner for explicit technique sets
-- `src/run_all_models_raw_name.py`: run all techniques + summarize with raw/internal names
-- `src/run_repo_health_check.py`: complete repository health check (type check + tests + safeguard)
-- `src/run_pos_test_guard.py`: integration safeguard pipeline (preferred integration validation)
+- `src/runners/run_1_model.py`: run one technique on one dataset
+- `src/runners/run_models.py`: generic benchmark runner for explicit technique sets
+- `src/runners/run_all_models_raw_name.py`: run all techniques + summarize with raw/internal names
+- `src/integration_tests/health_check.py`: complete repository health check (type check + tests + safeguard)
+- `src/safeguards/pos_test_guard.py`: integration safeguard pipeline (preferred integration validation)
 - `src/fl_eval/metrics/scoring.py`: EXAM computation + cache serialization
-- `src/fl_eval/util/run_external_cmd.py`: external command execution + last-run metadata capture
+- `src/fl_eval/execution/external_cmd.py`: external command execution + last-run metadata capture
 - `src/analysis/data_analysis.py`: tables, plots, method comparison
 - `src/config.py`: centralized paths + limits configuration
 - `src/logging_config.py`: centralized logging setup
@@ -44,13 +44,13 @@ pyright src
 ### Integration safeguard (preferred integration check)
 
 ```bash
-python src/run_pos_test_guard.py --dataset-tar datasets/pos_test.tar.gz --clean-cache
+python src/safeguards/pos_test_guard.py --dataset-tar dataset/data/pos_test.tar.gz --clean-cache
 ```
 
 ### Complete repository health check (recommended)
 
 ```bash
-python src/run_repo_health_check.py --clean-cache
+python src/integration_tests/health_check.py --clean-cache
 ```
 
 ## 4) Configuration knobs (environment variables)
@@ -63,7 +63,7 @@ python src/run_repo_health_check.py --clean-cache
 
 ## 5) Cache format
 
-Cache location: `run_artifacts/cached_results/<dataset_name>/<technique>/<mutant>.json`
+Cache location: `tmp/run_artifacts/cached_results/<dataset_name>/<technique>/<mutant>.json`
 
 All caches are organized by dataset name to allow independent cache management per dataset.
 
@@ -138,5 +138,5 @@ Validation runs once per technique in `_setup_evaluation()` before mutation proc
 2. Make smallest safe patch
 3. Run `pyright src`
 4. Run `pytest -q src/tests`
-5. If touching pipeline behavior, run `run_pos_test_guard.py` (or `run_repo_health_check.py`)
+5. If touching pipeline behavior, run `src/safeguards/pos_test_guard.py` (or `src/integration_tests/health_check.py`)
 6. Update docs when changing runtime behavior

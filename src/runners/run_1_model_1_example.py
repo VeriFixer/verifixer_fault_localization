@@ -5,11 +5,11 @@ from pathlib import Path
 from fl_eval.core.abstract import FLTechnique
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import ExamOutput
-from fl_eval.util.run_model_common import (
+from runners.run_model_common import (
     TECHNIQUE_MAP,
     execute_single_mutation,
 )
-from fl_eval.util.run_one_example_output import (
+from fl_eval.reporting.run_one_example_output import (
     clean_cache_for_run,
     print_one_example_intro,
     print_section,
@@ -55,16 +55,16 @@ How to use:
   Run the script from the project root directory.
 
     Example 1: Evaluate one mutant with a non-LLM technique
-        $ python src/run_1_model_1_example.py RANDFILE datasets/pos_test/killed/foo__mut1.dfy
+        $ python src/run_1_model_1_example.py RANDFILE dataset/data/pos_test/killed/foo__mut1.dfy
 
     Example 2: Evaluate one mutant with LLM (interactive, no API calls for debugging)
-        $ python src/run_1_model_1_example.py LLM_NO_API datasets/pos_test/killed/foo__mut1.dfy
+        $ python src/run_1_model_1_example.py LLM_NO_API dataset/data/pos_test/killed/foo__mut1.dfy
 
     Example 3: Evaluate one mutant with LLM (default cost_stub_all_lines_ranked)
-        $ python src/run_1_model_1_example.py LLM datasets/pos_test/killed/foo__mut1.dfy
+        $ python src/run_1_model_1_example.py LLM dataset/data/pos_test/killed/foo__mut1.dfy
 
     Example 4: Evaluate one mutant with a specific LLM model (requires LLM_REAL_MODEL_NAME env var)
-        $ LLM_REAL_MODEL_NAME=qwen3-coder-480b python src/run_1_model_1_example.py LLM datasets/pos_test/killed/foo__mut1.dfy
+        $ LLM_REAL_MODEL_NAME=qwen3-coder-480b python src/run_1_model_1_example.py LLM dataset/data/pos_test/killed/foo__mut1.dfy
 """
 
     parser = argparse.ArgumentParser(

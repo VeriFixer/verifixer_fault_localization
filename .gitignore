@@ -1,15 +1,15 @@
 src/cached_results/*
-run_artifacts/*
-!run_artifacts/.empty_marker
+tmp/*
+!tmp/.empty_marker
 
 
 # Setting the datasets
-datasets/*
-!datasets/dafnybench_all_mutants.tar.gz
-!datasets/dafnybench_original_can_run.tar.gz
-!datasets/sample_original_can_run.tar.gz
-!datasets/dafnytestgen_tests_can_run.tar.gz
-!datasets/pos_test.tar.gz
+dataset/data/*
+!dataset/data/dafnybench_all_mutants.tar.gz
+!dataset/data/dafnybench_original_can_run.tar.gz
+!dataset/data/sample_original_can_run.tar.gz
+!dataset/data/dafnytestgen_tests_can_run.tar.gz
+!dataset/data/pos_test.tar.gz
 
 
 # Byte-compiled / optimized / DLL files

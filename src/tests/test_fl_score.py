@@ -44,7 +44,7 @@ class TestFLCore(unittest.TestCase):
         self.temp_dir.cleanup()
         
         # Clean up cached results for this test dataset
-        dataset_cache = gl.get_dataset_cache_dir(Path("datasets/test"))
+        dataset_cache = gl.get_dataset_cache_dir(Path("dataset/data/test"))
         if dataset_cache.exists():
             shutil.rmtree(dataset_cache)
 
@@ -91,7 +91,7 @@ class TestFLCore(unittest.TestCase):
 
         num_runs = 100
         valid_scores = {0.0, 0.25, 0.5, 0.75, 1.0} # Ranks 0-4 out of 5 total lines
-        dataset_dir = Path("datasets/test")
+        dataset_dir = Path("dataset/data/test")
 
         for _ in range(num_runs):
             examp_out = compute_exam_score(self.ranker, mock_gtruth, dataset_dir)

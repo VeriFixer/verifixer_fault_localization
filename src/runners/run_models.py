@@ -5,16 +5,16 @@ import config as gl
 from analysis.data_analysis import generate_plots, print_ascii_table, print_latex_table
 from fl_eval.metrics.scoring import ExamOutput
 from fl_eval.metrics.summary_stats import StatsSummaryEntry
-from fl_eval.util.run_model_common import (
+from runners.run_model_common import (
     get_techniques_for_all_models,
     get_techniques_for_cntm_ablation,
     get_techniques_for_health_check,
     get_techniques_for_paper_only,
     prepare_dataset_cache,
 )
-from fl_eval.util.run_parallel_or_seq import shutdown_parallel_executor
+from fl_eval.execution.parallel_executor import shutdown_parallel_executor
 from logging_config import get_logger
-from run_1_model import compute_metrics_one_dataset
+from runners.run_1_model import compute_metrics_one_dataset
 
 logger = get_logger(__name__)
 
@@ -117,7 +117,7 @@ def run_models_for_techniques(
         _log_benchmark_llm_cost_totals(llm_cost_totals_by_technique)
 
         try:
-            images_dir = gl.BASE_PATH / "images"
+            images_dir = gl.IMAGES_DIR
             images_dir.mkdir(parents=True, exist_ok=True)
             generate_plots(raw_results, images_dir, paper_only=use_paper_names)  # type: ignore[arg-type]
             logger.info(f"Plot artifacts saved to: {images_dir}")

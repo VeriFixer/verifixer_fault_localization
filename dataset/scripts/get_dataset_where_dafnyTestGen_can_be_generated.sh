@@ -3,21 +3,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/find_repo_root.sh"
 BASE_PATH="$(find_repo_root)" || exit 1 
 
-OUT_DIR="${BASE_PATH}/datasets/post_test_with_tests"
+OUT_DIR="${BASE_PATH}/dataset/data/post_test_with_tests"
 mkdir -p "$OUT_DIR/killed"
 mkdir -p "$OUT_DIR/original"
 mkdir -p "$OUT_DIR/not_supported"
 
-FULL_DATASET_DIR="${BASE_PATH}/datasets/pos_test"
-#FULL_DATASET_DIR="${BASE_PATH}/datasets/pos_test"
+FULL_DATASET_DIR="${BASE_PATH}/dataset/data/pos_test"
+#FULL_DATASET_DIR="${BASE_PATH}/dataset/data/pos_test"
 
 ORIG_DIR="$FULL_DATASET_DIR/original"
 KILLED_DIR="$FULL_DATASET_DIR/killed"   # define killed directory
 MAX_JOBS=${MAX_JOBS:-$(( $(nproc) ))}
 #MAX_JOBS=1
 
-PROGRESS_LOCK="${BASE_PATH}/src/progress.lock"
-PROGRESS_TMP="${BASE_PATH}/src/progress.tmp"
+PROGRESS_LOCK="${BASE_PATH}/tmp/dataset_scripts_progress.lock"
+PROGRESS_TMP="${BASE_PATH}/tmp/dataset_scripts_progress.tmp"
+
+mkdir -p "${BASE_PATH}/tmp"
 
 process_file() {
     killed_file="$1"

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import config as gl
-import fl_eval.util.run_external_cmd as run_cmd
+import fl_eval.execution.external_cmd as run_cmd
 from fl_eval.core import method_extractor as me
 
 

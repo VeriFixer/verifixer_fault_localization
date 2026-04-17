@@ -11,7 +11,7 @@ Responsibilities:
 Usage:
     import config as gl
     print(gl.BASE_PATH)  # Repository root
-    print(gl.CACHE_DIR)  # run_artifacts/cached_results
+    print(gl.CACHE_DIR)  # tmp/run_artifacts/cached_results
     print(gl.MAX_TIME_EXTERNAL_PROGRAMS)  # Timeout in seconds
     print(gl.RANDOM_FL_EXECUTABLE)  # Path to random strategy executable
 
@@ -55,10 +55,16 @@ def find_repo_root(marker: str = ".repo_verifixer_fault_localization_marker") ->
 
 # === Repository Structure ===
 BASE_PATH: Path = find_repo_root()
+DATASET_ROOT: Path = BASE_PATH / "dataset" / "data"
+DATASET_SCRIPTS_ROOT: Path = BASE_PATH / "dataset" / "scripts"
+TMP_ROOT: Path = BASE_PATH / "tmp"
+ARTIFACTS_ROOT: Path = TMP_ROOT / "run_artifacts"
 
 # === Output and Cache Directories ===
-CACHE_DIR: Path = BASE_PATH / "run_artifacts" / "cached_results"
-AUTOFIX_RUNS_DIR: Path = BASE_PATH / "run_artifacts" / "autofix_fl_runs"
+CACHE_DIR: Path = ARTIFACTS_ROOT / "cached_results"
+AUTOFIX_RUNS_DIR: Path = ARTIFACTS_ROOT / "autofix_fl_runs"
+MODELS_LOG_DIR: Path = ARTIFACTS_ROOT / "models_log"
+IMAGES_DIR: Path = ARTIFACTS_ROOT / "images"
 
 # === Performance Limrun_external_cmdits for External Programs ===
 # Can be overridden via environment variables: FL_MAX_RAM_GB, FL_MAX_TIME_SECONDS
@@ -110,7 +116,7 @@ RETURN_AT_RANDOM_ALL_LINES_DIR: Optional[Path] = get_strategy_executable_path(
     "ReturnAtRandomAllLinesOfFailingMethod",
     "FL_RETURN_AT_RANDOM_ALL_LINES_DIR"
 )
-AUTOFIX_DIR: Path = BASE_PATH / "Dafny-AutoFix"
+AUTOFIX_DIR: Path = BASE_PATH / "external" / "tools" / "dafny-autofix"
 
 # Autofix script path
 AUTOFIX_SCRIPT: Path = AUTOFIX_DIR / "run.sh"
@@ -127,17 +133,17 @@ def get_file_cache_path(file_path : Path, technique_name : str) -> Path:
 def get_dataset_cache_dir(dataset_dir: Path) -> Path:
     """Get the cache directory for a specific dataset.
     
-    Cache structure: run_artifacts/cached_results/<dataset_name>/
+    Cache structure: tmp/run_artifacts/cached_results/<dataset_name>/
     
     Args:
-        dataset_dir: Path to the dataset directory (e.g., datasets/pos_test).
+        dataset_dir: Path to the dataset directory (e.g., dataset/data/pos_test).
     
     Returns:
         Path to the cache directory for this dataset.
     
     Examples:
-        >>> get_dataset_cache_dir(Path("datasets/pos_test"))
-        Path('run_artifacts/cached_results/pos_test')
+        >>> get_dataset_cache_dir(Path("dataset/data/pos_test"))
+        Path('tmp/run_artifacts/cached_results/pos_test')
     """
     # Use the absolute path's name to create a dataset-specific cache dir
     dataset_abs = dataset_dir.resolve()
@@ -160,8 +166,14 @@ def print_config(verbose: bool = True) -> None:
         print("FAULT LOCALIZATION CONFIGURATION")
         print("="*70)
         print(f"Repository Root (BASE_PATH)        : {BASE_PATH}")
+        print(f"Dataset Root                       : {DATASET_ROOT}")
+        print(f"Dataset Scripts Root               : {DATASET_SCRIPTS_ROOT}")
+        print(f"Tmp Root                           : {TMP_ROOT}")
+        print(f"Artifacts Root                     : {ARTIFACTS_ROOT}")
         print(f"Cache Directory                    : {CACHE_DIR}")
         print(f"AutoFix Runs Directory             : {AUTOFIX_RUNS_DIR}")
+        print(f"Model Logs Directory               : {MODELS_LOG_DIR}")
+        print(f"Images Directory                   : {IMAGES_DIR}")
         print(f"Max RAM for External Programs      : {MAX_RAM_EXTERNAL_PROGRAMS} GB")
         print(f"Max Time for External Programs     : {MAX_TIME_EXTERNAL_PROGRAMS} seconds")
         print()

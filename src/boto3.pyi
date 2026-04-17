@@ -1,3 +1,0 @@
-from typing import Any
-
-def client(*args: Any, **kwargs: Any) -> Any: ...

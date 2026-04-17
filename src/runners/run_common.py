@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from fl_eval.util.run_model_common import add_run_control_args
+from runners.run_model_common import add_run_control_args
 
 
 def build_common_runner_parser(description: str) -> argparse.ArgumentParser:

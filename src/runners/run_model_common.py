@@ -24,7 +24,7 @@ from fl_eval.util.ranking_strategy import (
     CNTM_ABLATION_PURE_STATE,
     CounterExampleRankingControls,
 )
-from fl_eval.util.dataset_validation import log_validation_result, validate_dataset
+from fl_eval.validation.dataset_validation import log_validation_result, validate_dataset
 from logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -130,7 +130,7 @@ def get_techniques_for_health_check() -> list[str]:
     core functionality validation.
     """
     # Exclude autofix (slow, long-running) and LLM techniques
-    excluded = {"autofixDefault", "autofixSimplified", "llm_stub_all_lines_ranked", "llm_qwen_480b"}
+    excluded = {"SNAP", "SNAP_SIMPLIFIED", "LLM", "LLM_NO_API"}
     return [
         name for name, cfg in TECHNIQUE_CONFIG.items() 
         if cfg.run_on_all_models and name not in excluded

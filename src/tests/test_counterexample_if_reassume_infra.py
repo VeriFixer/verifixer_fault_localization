@@ -56,11 +56,11 @@ def _extract_trace_and_node_counts(stdout: str) -> tuple[int, int]:
     ("mutant_rel_path", "expected_min_traces", "expected_min_nodes"),
     [
         # User-provided basic example baseline.
-        ("datasets/pos_test/killed/example_to_test_reassume__MUTANT.dfy", 4, 20),
+        ("dataset/data/pos_test/killed/example_to_test_reassume__MUTANT.dfy", 4, 20),
         # Previously failing baselines for debugging.
-        ("datasets/pos_test/killed/Dafny-Practice_tmp_tmphnmt4ovh_BST__3880-3880_AOI.dfy", 1, 10),
-        ("datasets/pos_test/killed/abs__171-182_SDL.dfy", 1, 2),
-        ("datasets/pos_test/killed/dafny-duck_tmp_tmplawbgxjo_p4__526_AOR_Sub.dfy", 2, 10),
+        ("dataset/data/pos_test/killed/Dafny-Practice_tmp_tmphnmt4ovh_BST__3880-3880_AOI.dfy", 1, 10),
+        ("dataset/data/pos_test/killed/abs__171-182_SDL.dfy", 1, 2),
+        ("dataset/data/pos_test/killed/dafny-duck_tmp_tmplawbgxjo_p4__526_AOR_Sub.dfy", 2, 10),
     ],
 )
 def test_counterexample_if_reassume_csharp_output_baselines(

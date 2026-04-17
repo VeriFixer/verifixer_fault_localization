@@ -1,5 +1,5 @@
 from fl_eval.core.abstract import FLTechnique
-import fl_eval.util.run_external_cmd as run_cmd
+import fl_eval.execution.external_cmd as run_cmd
 import config as gl
 from typing import Any
 from pathlib import Path

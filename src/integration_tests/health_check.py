@@ -7,7 +7,7 @@ Runs, in order:
   3) Existing pos_test safeguard benchmark validation
 
 Usage:
-  python src/run_repo_health_check.py --clean-cache
+  python src/integration_tests/health_check.py --clean-cache
 """
 
 from __future__ import annotations
@@ -18,8 +18,17 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+import config as gl
+from config import find_repo_root
+
+# Setup sys.path using repo root discovery
+_REPO_ROOT = find_repo_root()
+_SRC_ROOT = _REPO_ROOT / "src"
+if str(_SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SRC_ROOT))
+
 from fl_eval.util.terminal_colors import Color, colored, separator
-from run_pos_test_guard import find_repo_root
+from safeguards.pos_test_guard import check_prediction_guarantees
 
 
 TYPE_CHECK_CMDS: list[tuple[str, list[str]]] = [
@@ -54,7 +63,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dataset-tar",
         type=Path,
-        default=Path("datasets/pos_test.tar.gz"),
+        default=Path("dataset/data/pos_test.tar.gz"),
         help="Path to the pos_test dataset tarball used by safeguard step.",
     )
     parser.add_argument(
@@ -66,12 +75,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--clean-cache",
         action="store_true",
-        help="Pass --clean-cache to src/run_pos_test_guard.py.",
+        help="Pass --clean-cache to src/safeguards/pos_test_guard.py.",
     )
     parser.add_argument(
         "--sequential",
         action="store_true",
-        help="Pass --sequential to src/run_pos_test_guard.py.",
+        help="Pass --sequential to src/safeguards/pos_test_guard.py.",
     )
     parser.add_argument(
         "--skip-type-check",
@@ -93,7 +102,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    repo_root = find_repo_root(Path(__file__))
+    # find_repo_root() expects the marker filename, not a file path.
+    repo_root = find_repo_root()
     step_results: list[StepResult] = []
 
     # Phase 1: Type checking
@@ -132,7 +142,7 @@ def main() -> int:
     
     safeguard_cmd: list[str] = [
         sys.executable,
-        str(repo_root / "src" / "run_pos_test_guard.py"),
+        str(repo_root / "src" / "safeguards" / "pos_test_guard.py"),
         "--dataset-tar",
         str(args.dataset_tar),
         "--extracted-name",

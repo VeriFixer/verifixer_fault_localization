@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, cast
 
-from fl_eval.util.trace_extractor import (
+from fl_eval.tracing.trace_extractor import (
     extract_autofix_summary,
     extract_counterexample_base_summary,
     extract_counterexample_trace_summary,

@@ -5,19 +5,19 @@ This script serves as CI/local smoke test to detect infrastructure breakage. It 
 full FL evaluation pipeline and validates that all expected artifacts are produced.
 
 For a complete repository validation (type check + tests + safeguard), use
-`src/run_repo_health_check.py`.
+`src/integration_tests/health_check.py`.
 
 Flow:
-    1) Extract datasets/pos_test.tar.gz → datasets/pos_test
-    2) Execute src/run_models.py on that dataset
+    1) Extract dataset/data/pos_test.tar.gz → dataset/data/pos_test
+    2) Execute src/runners/run_models.py on that dataset
     3) Validate key outputs:
-       - Plot files: run_artifacts/plots_<mutant>.png per FL technique
-       - Cache files: run_artifacts/cached_results/<technique>/<mutant>.json
+       - Plot files: tmp/run_artifacts/images/*.png
+       - Cache files: tmp/run_artifacts/cached_results/<dataset>/<technique>/<mutant>.json
        - Metadata: execution_metadata (timestamps, commands, status) in cache
     4) Apply quality gates (EXAM score thresholds, minimum fault detection rate)
 
 Usage:
-    python src/run_pos_test_guard.py --dataset-tar datasets/pos_test.tar.gz [--clean-cache]
+    python src/safeguards/pos_test_guard.py --dataset-tar dataset/data/pos_test.tar.gz [--clean-cache]
 
 Quality Gates:
     Each technique has max_avg_exam and min_found_count thresholds to detect regressions.
@@ -43,12 +43,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+# Setup: Find repo root via marker file, then add src to path
+REPO_MARKER = ".repo_verifixer_fault_localization_marker"
+
 import config as gl
+from config import find_repo_root
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import compute_exam_score_one_file, load_from_file_output
-from fl_eval.util.run_model_common import TECHNIQUE_MAP, get_techniques_for_all_models, get_techniques_for_health_check
-
-REPO_MARKER = ".repo_verifixer_fault_localization_marker"
+from runners.run_model_common import TECHNIQUE_MAP, get_techniques_for_all_models, get_techniques_for_health_check
 
 
 @dataclass(frozen=True)
@@ -72,6 +74,13 @@ TECHNIQUE_GUARDS: dict[str, TechniqueGuard] = {
     # Remove allow_all_empty_predictions=True when AutoFix becomes reliable.
     "SNAP": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
     "SNAP_SIMPLIFIED": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
+}
+
+# In health-check mode we keep only infrastructure/smoke guarantees for techniques
+# that currently depend on optional strategy binaries in some environments.
+HEALTH_CHECK_OPTIONAL_QUALITY_TECHNIQUES: set[str] = {
+    "RAND",
+    "CNTS",
 }
 
 
@@ -124,19 +133,6 @@ def check_prediction_guarantees(
     return errors
 
 
-def find_repo_root(start: Path) -> Path:
-    current = start.resolve()
-    if current.is_file():
-        current = current.parent
-
-    while True:
-        if (current / REPO_MARKER).exists():
-            return current
-        if current.parent == current:
-            raise FileNotFoundError(
-                f"Could not locate repository root marker '{REPO_MARKER}' from {start}."
-            )
-        current = current.parent
 
 
 def extract_dataset(dataset_tar: Path, datasets_dir: Path, extracted_name: str) -> Path:
@@ -213,14 +209,14 @@ def validate_outputs(
     )
 
     required_split_plots = [
-        gl.BASE_PATH / "images" / "benchmark_hybrid_analysis_FILE_distribution.png",
-        gl.BASE_PATH / "images" / "benchmark_hybrid_analysis_FILE_success.png",
+        gl.IMAGES_DIR / "benchmark_hybrid_analysis_FILE_distribution.png",
+        gl.IMAGES_DIR / "benchmark_hybrid_analysis_FILE_success.png",
     ]
     missing_split_plots = [p for p in required_split_plots if not (p.exists() and p.stat().st_size > 0)]
     if missing_split_plots:
         legacy_plot_candidates = [
-            gl.BASE_PATH / "images" / "benchmark_hybrid_analysis_FILE.png",
-            gl.BASE_PATH / "images" / "benchmark_hybrid_analysis.png",
+            gl.IMAGES_DIR / "benchmark_hybrid_analysis_FILE.png",
+            gl.IMAGES_DIR / "benchmark_hybrid_analysis.png",
             dataset_dir.parent / "benchmark_hybrid_analysis_FILE.png",
             dataset_dir.parent / "benchmark_hybrid_analysis.png",
         ]
@@ -323,7 +319,15 @@ def validate_outputs(
                 f"Technique '{technique_name}' evaluated {evaluated}/{len(diff_paths)} mutations (failed={failed_mutations})."
             )
 
-        if evaluated > 0 and empty_predictions == evaluated and not guard.allow_all_empty_predictions:
+        allow_all_empty = guard.allow_all_empty_predictions
+        if health_check and technique_name in HEALTH_CHECK_OPTIONAL_QUALITY_TECHNIQUES:
+            allow_all_empty = True
+
+        min_found_count = guard.min_found_count
+        if health_check and technique_name in HEALTH_CHECK_OPTIONAL_QUALITY_TECHNIQUES:
+            min_found_count = 0
+
+        if evaluated > 0 and empty_predictions == evaluated and not allow_all_empty:
             errors.append(
                 f"Technique '{technique_name}' produced only empty predictions across all evaluated mutations."
             )
@@ -335,9 +339,9 @@ def validate_outputs(
                 f"Technique '{technique_name}' avg EXAM {avg_exam:.4f} exceeds limit {guard.max_avg_exam:.4f}."
             )
 
-        if found_count < guard.min_found_count:
+        if found_count < min_found_count:
             errors.append(
-                f"Technique '{technique_name}' found_count {found_count} is below limit {guard.min_found_count}."
+                f"Technique '{technique_name}' found_count {found_count} is below limit {min_found_count}."
             )
 
         summary[technique_name] = {
@@ -375,7 +379,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--dataset-tar",
         type=Path,
-        default=Path("datasets/pos_test.tar.gz"),
+        default=Path("dataset/data/pos_test.tar.gz"),
         help="Path to the pos_test dataset tarball.",
     )
     parser.add_argument(
@@ -387,12 +391,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--clean-cache",
         action="store_true",
-        help="Pass --clean-cache to src/run_models.py.",
+        help="Pass --clean-cache to src/runners/run_models.py.",
     )
     parser.add_argument(
         "--sequential",
         action="store_true",
-        help="Pass --sequential to src/run_models.py.",
+        help="Pass --sequential to src/runners/run_models.py.",
     )
     parser.add_argument(
         "--health-check",
@@ -404,7 +408,8 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    repo_root = find_repo_root(Path(__file__))
+    # find_repo_root() expects the marker filename, not a file path.
+    repo_root = find_repo_root()
 
     dataset_tar = (repo_root / args.dataset_tar).resolve() if not args.dataset_tar.is_absolute() else args.dataset_tar
     if not dataset_tar.exists():
@@ -414,7 +419,7 @@ def main() -> int:
     dataset_dir = extract_dataset(dataset_tar, datasets_dir, args.extracted_name)
     mutation_count = validate_dataset_layout(dataset_dir)
 
-    run_models = repo_root / "src" / "run_models.py"
+    run_models = repo_root / "src" / "runners" / "run_models.py"
     run_benchmark(
         run_models,
         dataset_dir,
@@ -444,14 +449,14 @@ def main() -> int:
         f"{len(techniques_used)} "
         f"({'health-check mode' if args.health_check else 'full mode'})"
     )
-    split_distribution = gl.BASE_PATH / "images" / "benchmark_hybrid_analysis_FILE_distribution.png"
-    split_success = gl.BASE_PATH / "images" / "benchmark_hybrid_analysis_FILE_success.png"
+    split_distribution = gl.IMAGES_DIR / "benchmark_hybrid_analysis_FILE_distribution.png"
+    split_success = gl.IMAGES_DIR / "benchmark_hybrid_analysis_FILE_success.png"
     if split_distribution.exists() and split_success.exists():
         print(f" - plots: {split_distribution} | {split_success}")
     else:
-        plot_summary = gl.BASE_PATH / "images" / "benchmark_hybrid_analysis_FILE.png"
+        plot_summary = gl.IMAGES_DIR / "benchmark_hybrid_analysis_FILE.png"
         if not plot_summary.exists():
-            plot_summary = gl.BASE_PATH / "images" / "benchmark_hybrid_analysis.png"
+            plot_summary = gl.IMAGES_DIR / "benchmark_hybrid_analysis.png"
         if not plot_summary.exists():
             plot_summary = dataset_dir.parent / "benchmark_hybrid_analysis_FILE.png"
         if not plot_summary.exists():

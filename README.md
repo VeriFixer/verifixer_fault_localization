@@ -1,141 +1,177 @@
 # Fault Localization for Dafny Programs
 
-This repository evaluates **fault localization techniques for Dafny programs** using the **EXAM score** metric on mutated Dafny datasets.
+This repository evaluates fault-localization techniques for Dafny mutants using EXAM metrics.
 
----
+## Artifact Evaluation Priority Guide
 
-## Quick Start
+This README is ordered for artifact evaluators:
+1. Fastest way to see the pipeline working.
+2. How to replicate research-question runs using existing caches.
+3. How to replicate everything from scratch.
+4. Extra/reference details.
 
-### With Docker (recommended)
+## 1) Fastest Way To See Something Working
 
-See [README_DOCKER.md](README_DOCKER.md) for complete setup.
-
-### Clone with Submodules
+### Prerequisites
+1. Clone with submodules.
+2. Pull LFS datasets.
+3. Use Python environment with dependencies installed.
 
 ```shell
 git clone --recurse-submodules git@github.com:VeriFixer/verifixer_fault_localization.git
 cd verifixer_fault_localization
-./scripts/install-git-hooks.sh
-```
-
-### Pull Large Dataset Files (Git LFS)
-
-Large dataset files are stored using **Git LFS**. To download them:
-
-```shell
 git lfs install
 git lfs pull
 ```
 
-> **Note:** If you skip this step, Git will store LFS pointers instead of actual files. The repository will still work, but you may need to manually regenerate datasets or download them separately.
+### Fastest evaluator path (Docker first)
 
-### Run Evaluation
+Right after cloning, the fastest way to evaluate is Docker.
+
+If you already have the prebuilt image tar:
 
 ```bash
-# Single technique on dataset
-python src/run_1_model.py random datasets/pos_test
-
-# All techniques
-python src/run_all_models_raw_name.py datasets/pos_test
-
-# Health check (type check + tests + safeguard)
-python src/run_repo_health_check.py --clean-cache
+docker load -i dafny_research_latest.tar
+docker run --rm -it -w /app dafny_research:latest bash
 ```
 
----
+If you need to build locally:
 
-## Dataset Structure
-
-Expected format:
+```bash
+DOCKER_BUILDKIT=1 docker build -t dafny_research:latest .
+docker run --rm -it -w /app dafny_research:latest bash
 ```
+
+Inside the container, run a fast smoke command:
+
+```bash
+python src/runners/run_1_model.py random dataset/data/pos_test
+```
+
+For full container usage and troubleshooting, see [README_DOCKER.md](README_DOCKER.md).
+
+### 60-second smoke run
+
+Run one fast technique on the smallest packaged dataset:
+
+```bash
+python src/runners/run_1_model.py random dataset/data/pos_test
+```
+
+Expected success signal:
+1. A metrics summary is printed in terminal.
+2. Cache files appear under `tmp/run_artifacts/cached_results/pos_test/random/`.
+
+### One-command health validation
+
+```bash
+python src/integration_tests/health_check.py --clean-cache
+```
+
+This runs type checks, tests, and the safeguard benchmark.
+
+## 2) Replicate Research Questions Using Cached Results
+
+Use this path when cache artifacts already exist and you want deterministic, quick reruns.
+
+### RQ1 (paper subset techniques)
+
+```bash
+python src/research_questions/rq1.py dataset/data/pos_test --use-paper-names
+```
+
+### RQ2 (CNTM ablation)
+
+```bash
+python src/research_questions/rq2.py dataset/data/pos_test --use-paper-names
+```
+
+### Full benchmark table/plots (cached-first behavior)
+
+```bash
+python src/runners/run_all_models_raw_name.py dataset/data/pos_test
+```
+
+Expected outputs:
+1. Terminal summary tables (file scope and method scope).
+2. Plot files in `tmp/run_artifacts/images/`.
+3. Cache reused from `tmp/run_artifacts/cached_results/` when present.
+
+## 3) Replicate Everything From Scratch
+
+Use this path for full clean reproducibility.
+
+### Step A: Remove old artifacts and caches
+
+```bash
+rm -rf tmp/run_artifacts/cached_results/*
+rm -rf tmp/run_artifacts/images/*
+```
+
+### Step b: Run full benchmark from clean state
+
+```bash
+python src/runners/run_all_models_raw_name.py dataset/data/pos_test --clean-cache
+```
+
+### Step C: Validate complete repository pipeline
+
+```bash
+python src/integration_tests/health_check.py --clean-cache
+```
+
+## 4) Additional Reference
+
+### Repository layout highlights
+
+1. `src/runners/` contains benchmark entry points.
+2. `src/safeguards/` contains safeguard/integration benchmark checks.
+3. `src/integration_tests/` contains repository health-check orchestration.
+4. `external/` contains moved submodules:
+5. `external/core/dafny`
+6. `external/mutation/mutdafny`
+7. `external/bench/dafnybench`
+8. `external/tests_gen/spec-test-generator`
+9. `external/tests_gen/dafny-test-gen`
+10. `external/tools/dafny-autofix`
+
+### Dataset shape
+
+Expected dataset format:
+
+```text
 <dataset>/
-├── original/     # Passing Dafny programs
-└── killed/       # Mutated versions with failing assertions
+	original/
+	killed/
 ```
 
-Example: `datasets/pos_test/` (extracted from `datasets/pos_test.tar.gz`)
+Example dataset: `dataset/data/pos_test` (from `dataset/data/pos_test.tar.gz`).
 
----
+### Techniques (internal names)
 
-## Available Techniques
+1. `random`
+2. `counterBase`
+3. `counterExampleIf`
+4. `counterExampleIfReassume`
+5. `empty`
+6. `autofixDefault`
+7. `autofixSimplified`
+8. `llm_without_api`
+9. `llm_real`
 
-### Standard Techniques
-- `random` — randomly ranks all lines
-- `counterBase` — uses Dafny counterexample output
-- `counterExampleIf` — extends counterexample parsing to include `if` decision points
-- `counterExampleIfReassume` — adds extra paths by assuming false on branches
-- `empty` — baseline returning no predictions
-- `autofixDefault`, `autofixSimplified` — AutoFix-based ranking
+### Useful commands
 
-### LLM-Based Techniques
+Run one example:
 
-#### `llm_without_api` (interactive, no API calls)
-Useful for debugging the complete pipeline without external LLM calls:
 ```bash
-python src/run_1_model.py llm_without_api datasets/pos_test
+python src/runners/run_1_model_1_example.py <technique> <dfy_file>
 ```
 
-#### `llm_real` (pluggable LLM model via environment variable)
-Default uses stub mode (`cost_stub_all_lines_ranked`):
-```bash
-python src/run_1_model.py llm_real datasets/pos_test
-```
+Run tests and type-checking:
 
-Swap backing model via `LLM_REAL_MODEL_NAME`:
-```bash
-LLM_REAL_MODEL_NAME=qwen3-coder-next python src/run_1_model.py llm_real datasets/pos_test
-```
-
-Currently supported models:
-- `cost_stub_all_lines_ranked` — stub mode for testing (no API calls)
-- `without_api` — interactive debugging mode
-- `qwen3-coder-next` — Qwen3 Coder Next model via OpenRouter
-
-**To add new models:** Add entries to `MODEL_REGISTRY` in `src/fl_eval/llm/llm_configurations.py` with model configuration (provider, model ID, context window, costs)
-
----
-
-## Commands Reference
-
-### Run One Example
-```bash
-python src/run_1_model_1_example.py <technique> <dfy_file>
-```
-Example: `python src/run_1_model_1_example.py random datasets/pos_test/killed/absMax__2.dfy`
-
-### Run Tests & Type Checking
 ```bash
 pytest -q src/tests
 pyright src
 ```
 
-### Cache Management
-
-Results cached in `run_artifacts/cached_results/<dataset_name>/<technique>/`
-
-Clear cache:
-```bash
-rm -rf run_artifacts/cached_results/<dataset_name>
-```
-
----
-
-## Adding a New Technique
-
-1. Create `src/fl_eval/strategies/my_technique.py`
-2. Implement `class MyTechnique(FLTechnique)` with `get_fault_localization(file: Path) -> list[int]`
-3. Register in `src/fl_eval/util/run_model_common.py` → `TECHNIQUE_CONFIG`
-
----
-
-## Repository Structure
-
-- `src/run_1_model_1_example.py` — run one technique per one particular example
-- `src/run_1_model.py` — run one technique
-- `src/run_models.py` — generic benchmark runner for explicit model lists
-- `src/run_all_models_raw_name.py` — run full technique set with raw names
-- `src/fl_eval/strategies/` — technique implementations
-- `datasets/` — dataset directories and tarballs
-- `run_artifacts/` — cached results and outputs
-
-For detailed onboarding, see [AGENTS.md](AGENTS.md).
+For detailed operational notes, see [AGENTS.md](AGENTS.md) and [README_DOCKER.md](README_DOCKER.md).

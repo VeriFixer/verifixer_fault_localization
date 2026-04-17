@@ -2,7 +2,7 @@
 // 
 // example_to_test.dfy
 
-method abs1(x: int) returns (y: int)
+method demo(x: int) returns (y: int)
   ensures x > 0 ==> y == x
   ensures x<  0 ==> y == x + 1
   decreases x
@@ -12,15 +12,12 @@ method abs1(x: int) returns (y: int)
     return y;
   }
   if x > 0 {
+    assume false;
     y := x + 2;
     return y;
   }
   if x < -1 {
     y := x + 2;
-    return y;
-  }
-  if x < 0 {
-    y := x + 4;
     return y;
   }
   return x;

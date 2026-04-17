@@ -4,7 +4,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from fl_eval.util.dataset_validation import (
+from fl_eval.validation.dataset_validation import (
     validate_dataset,
     _check_directory_structure,
     _check_file_pairing,

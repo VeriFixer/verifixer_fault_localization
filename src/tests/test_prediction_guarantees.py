@@ -1,6 +1,6 @@
 """Tests for cross-technique prediction guarantees in pos_test safeguard."""
 
-from run_pos_test_guard import check_prediction_guarantees
+from safeguards.pos_test_guard import check_prediction_guarantees
 
 
 def test_prediction_guarantees_pass_when_monotonic():

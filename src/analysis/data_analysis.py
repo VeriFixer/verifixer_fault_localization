@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Callable, cast
 from fl_eval.metrics.scoring import ExamOutput
 from fl_eval.metrics.summary_stats import StatsSummaryEntry
-from fl_eval.util.run_model_common import get_technique_display_name
+from runners.run_model_common import get_technique_display_name
 from logging_config import get_logger
 
 logger = get_logger(__name__)

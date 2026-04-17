@@ -1,19 +1,19 @@
 [submodule "mutdafny"]
-	path = mutdafny
+	path = external/mutation/mutdafny
 	url = git@github.com:MutDafny/mutdafny.git
 [submodule "dafny"]
-	path = dafny
+	path = external/core/dafny
 	url = https://github.com/dafny-lang/dafny.git
 [submodule "dafnybench"]
-	path = dafnybench
+	path = external/bench/dafnybench
 	url = https://github.com/sun-wendy/DafnyBench.git
 [submodule "SpecTestGenerator"]
-	path = SpecTestGenerator
+	path = external/tests_gen/spec-test-generator
 	url = git@github.com:VeriFixer/SpecTestGenerator.git
 [submodule "DafnyTestGen"]
-	path = DafnyTestGen
+	path = external/tests_gen/dafny-test-gen
 	url = git@github.com:ricostynha1/DafnyTestGen.git
 [submodule "Dafny-AutoFix"]
-	path = Dafny-AutoFix
+	path = external/tools/dafny-autofix
 	url = git@github.com:VeriFixer/Dafny-AutoFix.git
 	branch = integration_all_repos

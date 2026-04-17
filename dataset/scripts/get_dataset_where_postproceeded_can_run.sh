@@ -5,17 +5,19 @@ BASE_PATH="$(find_repo_root)" || exit 1
 
 
 
-OUT_DIR="${BASE_PATH}/datasets/dafnybench_original_can_run"
+OUT_DIR="${BASE_PATH}/dataset/data/dafnybench_original_can_run"
 mkdir -p "$OUT_DIR/killed"
 mkdir -p "$OUT_DIR/original"
 
-FULL_DATASET_DIR="${BASE_PATH}/datasets/dafnybench_all_mutants"
+FULL_DATASET_DIR="${BASE_PATH}/dataset/data/dafnybench_all_mutants"
 ORIG_DIR="$FULL_DATASET_DIR/original"
 KILLED_DIR="$FULL_DATASET_DIR/killed"   # define killed directory
 MAX_JOBS=${MAX_JOBS:-$(( $(nproc) ))}
 
-PROGRESS_LOCK="${BASE_PATH}/src/progress.lock"
-PROGRESS_TMP="${BASE_PATH}/src/progress.tmp"
+PROGRESS_LOCK="${BASE_PATH}/tmp/dataset_scripts_progress.lock"
+PROGRESS_TMP="${BASE_PATH}/tmp/dataset_scripts_progress.tmp"
+
+mkdir -p "${BASE_PATH}/tmp"
 
 process_file() {
     original_file="$1"

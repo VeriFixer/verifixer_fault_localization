@@ -89,38 +89,38 @@ COPY .repo_verifixer_fault_localization_marker /app/
 # Build DafnyTestGen
 
 # Build SpecTestGenerator
-#COPY SpecTestGenerator/ /app/SpecTestGenerator/
-#RUN make -C /app/SpecTestGenerator -j"$(nproc)"
+#COPY external/tests_gen/spec-test-generator/ /app/external/tests_gen/spec-test-generator/
+#RUN make -C /app/external/tests_gen/spec-test-generator -j"$(nproc)"
 
-COPY DafnyTestGen/ /app/DafnyTestGen/
+COPY external/tests_gen/dafny-test-gen/ /app/external/tests_gen/dafny-test-gen/
 RUN --mount=type=cache,target=/root/.nuget/packages \
-    dotnet restore /app/DafnyTestGen/DafnyTestGen/DafnyTestGen.csproj && \
-    dotnet build /app/DafnyTestGen/DafnyTestGen/DafnyTestGen.csproj \
+    dotnet restore /app/external/tests_gen/dafny-test-gen/DafnyTestGen/DafnyTestGen.csproj && \
+    dotnet build /app/external/tests_gen/dafny-test-gen/DafnyTestGen/DafnyTestGen.csproj \
       -c Release -o /app/build_output/DafnyTestGen --no-restore
 
 # Build strategies
 COPY strategies/ /app/strategies/
 RUN --mount=type=cache,target=/root/.nuget/packages \
-    find /app/strategies -name '*.csproj' -print0 | \
-    while IFS= read -r -d '' csproj; do \
+    set -euo pipefail; \
+    for csproj in /app/strategies/*/*.csproj; do \
       dir="$(dirname "$csproj")"; \
       out="/app/build_output/$(basename "$dir")"; \
-      dotnet restore "$csproj" && \
-      dotnet build "$csproj" -c Release -o "$out" --no-restore; \
+      dotnet restore "$csproj"; \
+      dotnet build "$csproj" -c Release -o "$out" --no-restore /p:DafnyDir=/app/dafny/Binaries; \
     done
 
 # Build Autofix
-COPY Dafny-AutoFix/ /app/Dafny-AutoFix/
+COPY external/tools/dafny-autofix/ /app/external/tools/dafny-autofix/
 RUN --mount=type=cache,target=/root/.nuget/packages \
-    mkdir /app/Dafny-AutoFix/autofix/lib && \
-    cp -a /tmp/z3/build/Microsoft.Z3.dll /app/Dafny-AutoFix/autofix/lib && \
-    cp -a /tmp/z3/build/libz3.so /app/Dafny-AutoFix/autofix/lib && \
-    dotnet restore /app/Dafny-AutoFix/autofix && \
-    dotnet build /app/Dafny-AutoFix/autofix -c Release -o /app/build_output/Autofix --no-restore
+    mkdir /app/external/tools/dafny-autofix/autofix/lib && \
+    cp -a /tmp/z3/build/Microsoft.Z3.dll /app/external/tools/dafny-autofix/autofix/lib && \
+    cp -a /tmp/z3/build/libz3.so /app/external/tools/dafny-autofix/autofix/lib && \
+    dotnet restore /app/external/tools/dafny-autofix/autofix && \
+    dotnet build /app/external/tools/dafny-autofix/autofix -c Release -o /app/build_output/Autofix --no-restore /p:DafnyDir=/app/dafny/Binaries
 
 # Copy large runtime-only assets last
-COPY dafnybench/ /app/dafnybench/
-COPY mutdafny/ /app/mutdafny/
-COPY datasets/ /app/datasets/
+COPY external/bench/dafnybench/ /app/external/bench/dafnybench/
+COPY external/mutation/mutdafny/ /app/external/mutation/mutdafny/
+COPY dataset/ /app/dataset/
 
 CMD ["bash"]

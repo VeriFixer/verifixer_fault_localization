@@ -4,7 +4,7 @@ import tempfile
 
 from fl_eval.core.abstract import FLTechnique
 import config as gl
-import fl_eval.util.run_external_cmd as run_cmd
+import fl_eval.execution.external_cmd as run_cmd
 
 
 class AutoFixRanker(FLTechnique):
@@ -16,7 +16,7 @@ class AutoFixRanker(FLTechnique):
                 "autofix_strategy must be one of: dynamic-and-static-score, dynamic-score-only"
             )
 
-        self.run_script = gl.BASE_PATH / "Dafny-AutoFix" / "run.sh"
+        self.run_script = gl.AUTOFIX_SCRIPT
         self.output_root = gl.AUTOFIX_RUNS_DIR
 
     def _parse_ranked_lines(self, lines_file: Path) -> list[int]:

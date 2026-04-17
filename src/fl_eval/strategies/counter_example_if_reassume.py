@@ -3,10 +3,10 @@ from typing import Any
 
 from fl_eval.core.abstract import FLTechnique
 import config as gl
-import fl_eval.util.run_external_cmd as run_cmd
+import fl_eval.execution.external_cmd as run_cmd
 from logging_config import get_logger
 
-from fl_eval.util.counterexample_trace_utils import parse_counterexample_trace_report, rank_counterexample_nodes
+from fl_eval.tracing.counterexample_trace_utils import parse_counterexample_trace_report, rank_counterexample_nodes
 from fl_eval.util.ranking_strategy import (
     DEFAULT_COUNTEREXAMPLE_RANKING_CONTROLS,
     CounterExampleRankingControls,

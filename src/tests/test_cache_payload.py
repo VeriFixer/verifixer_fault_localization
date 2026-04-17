@@ -6,7 +6,7 @@ from dataclasses import dataclass
 import config as gl
 from fl_eval.core.abstract import FLTechnique
 from fl_eval.metrics.scoring import compute_exam_score, save_to_file_output, load_from_file_output
-import fl_eval.util.run_external_cmd as run_cmd
+import fl_eval.execution.external_cmd as run_cmd
 
 
 class DummyTechnique(FLTechnique):
@@ -28,7 +28,7 @@ class MockGroundTruth:
 def test_save_load_rich_cache_roundtrip(tmp_path, monkeypatch):
     monkeypatch.setattr(gl, "CACHE_DIR", tmp_path)
 
-    dataset_dir = Path("datasets/pos_test")
+    dataset_dir = Path("dataset/data/pos_test")
     flt = DummyTechnique(name="dummy")
     gtruth = MockGroundTruth(mutantfile=Path("mutant.dfy"))
 
@@ -55,7 +55,7 @@ def test_save_load_rich_cache_roundtrip(tmp_path, monkeypatch):
 def test_compute_exam_score_writes_rich_metadata(tmp_path, monkeypatch):
     monkeypatch.setattr(gl, "CACHE_DIR", tmp_path)
 
-    dataset_dir = Path("datasets/pos_test")
+    dataset_dir = Path("dataset/data/pos_test")
     flt = DummyTechnique(name="compute")
     gtruth = MockGroundTruth(
         mutantfile=Path("sample.dfy"),

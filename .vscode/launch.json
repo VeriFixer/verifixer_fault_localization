@@ -7,7 +7,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/build_output/CounterExampleIf/CounterExampleIf.dll",
             "args": [
-                "${workspaceFolder}/datasets/pos_test/killed/example_to_test_reassume__MUTANT.dfy"
+                "${workspaceFolder}/datasets/pos_test/killed/example_to_test_reassume___MUTANT.dfy"
             ],
             "cwd": "${workspaceFolder}",
             "stopAtEntry": false,

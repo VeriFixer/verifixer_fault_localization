@@ -24,7 +24,7 @@ Key Implementation Notes:
 - Cache reads strictly validate schema v2 format (no backward compatibility)
 - Metadata capture delegated to run_external_cmd module via get_last_execution_metadata()
 - Thread-safe if single-threaded execution (global state in run_external_cmd)
-- All cache paths are dataset-specific: run_artifacts/cached_results/<dataset_name>/<technique>/<mutant>.json
+- All cache paths are dataset-specific: tmp/run_artifacts/cached_results/<dataset_name>/<technique>/<mutant>.json
 """
 
 from fl_eval.core.abstract import FLTechnique 
@@ -35,7 +35,7 @@ import traceback
 from dataclasses import dataclass, field
 import sys
 from typing import Any, Protocol, cast
-import fl_eval.util.run_external_cmd as run_cmd
+import fl_eval.execution.external_cmd as run_cmd
 from logging_config import get_logger
 
 
@@ -291,7 +291,7 @@ def _results_file_path(flt: FLTechnique, Gtruth: GroundTruthLike, dataset_dir: P
         dataset_dir: Path to the dataset directory for dataset-specific caching
 
     Returns:
-        Path to the cache file (run_artifacts/cached_results/<dataset_name>/<technique>/<mutant>.json)
+        Path to the cache file (tmp/run_artifacts/cached_results/<dataset_name>/<technique>/<mutant>.json)
     """
     cache_dir = gl.get_dataset_cache_dir(dataset_dir)
     return cache_dir / flt.name / f"{Gtruth.mutantfile.name}.json"

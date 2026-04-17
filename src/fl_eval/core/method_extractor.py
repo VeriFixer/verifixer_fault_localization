@@ -30,7 +30,7 @@ import config as gl
 import re
 import json
 import hashlib
-import fl_eval.util.run_external_cmd as run_cmd
+import fl_eval.execution.external_cmd as run_cmd
 
 logger = get_logger(__name__)
 

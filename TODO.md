@@ -1,3 +1,17 @@
+Bugs to correct:
+Method exam score is to lignint if method predicts something outside the method, ignoring the prdiciton only makes score better. Instead I should do other thing (at least increase the rank variable that is measuring that and clamp to one in the worse case)
+
+
+
+Bug to correct on the reassume 
+python src/runners/run_1_model_1_example.py counterExampleIfReassume dataset/data/pos_test/killed/example_to_test_reassume_single_fault__MUTANT.dfy 
+
+
+
+
+
+
+
 counterbasIf should have solved this as counterbase solved it
 
 Sample counterBase-only successes:
