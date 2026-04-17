@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import argparse
-
 from runners.run_model_common import (
     get_technique_display_name,
     get_techniques_for_cntm_ablation,
     get_techniques_for_paper_only,
 )
-from runners.run_common import build_common_runner_parser
 
 
 
@@ -45,11 +42,3 @@ def test_get_techniques_for_cntm_ablation_exact_subset() -> None:
         "CNTM_no_depth",
         "CNTM_no_control",
     ]
-
-
-def test_common_runner_parser_includes_use_paper_names_flag() -> None:
-    parser = build_common_runner_parser("test parser")
-
-    args = parser.parse_args(["dataset/data/pos_test", "--use-paper-names"])
-    assert isinstance(parser, argparse.ArgumentParser)
-    assert args.use_paper_names is True

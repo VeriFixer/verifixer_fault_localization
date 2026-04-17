@@ -7,24 +7,15 @@ import json
 import re
 import os
 from collections import Counter
-from fl_eval.util.ranking_strategy import (
-    RankingStrategy,
-    RANK_BY_FREQUENCY,
-    RANK_BY_ORDER,
-)
 
 class CounterExampleBaseRanker(FLTechnique):
     def __init__(
         self,
         name: str,
-        ranking_strategy: RankingStrategy = RANK_BY_FREQUENCY,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
         super().__init__(name, **kwargs)
         self.dafny = os.environ.get("DAFNY_EXEC") or "dafny"
-        if self.dafny is None:
-            raise ValueError("DAFNY_EXEC environment variable must be set or dafny must be in PATH")
-        self.ranking_strategy = ranking_strategy
 
     def get_counterexample_lines_from_json_diagnostic(self, diagnostic: dict[str, Any]) -> tuple[bool, list[int]]:
         lines_on_counterexamples : list[int] = []
@@ -54,23 +45,15 @@ class CounterExampleBaseRanker(FLTechnique):
         return (was_found_counter_example, lines_on_counterexamples)
 
     def _rank_lines(self, all_lines: list[int]) -> list[int]:
-        """Rank lines by suspiciousness using configured strategy."""
+        """Rank lines by suspiciousness."""
         unique_lines: list[int] = []
         for line in all_lines:
             if line not in unique_lines:
                 unique_lines.append(line)
-        
-        if self.ranking_strategy == RANK_BY_FREQUENCY:
-            line_counts = Counter(all_lines)
-            ranked = sorted(unique_lines, key=lambda l: (-line_counts[l], unique_lines.index(l)))
-            return ranked
-        elif self.ranking_strategy == RANK_BY_ORDER:
-            return unique_lines
-        else:
-            raise ValueError(
-                f"Unknown ranking strategy '{self.ranking_strategy}'. "
-                f"Supported: {[RANK_BY_FREQUENCY.name, RANK_BY_ORDER.name]}"
-            )
+
+        line_counts = Counter(all_lines)
+        ranked = sorted(unique_lines, key=lambda l: (-line_counts[l], unique_lines.index(l)))
+        return ranked
 
     def get_fault_localization(self, file: Path) -> list[int]:
         if not file.exists():
@@ -89,7 +72,7 @@ class CounterExampleBaseRanker(FLTechnique):
 
         ]
 
-        (status, stdout, stderr) = run_cmd.run_external_cmd(command)
+        (_status, stdout, _stderr) = run_cmd.run_external_cmd(command)
         
         # Separate json in actuall newlines need to escape new lines \\n inside json and put them back together
         placeholder = "___ESCAPED_NEWLINE_PLACEHOLDER___"
@@ -99,7 +82,7 @@ class CounterExampleBaseRanker(FLTechnique):
         results_json_list = [r.replace(placeholder,"\\n") for r in results_json_list]
 
 
-        diagnostics = []
+        diagnostics: list[dict[str, Any]] = []
         for result in results_json_list:
             result_json = json.loads(result)
             if(result_json["type"] == "diagnostic"):

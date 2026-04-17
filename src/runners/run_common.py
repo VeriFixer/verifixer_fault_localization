@@ -12,11 +12,6 @@ def build_common_runner_parser(description: str) -> argparse.ArgumentParser:
         help="Path to dataset directory (containing 'killed' and 'original' folders).",
     )
     add_run_control_args(parser)
-    parser.add_argument(
-        "--use-paper-names",
-        action="store_true",
-        help="Use publication aliases in tables/plots.",
-    )
     return parser
 
 

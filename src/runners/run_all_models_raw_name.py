@@ -14,7 +14,6 @@ def main() -> int:
         args.data_path,
         get_techniques_for_all_models(),
         sequential=args.sequential,
-        use_paper_names=False,
     )
     return 0
 

@@ -76,14 +76,6 @@ TECHNIQUE_GUARDS: dict[str, TechniqueGuard] = {
     "SNAP_SIMPLIFIED": TechniqueGuard(max_avg_exam=1.0, min_found_count=1),
 }
 
-# In health-check mode we keep only infrastructure/smoke guarantees for techniques
-# that currently depend on optional strategy binaries in some environments.
-HEALTH_CHECK_OPTIONAL_QUALITY_TECHNIQUES: set[str] = {
-    "RAND",
-    "CNTS",
-}
-
-
 def check_prediction_guarantees(
     per_technique_predictions: dict[str, dict[str, list[int]]],
 ) -> list[str]:
@@ -320,12 +312,7 @@ def validate_outputs(
             )
 
         allow_all_empty = guard.allow_all_empty_predictions
-        if health_check and technique_name in HEALTH_CHECK_OPTIONAL_QUALITY_TECHNIQUES:
-            allow_all_empty = True
-
         min_found_count = guard.min_found_count
-        if health_check and technique_name in HEALTH_CHECK_OPTIONAL_QUALITY_TECHNIQUES:
-            min_found_count = 0
 
         if evaluated > 0 and empty_predictions == evaluated and not allow_all_empty:
             errors.append(
@@ -351,8 +338,7 @@ def validate_outputs(
             "empty_predictions": empty_predictions,
         }
 
-    # TEMPORARY COMMENTED GURARANTEE UNTILL FIX COUNTERXAMPLES
-    #errors.extend(check_prediction_guarantees(per_technique_predictions))
+    errors.extend(check_prediction_guarantees(per_technique_predictions))
 
     print("Technique checks:")
     for technique_name in sorted(summary.keys()):

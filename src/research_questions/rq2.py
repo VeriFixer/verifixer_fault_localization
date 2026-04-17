@@ -21,7 +21,6 @@ def main() -> int:
         args.data_path,
         get_techniques_for_cntm_ablation(),
         sequential=args.sequential,
-        use_paper_names=args.use_paper_names,
     )
     return 0
 

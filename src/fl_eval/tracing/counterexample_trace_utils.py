@@ -11,9 +11,6 @@ from fl_eval.util.ranking_strategy import (
     CounterExampleNode,
     NODE_SELECTION_POLICY_PURE_STATE,
     NODE_SELECTION_POLICY_REGULAR,
-    RANK_BY_FREQUENCY,
-    RankingStrategy,
-    RANK_BY_ORDER,
     SUPPORTED_NODE_SELECTION_POLICIES,
 )
 
@@ -126,7 +123,6 @@ def parse_counterexample_trace_report(stdout: str) -> CounterExampleTraceReport 
 
 def rank_counterexample_nodes(
     traces: list[list[CounterExampleNode]],
-    ranking_strategy: RankingStrategy = RANK_BY_FREQUENCY,
     ranking_controls: CounterExampleRankingControls = DEFAULT_COUNTEREXAMPLE_RANKING_CONTROLS,
 ) -> list[int]:
     if ranking_controls.node_selection_policy not in SUPPORTED_NODE_SELECTION_POLICIES:
@@ -165,9 +161,6 @@ def rank_counterexample_nodes(
 
     def ranking_key(line: int) -> tuple[int, ...]:
         line_data = line_freq_depth_map[line]
-
-        if ranking_strategy == RANK_BY_ORDER:
-            return (first_seen_order[line],)
 
         criteria: list[int] = []
         if ranking_controls.use_frequency:

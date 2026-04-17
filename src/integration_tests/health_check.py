@@ -7,7 +7,7 @@ Runs, in order:
   3) Existing pos_test safeguard benchmark validation
 
 Usage:
-  python src/integration_tests/health_check.py --clean-cache
+    python src/integration_tests/health_check.py
 """
 
 from __future__ import annotations
@@ -72,11 +72,20 @@ def parse_args() -> argparse.Namespace:
         default="pos_test",
         help="Expected extracted top-level dataset directory name.",
     )
-    parser.add_argument(
+    clean_cache_group = parser.add_mutually_exclusive_group()
+    clean_cache_group.add_argument(
         "--clean-cache",
+        dest="clean_cache",
         action="store_true",
-        help="Pass --clean-cache to src/safeguards/pos_test_guard.py.",
+        help="Clean safeguard cache before running (default).",
     )
+    clean_cache_group.add_argument(
+        "--no-clean-cache",
+        dest="clean_cache",
+        action="store_false",
+        help="Do not clean safeguard cache before running.",
+    )
+    parser.set_defaults(clean_cache=True)
     parser.add_argument(
         "--sequential",
         action="store_true",

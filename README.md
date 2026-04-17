@@ -77,13 +77,13 @@ Use this path when cache artifacts already exist and you want deterministic, qui
 ### RQ1 (paper subset techniques)
 
 ```bash
-python src/research_questions/rq1.py dataset/data/pos_test --use-paper-names
+python src/research_questions/rq1.py dataset/data/pos_test
 ```
 
 ### RQ2 (CNTM ablation)
 
 ```bash
-python src/research_questions/rq2.py dataset/data/pos_test --use-paper-names
+python src/research_questions/rq2.py dataset/data/pos_test
 ```
 
 ### Full benchmark table/plots (cached-first behavior)

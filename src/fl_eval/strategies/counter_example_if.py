@@ -8,8 +8,6 @@ from fl_eval.tracing.counterexample_trace_utils import parse_counterexample_trac
 from fl_eval.util.ranking_strategy import (
     DEFAULT_COUNTEREXAMPLE_RANKING_CONTROLS,
     CounterExampleRankingControls,
-    RankingStrategy,
-    RANK_BY_FREQUENCY,
 )
 
 
@@ -25,12 +23,10 @@ class CounterExampleIf(FLTechnique):
     def __init__(
         self,
         name: str,
-        ranking_strategy: RankingStrategy = RANK_BY_FREQUENCY,
         ranking_controls: CounterExampleRankingControls = DEFAULT_COUNTEREXAMPLE_RANKING_CONTROLS,
         **kwargs: Any,
     ) -> None:
         super().__init__(name, **kwargs)
-        self.ranking_strategy = ranking_strategy
         self.ranking_controls = ranking_controls
 
     @staticmethod
@@ -71,6 +67,5 @@ class CounterExampleIf(FLTechnique):
 
         return rank_counterexample_nodes(
             parsed_nodes,
-            self.ranking_strategy,
             ranking_controls=self.ranking_controls,
         )

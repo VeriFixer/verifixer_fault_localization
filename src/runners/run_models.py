@@ -86,7 +86,6 @@ def run_models_for_techniques(
     base_path: Path,
     techniques_to_run: list[str],
     sequential: bool = False,
-    use_paper_names: bool = False,
 ) -> None:
     try:
         logger.info(f"Starting Benchmark on: {base_path}")
@@ -112,14 +111,14 @@ def run_models_for_techniques(
             logger.info("No results collected.")
             return
 
-        print_ascii_table(stats_summary, paper_only=use_paper_names)
-        print_latex_table(stats_summary, paper_only=use_paper_names)
+        print_ascii_table(stats_summary, paper_only=False)
+        print_latex_table(stats_summary, paper_only=False)
         _log_benchmark_llm_cost_totals(llm_cost_totals_by_technique)
 
         try:
             images_dir = gl.IMAGES_DIR
             images_dir.mkdir(parents=True, exist_ok=True)
-            generate_plots(raw_results, images_dir, paper_only=use_paper_names)  # type: ignore[arg-type]
+            generate_plots(raw_results, images_dir, paper_only=False)  # type: ignore[arg-type]
             logger.info(f"Plot artifacts saved to: {images_dir}")
         except Exception as e:
             logger.error(f"Could not generate plots: {e}")
@@ -165,12 +164,6 @@ def main() -> int:
         action="store_true",
         help="Run evaluations sequentially",
     )
-    parser.add_argument(
-        "--use-paper-names",
-        action="store_true",
-        help="Use publication aliases in tables/plots.",
-    )
-
     args = parser.parse_args()
     if not prepare_dataset_cache(args.data_path, args.clean_cache):
         return 1
@@ -180,7 +173,6 @@ def main() -> int:
         args.data_path,
         techniques_to_run,
         sequential=args.sequential,
-        use_paper_names=args.use_paper_names,
     )
     return 0
 
