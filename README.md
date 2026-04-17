@@ -96,6 +96,32 @@ Expected outputs:
 1. Terminal summary tables (file scope and method scope).
 2. Plot files in `tmp/run_artifacts/images/`.
 3. Cache reused from `tmp/run_artifacts/cached_results/` when present.
+4. Per-mutant trace+summary artifacts in `tmp/run_artifacts/pretty_outputs/<dataset>/<technique>/`.
+
+### Query mutants by EXAM threshold
+
+To list mutants with EXAM above a threshold (default output is filenames only):
+
+```bash
+python src/analysis/query_exam_results.py \
+	--dataset dataset/data/pos_test \
+	--techniques CNTM \
+	--scope file \
+	--op ">" \
+	--value 0.20
+```
+
+Optional output formats:
+
+```bash
+python src/analysis/query_exam_results.py \
+	--dataset dataset/data/pos_test \
+	--techniques CNTM,CNTS \
+	--scope method \
+	--op ">=" \
+	--value 0.30 \
+	--output json
+```
 
 ## 3) Replicate Everything From Scratch
 

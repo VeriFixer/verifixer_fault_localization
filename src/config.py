@@ -65,6 +65,7 @@ CACHE_DIR: Path = ARTIFACTS_ROOT / "cached_results"
 AUTOFIX_RUNS_DIR: Path = ARTIFACTS_ROOT / "autofix_fl_runs"
 MODELS_LOG_DIR: Path = ARTIFACTS_ROOT / "models_log"
 IMAGES_DIR: Path = ARTIFACTS_ROOT / "images"
+PRETTY_OUTPUTS_DIR: Path = ARTIFACTS_ROOT / "pretty_outputs"
 
 # === Performance Limrun_external_cmdits for External Programs ===
 # Can be overridden via environment variables: FL_MAX_RAM_GB, FL_MAX_TIME_SECONDS
@@ -150,6 +151,26 @@ def get_dataset_cache_dir(dataset_dir: Path) -> Path:
     dataset_key = dataset_abs.name  # Use the directory name (e.g., "pos_test")
     
     return CACHE_DIR / dataset_key
+
+
+def get_dataset_pretty_output_dir(dataset_dir: Path) -> Path:
+    """Get the pretty-output artifact directory for a specific dataset.
+
+    Artifact structure: tmp/run_artifacts/pretty_outputs/<dataset_name>/
+    """
+    dataset_abs = dataset_dir.resolve()
+    dataset_key = dataset_abs.name
+    return PRETTY_OUTPUTS_DIR / dataset_key
+
+
+def get_pretty_output_file_path(mutant_file_path: Path, technique_name: str) -> Path:
+    """Get per-mutant pretty-output artifact path for a technique.
+
+    Returns a JSON file path using dataset/technique/mutant partitioning.
+    """
+    dataset_folder = mutant_file_path.parent.parent.name
+    file_name = mutant_file_path.name + ".json"
+    return PRETTY_OUTPUTS_DIR / dataset_folder / technique_name / file_name
 
 
 

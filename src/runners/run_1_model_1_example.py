@@ -14,6 +14,7 @@ from fl_eval.reporting.run_one_example_output import (
     print_one_example_intro,
     print_section,
     render_one_example_pretty_result,
+    save_one_example_json_artifact,
 )
 from logging_config import get_logger
 
@@ -34,6 +35,16 @@ def compute_metrics_one_example(
 
     fl_technique, score, context, base_path = single_output
 
+    artifact_path = save_one_example_json_artifact(
+        flt_name,
+        dfy_path,
+        fl_technique,
+        score,
+        context.diff_path,
+        context.gtruth,
+        base_path,
+    )
+
     if enable_pretty_output:
         render_one_example_pretty_result(
             flt_name,
@@ -43,6 +54,7 @@ def compute_metrics_one_example(
             context.diff_path,
             context.gtruth,
             base_path,
+            artifact_path=artifact_path,
         )
 
     return fl_technique, score, context.diff_path, context.gtruth, base_path
