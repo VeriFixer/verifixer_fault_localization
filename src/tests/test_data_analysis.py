@@ -5,7 +5,18 @@ import os
 from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
-from analysis.data_analysis import compare_two_methods, generate_plots, print_ascii_table, print_latex_table
+from analysis.data_analysis import (
+    build_pairwise_stat_results,
+    build_pairwise_topk_results,
+    compare_two_methods,
+    generate_plots,
+    print_ascii_table,
+    print_latex_table,
+    print_pairwise_topk_latex_table,
+    print_pairwise_topk_table,
+    print_pairwise_wilcoxon_latex_table,
+    print_pairwise_wilcoxon_table,
+)
 from fl_eval.metrics.scoring import ExamOutput, ExamScore
 from fl_eval.metrics.summary_stats import StatsSummaryEntry
 
@@ -177,6 +188,193 @@ def test_print_latex_table_includes_new_non_empty_prediction_columns():
     assert any("0.1250" in call for call in calls)
     assert any("0.8750" in call for call in calls)
     assert any("50.00" in call for call in calls)
+
+
+def test_print_pairwise_wilcoxon_table_reports_all_pairs():
+    raw_results = {
+        "CNTM": [
+            mk_exam(0.10, True, "f1.dfy"),
+            mk_exam(0.20, True, "f2.dfy"),
+            mk_exam(0.30, False, "f3.dfy"),
+        ],
+        "TECH_A": [
+            mk_exam(0.40, False, "f1.dfy"),
+            mk_exam(0.50, False, "f2.dfy"),
+            mk_exam(0.60, True, "f3.dfy"),
+        ],
+        "TECH_B": [
+            mk_exam(0.15, True, "f1.dfy"),
+            mk_exam(0.25, True, "f2.dfy"),
+            mk_exam(0.35, False, "f3.dfy"),
+        ],
+    }
+
+    with patch("builtins.print") as mock_print:
+        rows = print_pairwise_wilcoxon_table(raw_results)
+
+    assert len(rows) == 3
+    assert any(row.technique_1 == "CNTM" and row.technique_2 == "TECH_A" for row in rows)
+    assert any(row.technique_1 == "CNTM" and row.technique_2 == "TECH_B" for row in rows)
+    assert any(row.technique_1 == "TECH_A" and row.technique_2 == "TECH_B" for row in rows)
+
+    cntm_tech_a = next(row for row in rows if row.technique_1 == "CNTM" and row.technique_2 == "TECH_A")
+    assert cntm_tech_a.pair_count == 3
+    assert cntm_tech_a.p_value <= 1.0
+    assert cntm_tech_a.rank_biserial < 0.0
+    assert cntm_tech_a.nonzero_pair_count == 3
+
+    calls = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
+    assert any("PAIRWISE WILCOXON SIGNED-RANK TESTS" in call for call in calls)
+    assert any("Rank-biserial" in call for call in calls)
+    assert any("CNTM" in call for call in calls)
+    assert any("TECH_A" in call for call in calls)
+    assert any("TECH_B" in call for call in calls)
+
+
+def test_build_pairwise_stat_results_all_zero_differences():
+    raw_results = {
+        "A": [
+            mk_exam(0.1, True, "f1.dfy"),
+            mk_exam(0.2, False, "f2.dfy"),
+        ],
+        "B": [
+            mk_exam(0.1, True, "f1.dfy"),
+            mk_exam(0.2, False, "f2.dfy"),
+        ],
+    }
+
+    rows = build_pairwise_stat_results(raw_results)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.pair_count == 2
+    assert row.nonzero_pair_count == 0
+    assert row.statistic == 0.0
+    assert row.p_value == 1.0
+    assert row.rank_biserial == 0.0
+
+
+def test_print_pairwise_top1_table_reports_all_pairs():
+    raw_results = {
+        "A": [
+            ExamOutput(
+                filename="f1.dfy",
+                method_name="m",
+                file=ExamScore(score=0.1, found=True, prediction=True, line_ground_truth=10, line_prediction=[10, 11]),
+                method=ExamScore(score=0.1, found=True, prediction=True, line_ground_truth=10, line_prediction=[10, 11]),
+            ),
+            ExamOutput(
+                filename="f2.dfy",
+                method_name="m",
+                file=ExamScore(score=0.4, found=False, prediction=True, line_ground_truth=20, line_prediction=[19, 20]),
+                method=ExamScore(score=0.4, found=False, prediction=True, line_ground_truth=20, line_prediction=[19, 20]),
+            ),
+            ExamOutput(
+                filename="f3.dfy",
+                method_name="m",
+                file=ExamScore(score=0.3, found=False, prediction=True, line_ground_truth=30, line_prediction=[29, 30]),
+                method=ExamScore(score=0.3, found=False, prediction=True, line_ground_truth=30, line_prediction=[29, 30]),
+            ),
+        ],
+        "B": [
+            ExamOutput(
+                filename="f1.dfy",
+                method_name="m",
+                file=ExamScore(score=0.2, found=True, prediction=True, line_ground_truth=10, line_prediction=[12, 10]),
+                method=ExamScore(score=0.2, found=True, prediction=True, line_ground_truth=10, line_prediction=[12, 10]),
+            ),
+            ExamOutput(
+                filename="f2.dfy",
+                method_name="m",
+                file=ExamScore(score=0.2, found=True, prediction=True, line_ground_truth=20, line_prediction=[20, 21]),
+                method=ExamScore(score=0.2, found=True, prediction=True, line_ground_truth=20, line_prediction=[20, 21]),
+            ),
+            ExamOutput(
+                filename="f3.dfy",
+                method_name="m",
+                file=ExamScore(score=0.2, found=True, prediction=True, line_ground_truth=30, line_prediction=[30, 31]),
+                method=ExamScore(score=0.2, found=True, prediction=True, line_ground_truth=30, line_prediction=[30, 31]),
+            ),
+        ],
+    }
+
+    with patch("builtins.print") as mock_print:
+        rows = print_pairwise_topk_table(raw_results, k=1)
+
+    assert len(rows) == 1
+    row = rows[0]
+    assert row.pair_count == 3
+    assert row.discordant_pairs == 3
+    assert row.a_success_b_fail == 1
+    assert row.a_fail_b_success == 2
+    assert row.p_value <= 1.0
+
+    calls = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
+    assert any("PAIRWISE MCNEMAR TESTS" in call for call in calls)
+    assert any("OR(A/B)" in call for call in calls)
+
+
+def test_print_pairwise_wilcoxon_latex_table_output():
+    raw_results = {
+        "CNTM": [
+            mk_exam(0.10, True, "f1.dfy"),
+            mk_exam(0.20, True, "f2.dfy"),
+        ],
+        "TECH_A": [
+            mk_exam(0.40, False, "f1.dfy"),
+            mk_exam(0.50, False, "f2.dfy"),
+        ],
+    }
+    rows = build_pairwise_stat_results(raw_results)
+    with patch("builtins.print") as mock_print:
+        print_pairwise_wilcoxon_latex_table(rows, scope="file")
+
+    calls = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
+    assert any("LaTeX Table Output (Pairwise Wilcoxon" in call for call in calls)
+    assert any("\\begin{table}[h]" in call for call in calls)
+    assert any("Rank-biserial" in call for call in calls)
+    assert any("\\label{tab:pairwise_wilcoxon_file}" in call for call in calls)
+
+
+def test_print_pairwise_topk_latex_table_output():
+    raw_results = {
+        "A": [
+            ExamOutput(
+                filename="f1.dfy",
+                method_name="m",
+                file=ExamScore(score=0.1, found=True, prediction=True, line_ground_truth=10, line_prediction=[10, 11]),
+                method=ExamScore(score=0.1, found=True, prediction=True, line_ground_truth=10, line_prediction=[10, 11]),
+            ),
+            ExamOutput(
+                filename="f2.dfy",
+                method_name="m",
+                file=ExamScore(score=0.4, found=False, prediction=True, line_ground_truth=20, line_prediction=[19, 20]),
+                method=ExamScore(score=0.4, found=False, prediction=True, line_ground_truth=20, line_prediction=[19, 20]),
+            ),
+        ],
+        "B": [
+            ExamOutput(
+                filename="f1.dfy",
+                method_name="m",
+                file=ExamScore(score=0.2, found=True, prediction=True, line_ground_truth=10, line_prediction=[12, 10]),
+                method=ExamScore(score=0.2, found=True, prediction=True, line_ground_truth=10, line_prediction=[12, 10]),
+            ),
+            ExamOutput(
+                filename="f2.dfy",
+                method_name="m",
+                file=ExamScore(score=0.2, found=True, prediction=True, line_ground_truth=20, line_prediction=[20, 21]),
+                method=ExamScore(score=0.2, found=True, prediction=True, line_ground_truth=20, line_prediction=[20, 21]),
+            ),
+        ],
+    }
+    rows = build_pairwise_topk_results(raw_results, k=1)
+    with patch("builtins.print") as mock_print:
+        print_pairwise_topk_latex_table(rows, scope="file", k=1)
+
+    calls = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
+    assert any("LaTeX Table Output (Pairwise McNemar Top-1" in call for call in calls)
+    assert any("\\begin{table}[h]" in call for call in calls)
+    assert any("OR(A/B)" in call for call in calls)
+    assert any("\\label{tab:pairwise_mcnemar_top1_file}" in call for call in calls)
 
 if __name__ == "__main__":
     pytest.main([__file__])

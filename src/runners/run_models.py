@@ -2,7 +2,17 @@ import argparse
 from pathlib import Path
 
 import config as gl
-from analysis.data_analysis import generate_plots, print_ascii_table, print_latex_table
+from analysis.data_analysis import (
+    build_pairwise_stat_results,
+    build_pairwise_topk_results,
+    generate_plots,
+    print_ascii_table,
+    print_latex_table,
+    print_pairwise_topk_latex_table,
+    print_pairwise_topk_table,
+    print_pairwise_wilcoxon_latex_table,
+    print_pairwise_wilcoxon_table,
+)
 from fl_eval.metrics.scoring import ExamOutput
 from fl_eval.metrics.summary_stats import StatsSummaryEntry
 from runners.run_model_common import (
@@ -122,6 +132,35 @@ def run_models_for_techniques(
             logger.info(f"Plot artifacts saved to: {images_dir}")
         except Exception as e:
             logger.error(f"Could not generate plots: {e}")
+
+        try:
+            pairwise_exam_results = build_pairwise_stat_results(raw_results, scope="file")
+            if pairwise_exam_results:
+                print_pairwise_wilcoxon_table(raw_results, paper_only=False, scope="file")
+                print_pairwise_wilcoxon_latex_table(
+                    pairwise_exam_results,
+                    paper_only=False,
+                    scope="file",
+                )
+            else:
+                print_pairwise_wilcoxon_table(raw_results, paper_only=False, scope="file")
+        except Exception as e:
+            logger.error(f"Could not generate pairwise Wilcoxon table: {e}")
+
+        try:
+            pairwise_top1_results = build_pairwise_topk_results(raw_results, scope="file", k=1)
+            if pairwise_top1_results:
+                print_pairwise_topk_table(raw_results, paper_only=False, scope="file", k=1)
+                print_pairwise_topk_latex_table(
+                    pairwise_top1_results,
+                    paper_only=False,
+                    scope="file",
+                    k=1,
+                )
+            else:
+                print_pairwise_topk_table(raw_results, paper_only=False, scope="file", k=1)
+        except Exception as e:
+            logger.error(f"Could not generate pairwise Top-1 McNemar table: {e}")
     finally:
         shutdown_parallel_executor(wait=True)
 

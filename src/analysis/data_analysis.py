@@ -1,7 +1,9 @@
+from dataclasses import dataclass
+from itertools import combinations
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from scipy.stats import ttest_ind, mannwhitneyu, shapiro  # type: ignore
+from scipy.stats import binomtest, rankdata, wilcoxon  # type: ignore
 from pathlib import Path
 from typing import Any, Callable, cast
 from fl_eval.metrics.scoring import ExamOutput
@@ -10,6 +12,395 @@ from runners.run_model_common import get_technique_display_name
 from logging_config import get_logger
 
 logger = get_logger(__name__)
+
+
+@dataclass(frozen=True)
+class PairwiseStatResult:
+    technique_1: str
+    technique_2: str
+    pair_count: int
+    nonzero_pair_count: int
+    statistic: float
+    p_value: float
+    rank_biserial: float
+    significant: bool
+
+
+@dataclass(frozen=True)
+class PairwiseTopKResult:
+    technique_1: str
+    technique_2: str
+    pair_count: int
+    discordant_pairs: int
+    a_success_b_fail: int
+    a_fail_b_success: int
+    p_value: float
+    paired_odds_ratio: float
+    significant: bool
+
+
+def _get_exam_score_for_scope(score: ExamOutput, scope: str) -> float:
+    if scope == "method":
+        return score.score_method
+    if scope == "file":
+        return score.score_file
+    raise ValueError(f"Unsupported EXAM scope: {scope}")
+
+
+def _collect_paired_scores(
+    raw_results: dict[str, list[ExamOutput]],
+    tech1: str,
+    tech2: str,
+    scope: str = "file",
+) -> tuple[list[str], np.ndarray, np.ndarray] | None:
+    if tech1 not in raw_results or tech2 not in raw_results:
+        logger.error(f"One or both techniques ({tech1}, {tech2}) not found in results.")
+        return None
+
+    data1 = raw_results[tech1]
+    data2 = raw_results[tech2]
+
+    if not data1 or not data2:
+        logger.error(f"No data for {tech1} or {tech2}.")
+        return None
+
+    dict1 = {x.filename: x for x in data1}
+    dict2 = {x.filename: x for x in data2}
+    common_files = sorted(set(dict1) & set(dict2))
+
+    if not common_files:
+        return None
+
+    scores1 = np.array([
+        _get_exam_score_for_scope(dict1[filename], scope) for filename in common_files
+    ])
+    scores2 = np.array([
+        _get_exam_score_for_scope(dict2[filename], scope) for filename in common_files
+    ])
+    return common_files, scores1, scores2
+
+
+def _is_top_k_success(score: ExamOutput, scope: str, k: int) -> bool:
+    scoped_score = score.file if scope == "file" else score.method
+    if k <= 0:
+        return False
+    return scoped_score.line_ground_truth in scoped_score.line_prediction[:k]
+
+
+def _collect_paired_top_k_success(
+    raw_results: dict[str, list[ExamOutput]],
+    tech1: str,
+    tech2: str,
+    scope: str = "file",
+    k: int = 1,
+) -> tuple[list[str], np.ndarray, np.ndarray] | None:
+    collected = _collect_paired_scores(raw_results, tech1, tech2, scope=scope)
+    if collected is None:
+        return None
+
+    common_files, _, _ = collected
+    dict1 = {x.filename: x for x in raw_results[tech1]}
+    dict2 = {x.filename: x for x in raw_results[tech2]}
+    success1 = np.array([
+        int(_is_top_k_success(dict1[filename], scope, k)) for filename in common_files
+    ])
+    success2 = np.array([
+        int(_is_top_k_success(dict2[filename], scope, k)) for filename in common_files
+    ])
+    return common_files, success1, success2
+
+
+def _compute_rank_biserial_from_differences(
+    differences: np.ndarray,
+) -> tuple[float, int]:
+    nonzero_mask = differences != 0
+    nonzero_diffs = differences[nonzero_mask]
+    nonzero_count = int(nonzero_diffs.size)
+    if nonzero_count == 0:
+        return 0.0, 0
+
+    ranks = rankdata(np.abs(nonzero_diffs), method="average")
+    t_pos = float(np.sum(ranks[nonzero_diffs > 0]))
+    t_neg = float(np.sum(ranks[nonzero_diffs < 0]))
+    total = t_pos + t_neg
+    if total == 0.0:
+        return 0.0, nonzero_count
+    return (t_pos - t_neg) / total, nonzero_count
+
+
+def _run_paired_wilcoxon(scores1: np.ndarray, scores2: np.ndarray) -> tuple[float, float, float, int]:
+    if scores1.size == 0 or scores2.size == 0:
+        return 0.0, 1.0, 0.0, 0
+
+    differences = scores1 - scores2
+    rank_biserial, nonzero_count = _compute_rank_biserial_from_differences(differences)
+    if nonzero_count == 0:
+        return 0.0, 1.0, 0.0, 0
+
+    try:
+        result: Any = wilcoxon(differences, alternative="two-sided", zero_method="wilcox")
+    except ValueError as exc:
+        logger.warning(f"Could not run Wilcoxon test: {exc}")
+        return 0.0, 1.0, rank_biserial, nonzero_count
+
+    statistic = float(result.statistic)
+    p_value = float(result.pvalue)
+    if statistic != statistic or p_value != p_value:
+        return 0.0, 1.0, rank_biserial, nonzero_count
+    return statistic, p_value, rank_biserial, nonzero_count
+
+
+def _run_mcnemar(top1_a: np.ndarray, top1_b: np.ndarray) -> tuple[float, int, int, int, float]:
+    a_success_b_fail = int(np.sum((top1_a == 1) & (top1_b == 0)))
+    a_fail_b_success = int(np.sum((top1_a == 0) & (top1_b == 1)))
+    discordant_pairs = a_success_b_fail + a_fail_b_success
+
+    if discordant_pairs == 0:
+        return 1.0, 0, 0, 0, 1.0
+
+    small_tail = min(a_success_b_fail, a_fail_b_success)
+    p_value = float(binomtest(small_tail, n=discordant_pairs, p=0.5, alternative="two-sided").pvalue)
+    paired_odds_ratio = float((a_success_b_fail + 0.5) / (a_fail_b_success + 0.5))
+    return p_value, discordant_pairs, a_success_b_fail, a_fail_b_success, paired_odds_ratio
+
+
+def _build_pairwise_stat_result(
+    raw_results: dict[str, list[ExamOutput]],
+    tech1: str,
+    tech2: str,
+    scope: str = "file",
+) -> PairwiseStatResult | None:
+    collected = _collect_paired_scores(raw_results, tech1, tech2, scope=scope)
+    if collected is None:
+        return None
+
+    _, scores1, scores2 = collected
+    statistic, p_value, rank_biserial, nonzero_pair_count = _run_paired_wilcoxon(scores1, scores2)
+    return PairwiseStatResult(
+        technique_1=tech1,
+        technique_2=tech2,
+        pair_count=int(scores1.size),
+        nonzero_pair_count=nonzero_pair_count,
+        statistic=statistic,
+        p_value=p_value,
+        rank_biserial=rank_biserial,
+        significant=p_value < 0.05,
+    )
+
+
+def _build_pairwise_topk_result(
+    raw_results: dict[str, list[ExamOutput]],
+    tech1: str,
+    tech2: str,
+    scope: str = "file",
+    k: int = 1,
+) -> PairwiseTopKResult | None:
+    collected = _collect_paired_top_k_success(raw_results, tech1, tech2, scope=scope, k=k)
+    if collected is None:
+        return None
+
+    _, top1_a, top1_b = collected
+    p_value, discordant_pairs, a_success_b_fail, a_fail_b_success, paired_odds_ratio = _run_mcnemar(top1_a, top1_b)
+
+    return PairwiseTopKResult(
+        technique_1=tech1,
+        technique_2=tech2,
+        pair_count=int(top1_a.size),
+        discordant_pairs=discordant_pairs,
+        a_success_b_fail=a_success_b_fail,
+        a_fail_b_success=a_fail_b_success,
+        p_value=p_value,
+        paired_odds_ratio=paired_odds_ratio,
+        significant=p_value < 0.05,
+    )
+
+
+def build_pairwise_stat_results(
+    raw_results: dict[str, list[ExamOutput]],
+    scope: str = "file",
+) -> list[PairwiseStatResult]:
+    results: list[PairwiseStatResult] = []
+    for tech1, tech2 in combinations(raw_results.keys(), 2):
+        result = _build_pairwise_stat_result(raw_results, tech1, tech2, scope=scope)
+        if result is not None:
+            results.append(result)
+    return results
+
+
+def build_pairwise_topk_results(
+    raw_results: dict[str, list[ExamOutput]],
+    scope: str = "file",
+    k: int = 1,
+) -> list[PairwiseTopKResult]:
+    results: list[PairwiseTopKResult] = []
+    for tech1, tech2 in combinations(raw_results.keys(), 2):
+        result = _build_pairwise_topk_result(raw_results, tech1, tech2, scope=scope, k=k)
+        if result is not None:
+            results.append(result)
+    return results
+
+
+def _print_pairwise_stat_table(
+    results: list[PairwiseStatResult],
+    *,
+    paper_only: bool = False,
+) -> None:
+    title = "PAIRWISE WILCOXON SIGNED-RANK TESTS (FILE SCOPE)"
+    headers = ["Method A", "Method B", "Pairs", "Nonzero", "W", "p-value", "Rank-biserial", "Sig."]
+    widths = [30, 30, 8, 8, 12, 12, 14, 8]
+
+    separator = "-" * (sum(widths) + len(widths) * 3 + 1)
+    print(f"\n{title}")
+    print(separator)
+    print(
+        f"| {headers[0]:<{widths[0]}} | {headers[1]:<{widths[1]}} | {headers[2]:<{widths[2]}} | "
+        f"{headers[3]:<{widths[3]}} | {headers[4]:<{widths[4]}} | {headers[5]:<{widths[5]}} | "
+        f"{headers[6]:<{widths[6]}} | {headers[7]:<{widths[7]}} |"
+    )
+    print(separator)
+
+    for row in results:
+        name1 = get_technique_display_name(row.technique_1, paper_only=paper_only)
+        name2 = get_technique_display_name(row.technique_2, paper_only=paper_only)
+        sig_label = "yes" if row.significant else "no"
+        print(
+            f"| {name1:<{widths[0]}} | {name2:<{widths[1]}} | {row.pair_count:<{widths[2]}} | "
+            f"{row.nonzero_pair_count:<{widths[3]}} | {row.statistic:<{widths[4]}.4f} | {row.p_value:<{widths[5]}.4g} | "
+            f"{row.rank_biserial:<{widths[6]}.4f} | {sig_label:<{widths[7]}} |"
+        )
+
+    print(separator)
+
+
+def _print_pairwise_topk_table(
+    results: list[PairwiseTopKResult],
+    *,
+    paper_only: bool = False,
+    k: int = 1,
+) -> None:
+    title = f"PAIRWISE MCNEMAR TESTS (FILE SCOPE, TOP-{k})"
+    headers = ["Method A", "Method B", "Pairs", "Disc.", "A-only", "B-only", "p-value", "OR(A/B)", "Sig."]
+    widths = [30, 30, 8, 8, 8, 8, 12, 10, 8]
+
+    separator = "-" * (sum(widths) + len(widths) * 3 + 1)
+    print(f"\n{title}")
+    print(separator)
+    print(
+        f"| {headers[0]:<{widths[0]}} | {headers[1]:<{widths[1]}} | {headers[2]:<{widths[2]}} | "
+        f"{headers[3]:<{widths[3]}} | {headers[4]:<{widths[4]}} | {headers[5]:<{widths[5]}} | "
+        f"{headers[6]:<{widths[6]}} | {headers[7]:<{widths[7]}} | {headers[8]:<{widths[8]}} |"
+    )
+    print(separator)
+
+    for row in results:
+        name1 = get_technique_display_name(row.technique_1, paper_only=paper_only)
+        name2 = get_technique_display_name(row.technique_2, paper_only=paper_only)
+        sig_label = "yes" if row.significant else "no"
+        print(
+            f"| {name1:<{widths[0]}} | {name2:<{widths[1]}} | {row.pair_count:<{widths[2]}} | "
+            f"{row.discordant_pairs:<{widths[3]}} | {row.a_success_b_fail:<{widths[4]}} | {row.a_fail_b_success:<{widths[5]}} | "
+            f"{row.p_value:<{widths[6]}.4g} | {row.paired_odds_ratio:<{widths[7]}.4f} | {sig_label:<{widths[8]}} |"
+        )
+
+    print(separator)
+
+
+def print_pairwise_wilcoxon_table(
+    raw_results: dict[str, list[ExamOutput]],
+    paper_only: bool = False,
+    scope: str = "file",
+) -> list[PairwiseStatResult]:
+    results = build_pairwise_stat_results(raw_results, scope=scope)
+    if not results:
+        print("\nPAIRWISE WILCOXON SIGNED-RANK TESTS (FILE SCOPE)")
+        print("No comparable technique pairs found.")
+        return []
+
+    _print_pairwise_stat_table(results, paper_only=paper_only)
+    return results
+
+
+def print_pairwise_wilcoxon_latex_table(
+    results: list[PairwiseStatResult],
+    *,
+    paper_only: bool = False,
+    scope: str = "file",
+) -> None:
+    scope_label = "File" if scope == "file" else "Method"
+    print(f"\n--- LaTeX Table Output (Pairwise Wilcoxon, {scope_label} Scope) ---")
+    print(r"\begin{table}[h]")
+    print(r"    \centering")
+    print(r"    \begin{tabular}{l|l|r|r|r|r|r|c}")
+    print(r"        \hline")
+    print(r"        \textbf{Method A} & \textbf{Method B} & \textbf{Pairs} & \textbf{Nonzero} & \textbf{W} & \textbf{p-value} & \textbf{Rank-biserial} & \textbf{Sig.} \\")
+    print(r"        \hline")
+
+    for row in results:
+        name1 = get_technique_display_name(row.technique_1, paper_only=paper_only).replace("_", r"\_")
+        name2 = get_technique_display_name(row.technique_2, paper_only=paper_only).replace("_", r"\_")
+        sig_label = "yes" if row.significant else "no"
+        print(
+            f"        {name1} & {name2} & {row.pair_count} & {row.nonzero_pair_count} & "
+            f"{row.statistic:.4f} & {row.p_value:.4g} & {row.rank_biserial:.4f} & {sig_label} \\\\"  # noqa: E501
+        )
+
+    print(r"        \hline")
+    print(r"    \end{tabular}")
+    print(
+        rf"    \caption{{Pairwise Wilcoxon signed-rank tests for EXAM scores ({scope_label.lower()} scope), with matched rank-biserial effect sizes.}}"
+    )
+    print(rf"    \label{{tab:pairwise_wilcoxon_{scope.lower()}}}")
+    print(r"\end{table}")
+
+
+def print_pairwise_topk_table(
+    raw_results: dict[str, list[ExamOutput]],
+    paper_only: bool = False,
+    scope: str = "file",
+    k: int = 1,
+) -> list[PairwiseTopKResult]:
+    results = build_pairwise_topk_results(raw_results, scope=scope, k=k)
+    if not results:
+        print(f"\nPAIRWISE MCNEMAR TESTS (FILE SCOPE, TOP-{k})")
+        print("No comparable technique pairs found.")
+        return []
+
+    _print_pairwise_topk_table(results, paper_only=paper_only, k=k)
+    return results
+
+
+def print_pairwise_topk_latex_table(
+    results: list[PairwiseTopKResult],
+    *,
+    paper_only: bool = False,
+    scope: str = "file",
+    k: int = 1,
+) -> None:
+    scope_label = "File" if scope == "file" else "Method"
+    print(f"\n--- LaTeX Table Output (Pairwise McNemar Top-{k}, {scope_label} Scope) ---")
+    print(r"\begin{table}[h]")
+    print(r"    \centering")
+    print(r"    \begin{tabular}{l|l|r|r|r|r|r|r|c}")
+    print(r"        \hline")
+    print(r"        \textbf{Method A} & \textbf{Method B} & \textbf{Pairs} & \textbf{Disc.} & \textbf{A-only} & \textbf{B-only} & \textbf{p-value} & \textbf{OR(A/B)} & \textbf{Sig.} \\")
+    print(r"        \hline")
+
+    for row in results:
+        name1 = get_technique_display_name(row.technique_1, paper_only=paper_only).replace("_", r"\_")
+        name2 = get_technique_display_name(row.technique_2, paper_only=paper_only).replace("_", r"\_")
+        sig_label = "yes" if row.significant else "no"
+        print(
+            f"        {name1} & {name2} & {row.pair_count} & {row.discordant_pairs} & "
+            f"{row.a_success_b_fail} & {row.a_fail_b_success} & {row.p_value:.4g} & {row.paired_odds_ratio:.4f} & {sig_label} \\\\"  # noqa: E501
+        )
+
+    print(r"        \hline")
+    print(r"    \end{tabular}")
+    print(
+        rf"    \caption{{Pairwise McNemar tests for Top-{k} localization success ({scope_label.lower()} scope), with paired odds ratios.}}"
+    )
+    print(rf"    \label{{tab:pairwise_mcnemar_top{k}_{scope.lower()}}}")
+    print(r"\end{table}")
 
 
 def _print_ascii_scope_table(
@@ -342,64 +733,23 @@ def generate_dual_scope_plots(raw_results: dict[str, list[ExamOutput]], output_p
 
 
 def compare_two_methods(raw_results: dict[str, list[ExamOutput]], tech1: str, tech2: str):
-    """Compare two techniques on common files using file-scoped EXAM scores."""
-    if tech1 not in raw_results or tech2 not in raw_results:
-        logger.error(f"One or both techniques ({tech1}, {tech2}) not found in results.")
+    """Compare two techniques on common files using paired Wilcoxon signed-rank testing."""
+    collected = _collect_paired_scores(raw_results, tech1, tech2, scope="file")
+    if collected is None:
         return
 
-    data1 = raw_results[tech1]
-    data2 = raw_results[tech2]
-
-    if not data1 or not data2:
-        logger.error(f"No data for {tech1} or {tech2}.")
-        return
-
-    dict1 = {x.filename: x for x in data1}
-    dict2 = {x.filename: x for x in data2}
-    common_files = set(dict1.keys()) & set(dict2.keys())
-
-    if not common_files:
-        print(f"No common files between {tech1} and {tech2}.")
-        return
-
-    scores1 = np.array([dict1[f].score for f in common_files])
-    scores2 = np.array([dict2[f].score for f in common_files])
+    common_files, scores1, scores2 = collected
 
     print(f"\n--- Statistical Comparison between {tech1} and {tech2} ---")
     print(f"Comparing {len(common_files)} common files.")
 
-    shapiro_1: Any = shapiro(scores1)
-    shapiro_2: Any = shapiro(scores2)
-    p1 = float(shapiro_1.pvalue)
-    p2 = float(shapiro_2.pvalue)
-    normal1 = p1 > 0.05
-    normal2 = p2 > 0.05
+    statistic, p_val, rank_biserial, nonzero_pair_count = _run_paired_wilcoxon(scores1, scores2)
 
-    print(
-        f"Normality test (Shapiro-Wilk): {tech1} p={p1:.4f} ({'normal' if normal1 else 'not normal'}), "
-        f"{tech2} p={p2:.4f} ({'normal' if normal2 else 'not normal'})"
-    )
-
-    if normal1 and normal2:
-        test_res: Any = ttest_ind(scores1, scores2, equal_var=False)
-        test_name = "Welch's t-test"
-        justification = "Both distributions are approximately normal, so we use Welch's t-test (unequal variances) to compare means."
-        stat = float(test_res.statistic)
-        p_val = float(test_res.pvalue)
-    else:
-        test_res = mannwhitneyu(scores1, scores2, alternative="two-sided")
-        test_name = "Mann-Whitney U test"
-        justification = "At least one distribution is not normal, so we use the non-parametric Mann-Whitney U test to compare distributions."
-        stat = float(test_res.statistic)
-        p_val = float(test_res.pvalue)
-
-    if stat != stat or p_val != p_val:
-        stat = 0.0
-        p_val = 1.0
-
-    print(f"Test used: {test_name}")
-    print(f"Justification: {justification}")
-    print(f"Statistic: {stat:.4f}, p-value: {p_val:.4f}")
+    print("Test used: Wilcoxon signed-rank test")
+    print("Justification: The samples are paired by filename and EXAM scores are not assumed to be normal.")
+    print(f"Statistic: {statistic:.4f}, p-value: {p_val:.4f}")
+    print(f"Non-zero paired differences: {nonzero_pair_count}/{len(common_files)}")
+    print(f"Matched rank-biserial: {rank_biserial:.4f}")
 
     if p_val < 0.05:
         print(f"Result: Significant difference (p < 0.05) (p_val={p_val:.4f})")
@@ -409,6 +759,9 @@ def compare_two_methods(raw_results: dict[str, list[ExamOutput]], tech1: str, te
         print(f"{better} has lower average EXAM score ({mean1:.4f} vs {mean2:.4f})")
     else:
         print(f"Result: No significant difference (p >= 0.05) (p_val={p_val:.4f})")
+
+    dict1 = {x.filename: x for x in raw_results[tech1]}
+    dict2 = {x.filename: x for x in raw_results[tech2]}
 
     print("\n--- Debugging Overview ---")
     found1 = [dict1[f].found for f in common_files]
