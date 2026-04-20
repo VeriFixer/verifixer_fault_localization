@@ -359,6 +359,9 @@ namespace CounterExampleIfReassume
 
             var counterExamples = analyzer.ExtractCounterExamplesFromCli(programConfig.ProgramFile);
 
+            int methodStartLine = method.Body.StartToken.line;
+            int methodEndLine = method.Body.EndToken.line;
+
             foreach (var counterExample in counterExamples)
             {
                 if (!ShouldProcessCounterExample(programConfig, counterExample))
@@ -366,7 +369,16 @@ namespace CounterExampleIfReassume
                     continue;
                 }
 
-                var analysis = analyzer.Analyze(counterExample.StatePositions, method.Body);
+                var methodScopedStates = counterExample.StatePositions
+                    .Where(state => state.Line >= methodStartLine && state.Line <= methodEndLine)
+                    .ToList();
+
+                if (methodScopedStates.Count == 0)
+                {
+                    continue;
+                }
+
+                var analysis = analyzer.Analyze(methodScopedStates, method.Body);
 
                 if (analysis.SuspiciousNodes.Count == 0 && analysis.RawStateLines.Count == 0)
                 {
@@ -491,9 +503,6 @@ namespace CounterExampleIfReassume
             int currentPostconditionLine = -1;
             string currentPostconditionText = string.Empty;
 
-            bool insideCounterexample = false;
-            bool sawRelatedCounterexample = false;
-            bool sawPostconditionLocation = false;
             var positionRegex = new Regex(@"\.dfy\((?<line>\d+),(?<col>\d+)\):", RegexOptions.Compiled);
             var postconditionRegex = new Regex(@"\.dfy\((?<line>\d+),(?<col>\d+)\):\s*Related location:", RegexOptions.Compiled);
 
@@ -511,8 +520,7 @@ namespace CounterExampleIfReassume
                 {
                     currentStates.Clear();
                     currentPostconditionText = string.Empty;
-                    sawRelatedCounterexample = false;
-                    sawPostconditionLocation = false;
+                    seen.Clear();
                     return;
                 }
 
@@ -526,8 +534,6 @@ namespace CounterExampleIfReassume
                 currentStates.Clear();
                 currentPostconditionLine = -1;
                 currentPostconditionText = string.Empty;
-                sawRelatedCounterexample = false;
-                sawPostconditionLocation = false;
                 seen.Clear();
             }
 
@@ -535,29 +541,14 @@ namespace CounterExampleIfReassume
             {
                 string line = rawLine.TrimEnd();
 
-                if (line.Contains("Error: a postcondition could not be proved on this return path"))
+                if (line.Contains("Error:"))
                 {
                     FinalizeCurrentRecord();
-                    insideCounterexample = false;
-                    continue;
-                }
-
-                if (line.Contains("Related counterexample:"))
-                {
-                    insideCounterexample = true;
-                    sawRelatedCounterexample = true;
-                    continue;
-                }
-
-                if (!insideCounterexample)
-                {
-                    continue;
                 }
 
                 if (line.StartsWith("Dafny program verifier finished"))
                 {
                     FinalizeCurrentRecord();
-                    insideCounterexample = false;
                     continue;
                 }
 
@@ -566,8 +557,6 @@ namespace CounterExampleIfReassume
                     var postconditionMatch = postconditionRegex.Match(line);
                     currentPostconditionLine = int.Parse(postconditionMatch.Groups["line"].Value);
                     currentPostconditionText = ReadSourceLine(sourceLines, currentPostconditionLine);
-                    sawPostconditionLocation = true;
-                    continue;
                 }
 
                 var positionMatch = positionRegex.Match(line);
@@ -592,10 +581,7 @@ namespace CounterExampleIfReassume
                 });
             }
 
-            if (sawRelatedCounterexample && sawPostconditionLocation)
-            {
-                FinalizeCurrentRecord();
-            }
+            FinalizeCurrentRecord();
 
             return result;
         }

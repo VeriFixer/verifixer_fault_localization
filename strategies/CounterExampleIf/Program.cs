@@ -208,29 +208,11 @@ namespace returnMethodLinesRandom
             var result = new List<StatePosition>();
             var seen = new HashSet<string>();
 
-            bool insideCounterexample = false;
             var positionRegex = new Regex(@"\.dfy\((?<line>\d+),(?<col>\d+)\):", RegexOptions.Compiled);
 
             foreach (string rawLine in output.Split('\n'))
             {
                 string line = rawLine.TrimEnd();
-
-                if (line.Contains("Related counterexample:"))
-                {
-                    insideCounterexample = true;
-                    continue;
-                }
-
-                if (!insideCounterexample)
-                {
-                    continue;
-                }
-
-                if (line.Contains("Error:") || line.StartsWith("   |") || line.StartsWith("Dafny program verifier finished"))
-                {
-                    insideCounterexample = false;
-                    continue;
-                }
 
                 var match = positionRegex.Match(line);
                 if (!match.Success)
@@ -263,6 +245,14 @@ namespace returnMethodLinesRandom
             for (int traceId = 0; traceId < statePositions.Count; traceId++)
             {
                 var state = statePositions[traceId];
+
+                bool isInFailedMethod = failedMethodBodies.Any(methodBody =>
+                    state.Line >= methodBody.StartToken.line && state.Line <= methodBody.EndToken.line);
+                if (!isInFailedMethod)
+                {
+                    continue;
+                }
+
                 var trace = new CounterExampleTrace { trace_id = traceId };
                 trace.nodes.AddRange(AddBranchLogicLines(state.Line, state.Col, state.Raw, failedMethodBodies));
                 trace.nodes = trace.nodes.OrderBy(n => n.line).ThenByDescending(n => n.depth).ToList();
