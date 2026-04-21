@@ -23,3 +23,7 @@ obj/
 .venv
 venv/
 env/
+
+# MacOS
+.DS_Store
+*/.DS_Store
