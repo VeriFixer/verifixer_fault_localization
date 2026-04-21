@@ -21,7 +21,7 @@ from fl_eval.execution.parallel_executor import run_parallel_or_seq
 
 logger = get_logger(__name__)
 
-LLM_TECHNIQUES = {"LLM", "LLM_NO_API"}
+LLM_TECHNIQUES = {"LLM", "LLM_NO_API", "LLM_ERR_MSG", "LLM_ERR_MSG_CNTM"}
 
 
 def _enable_model_file_logging(technique_name: str) -> None:
@@ -227,13 +227,13 @@ def compute_metrics_one_dataset(
                     Note: LLM techniques always force sequential mode.
     """
     # Force sequential mode for LLM techniques for stability
-    if _is_llm_technique(flt_name):
-        if not sequential:
-            logger.info(
-                "LLM technique '%s' detected. Forcing sequential mode (LLM techniques require sequential execution).",
-                flt_name,
-            )
-        sequential = True
+    #if _is_llm_technique(flt_name):
+    #    if not sequential:
+    #        logger.info(
+    #            "LLM technique '%s' detected. Forcing sequential mode (LLM techniques require sequential execution).",
+    #            flt_name,
+    #        )
+    #    sequential = True
     
     if flt_name not in TECHNIQUE_MAP:
         logger.error("Fault Localization Technique '%s' not recognized.", flt_name)

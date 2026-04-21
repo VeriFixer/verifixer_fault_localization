@@ -1,0 +1,29 @@
+from pathlib import Path
+import sys
+
+SRC_ROOT = Path(__file__).resolve().parents[1]
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
+
+from runners.run_model_common import get_techniques_for_llm_only, prepare_dataset_cache
+from runners.run_common import parse_common_runner_args
+from runners.run_models import run_models_for_techniques
+
+
+def main() -> int:
+    args = parse_common_runner_args(
+        "RQ3 runner: execute LLM techniques only."
+    )
+    if not prepare_dataset_cache(args.data_path, args.clean_cache):
+        return 1
+
+    run_models_for_techniques(
+        args.data_path,
+        get_techniques_for_llm_only(),
+        sequential=args.sequential,
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

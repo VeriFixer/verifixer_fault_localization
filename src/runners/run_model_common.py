@@ -14,6 +14,8 @@ from fl_eval.strategies.counter_example_base_ranker import CounterExampleBaseRan
 from fl_eval.strategies.counter_example_if import CounterExampleIf
 from fl_eval.strategies.counter_example_if_reassume import CounterExampleIfReassume
 from fl_eval.strategies.empty_ranker import EmptyRanker
+from fl_eval.strategies.llm_err_msg import LLMErrMsgRanker
+from fl_eval.strategies.llm_err_msg_cntm import LLMErrMsgCNTMRanker
 from fl_eval.strategies.llm_ranker import LLMRanker
 from fl_eval.strategies.random_line_of_method_that_fails import RandomLineOfMethodThatFails
 from fl_eval.strategies.random_ranker import RandomRanker
@@ -77,6 +79,8 @@ TECHNIQUE_CONFIG: dict[str, TechniqueConfig] = {
     "SNAP_SIMPLIFIED": TechniqueConfig(AutoFixRanker, autofix_strategy="dynamic-score-only", run_on_all_models=False),
     "LLM_NO_API": TechniqueConfig(LLMRanker, run_on_all_models=False),
     "LLM": TechniqueConfig(LLMRanker, run_on_all_models=True),
+    "LLM_ERR_MSG": TechniqueConfig(LLMErrMsgRanker, run_on_all_models=False),
+    "LLM_ERR_MSG_CNTM": TechniqueConfig(LLMErrMsgCNTMRanker, run_on_all_models=False),
 }
 
 
@@ -105,6 +109,14 @@ def get_techniques_for_cntm_ablation() -> list[str]:
         "CNTM_no_frequency",
         "CNTM_no_depth",
         "CNTM_no_control",
+    ]
+
+
+def get_techniques_for_llm_only() -> list[str]:
+    return [
+        "LLM",
+        "LLM_ERR_MSG",
+        "LLM_ERR_MSG_CNTM",
     ]
 
 

@@ -8,7 +8,7 @@ from typing import Any, cast
 import config as gl
 from fl_eval.metrics.scoring import ExamOutput, load_execution_metadata_from_cache
 from fl_eval.strategies.autofix_ranker import AutoFixRanker
-from fl_eval.strategies.llm_ranker import LLMRanker
+from fl_eval.strategies.llm_base_ranker import LLMBaseRanker
 from fl_eval.util.terminal_colors import Color, colored, separator
 from fl_eval.tracing.trace_extractor import (
     extract_autofix_summary,
@@ -86,7 +86,7 @@ def extract_prompt_and_response(chat_history: list[Any]) -> tuple[str | None, st
 
 
 def print_llm_trace_if_available(flt_name: str, fl_technique: Any) -> None:
-    if not isinstance(fl_technique, LLMRanker):
+    if not isinstance(fl_technique, LLMBaseRanker):
         print(colored("ℹ Technique is not LLM-based; no prompt/response trace available.", Color.YELLOW))
         return
 
@@ -223,7 +223,7 @@ def _collect_trace_report_payload(
     dfy_path: Path,
     execution_metadata: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    if isinstance(fl_technique, LLMRanker):
+    if isinstance(fl_technique, LLMBaseRanker):
         chat_history = fl_technique.llm.get_chat_history()
         prompt, response = extract_prompt_and_response(chat_history)
         return {
@@ -412,7 +412,7 @@ def print_technique_trace(
 ) -> None:
     print_section("TECHNIQUE TRACE")
 
-    if isinstance(fl_technique, LLMRanker):
+    if isinstance(fl_technique, LLMBaseRanker):
         print_llm_trace_if_available(flt_name, fl_technique)
         return
 
@@ -511,7 +511,7 @@ def render_one_example_pretty_result(
     )
     print_single_file_summary(flt_name, dfy_path, diff_path, score)
 
-    if isinstance(fl_technique, LLMRanker):
+    if isinstance(fl_technique, LLMBaseRanker):
         print_section("LLM COST ESTIMATE")
         fl_technique.get_costs()
 

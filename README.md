@@ -184,6 +184,8 @@ Example dataset: `dataset/data/pos_test` (from `dataset/data/pos_test.tar.gz`).
 7. `autofixSimplified`
 8. `llm_without_api`
 9. `llm_real`
+10. `LLM_ERR_MSG`
+11. `LLM_ERR_MSG_CNTM`
 
 ### Useful commands
 
@@ -192,6 +194,17 @@ Run one example:
 ```bash
 python src/runners/run_1_model_1_example.py <technique> <dfy_file>
 ```
+
+Run a real LLM with Qwen via OpenRouter:
+
+```bash
+export OPENROUTER_API_KEY="<your-openrouter-api-key>" 
+LLM_REAL_MODEL_NAME=qwen3-coder-next python src/runners/run_1_model_1_example.py LLM_ERR_MSG_CNTM dataset/data/pos_test/killed/abs__161-188_CBE.dfy
+```
+
+The technique name goes before the Dafny file path. This form does not require exporting
+the variables into your shell session. You can replace `LLM_ERR_MSG_CNTM` with `LLM`,
+`LLM_NO_API`, or `LLM_ERR_MSG` depending on which LLM strategy you want to run.
 
 Run tests and type-checking:
 
