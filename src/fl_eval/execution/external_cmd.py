@@ -74,13 +74,21 @@ def run_external_cmd(cmd: list[str], timeout : int = gl.MAX_TIME_EXTERNAL_PROGRA
     systemd_cmd: list[str] = cmd
 
     try:
-        result = subprocess.run(
-            systemd_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=timeout
-        )
+        if timeout != None:
+            result = subprocess.run(
+                systemd_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=timeout
+            )
+        else:
+            result = subprocess.run(
+                systemd_cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
     except subprocess.TimeoutExpired as e:
         status = Status.TIMEOUT
         stdout = ""
