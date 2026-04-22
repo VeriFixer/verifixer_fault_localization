@@ -3,12 +3,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/find_repo_root.sh"
 BASE_PATH="$(find_repo_root)" || exit 1 
 
-OUT_DIR="${BASE_PATH}/dataset/data/dafnybench_tests_can_run"
+OUT_DIR="${BASE_PATH}/dataset/data/spec_tests_can_run"
 mkdir -p "$OUT_DIR/killed"
 mkdir -p "$OUT_DIR/original"
 
 #FULL_DATASET_DIR="${BASE_PATH}/dataset/data/dafnybench_original_can_run"
-FULL_DATASET_DIR="${BASE_PATH}/dataset/data/pos_test"
+FULL_DATASET_DIR="${BASE_PATH}/dataset/data/sample_original_can_run"
 
 ORIG_DIR="$FULL_DATASET_DIR/original"
 KILLED_DIR="$FULL_DATASET_DIR/killed"   # define killed directory
@@ -24,8 +24,10 @@ process_file() {
     killed_file="$1"
     filename=$(basename "$killed_file")
 
+    killed_output="${killed_file%.dfy}_test.dfy"
+
     # Capture Dafny output
-    command="${BASE_PATH}/SpecTestGenerator/Binaries/Dafny generate-tests Spec \"$killed_file\" --test-count 5"
+    command="${BASE_PATH}/external/tests_gen/spec-test-generator/Binaries/Dafny generate-tests Spec \"$killed_file\" --test-count 1 > \"$killed_output\""
     output=$(eval "$command" 2>&1)
     status=$?
 
@@ -35,11 +37,11 @@ process_file() {
 
         cp "$killed_file" "$OUT_DIR/killed/"
 
-        killed_txt="${killed_file%.dfy}.txt"
-        if [ -f "$killed_txt" ]; then
-            cp "$killed_txt" "$OUT_DIR/killed/"
+        killed_output="${killed_file%.dfy}_test.dfy"
+        if [ -f "$killed_output" ]; then
+            cp "$killed_output" "$OUT_DIR/killed/"
         else
-            echo "Warning: killed text file missing for $killed_file (tried $killed_txt)"
+            echo "Warning: killed .dfy file missing for $killed_file (tried $killed_output)"
         fi
 
         base_name_raw="${filename_without_extension%__*}"
@@ -56,6 +58,8 @@ process_file() {
         echo "Command: $command"
         echo "Exit Status: $status"
         echo "$output"
+
+        rm -f "$killed_output"
     fi
 
     # thread-safe progress update

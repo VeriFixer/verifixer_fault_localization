@@ -3,13 +3,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/find_repo_root.sh"
 BASE_PATH="$(find_repo_root)" || exit 1 
 
-OUT_DIR="${BASE_PATH}/dataset/data/post_test_with_tests"
+OUT_DIR="${BASE_PATH}/dataset/data/dafnytestgen_tests_can_run"
 mkdir -p "$OUT_DIR/killed"
 mkdir -p "$OUT_DIR/original"
 mkdir -p "$OUT_DIR/not_supported"
+mkdir -p "$OUT_DIR/has_errors"
 
-FULL_DATASET_DIR="${BASE_PATH}/dataset/data/pos_test"
-#FULL_DATASET_DIR="${BASE_PATH}/dataset/data/pos_test"
+FULL_DATASET_DIR="${BASE_PATH}/dataset/data/sample_original_can_run"
 
 ORIG_DIR="$FULL_DATASET_DIR/original"
 KILLED_DIR="$FULL_DATASET_DIR/killed"   # define killed directory
@@ -28,7 +28,7 @@ process_file() {
 
     out_file="$OUT_DIR/killed/${filename_without_extension}.test.dfy"
     # Capture DafnyTestGen output
-    command="dotnet ${BASE_PATH}/build_output/DafnyTestGen/DafnyTestGen.dll \"$killed_file\" -o \"$out_file\" -a -c -b -r 5"
+    command="dotnet ${BASE_PATH}/build_output/DafnyTestGen/DafnyTestGen.dll \"$killed_file\" -o \"$out_file\" --grouping by-status -n 20"
     output=$(eval "$command" 2>&1)
 
     status=$?
@@ -42,13 +42,40 @@ process_file() {
     if [ $status -eq 0 ]; then
         # eliminate metadata comments
         sed -i '1,5d' "$out_file"
-        cp "$killed_file" "$OUT_DIR/killed/"
 
-        killed_txt="${killed_file%.dfy}.txt"
-        if [ -f "$killed_txt" ]; then
-            cp "$killed_txt" "$OUT_DIR/killed/"
+        has_errors=false
+        command="dafny verify \"$out_file\""
+        dafny_output=$(eval "$command" 2>&1)
+        verified=$(echo $dafny_output | grep "Dafny program verifier finished")
+        if [[ $verified ]]; then
+            command="timeout 60 dafny run \"$out_file\" --no-verify"
+            dafny_output=$(eval "$command" 2>&1)
+            runs=$(echo $dafny_output | grep -i "exception")
+            if [[ ! -z $runs ]]; then
+                echo $dafny_output > logs.txt
+                has_errors=true
+            fi
         else
-            echo "Warning: killed text file missing for $killed_file (tried $killed_txt)"
+            has_errors=true
+        fi
+
+        if [[ $has_errors == false ]]; then 
+            cp "$killed_file" "$OUT_DIR/killed/"
+            killed_txt="${killed_file%.dfy}.txt"
+            if [ -f "$killed_txt" ]; then
+                cp "$killed_txt" "$OUT_DIR/killed/"
+            else
+                echo "Warning: killed text file missing for $killed_file (tried $killed_txt)"
+            fi
+        else
+            mv "$out_file" "$OUT_DIR/has_errors/"
+            cp "$killed_file" "$OUT_DIR/has_errors/"
+            killed_txt="${killed_file%.dfy}.txt"
+            if [ -f "$killed_txt" ]; then
+                cp "$killed_txt" "$OUT_DIR/has_errors/"
+            else
+                echo "Warning: killed text file missing for $killed_file (tried $killed_txt)"
+            fi
         fi
 
         base_name_raw="${filename_without_extension%__*}"
@@ -94,12 +121,11 @@ touch ${PROGRESS_LOCK}
 for file in "${files[@]}"; do
   ( process_file "$file") &
 
-   while [[ $(jobs -r -p | wc -l) -ge $MAX_JOBS ]]; do
-     wait -n
-   done
+  while [[ $(jobs -r -p | wc -l) -ge $MAX_JOBS ]]; do
+    wait -n
+  done
 done
 
 wait
-
 echo
 rm -f ${PROGRESS_TMP} ${PROGRESS_LOCK}
