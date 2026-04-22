@@ -48,7 +48,7 @@ process_file() {
         dafny_output=$(eval "$command" 2>&1)
         verified=$(echo $dafny_output | grep "Dafny program verifier finished")
         if [[ $verified ]]; then
-            command="dafny run \"$out_file\" --no-verify"
+            command="timeout 60 dafny run \"$out_file\" --no-verify"
             dafny_output=$(eval "$command" 2>&1)
             runs=$(echo $dafny_output | grep -i "exception")
             if [[ ! -z $runs ]]; then
@@ -121,12 +121,11 @@ touch ${PROGRESS_LOCK}
 for file in "${files[@]}"; do
   ( process_file "$file") &
 
-   while [[ $(jobs -r -p | wc -l) -ge $MAX_JOBS ]]; do
-     wait -n
-   done
+  while [[ $(jobs -r -p | wc -l) -ge $MAX_JOBS ]]; do
+    wait -n
+  done
 done
 
 wait
-
 echo
 rm -f ${PROGRESS_TMP} ${PROGRESS_LOCK}
