@@ -34,7 +34,7 @@ mutation_operators_descriptions = {
     "SDL": "Deletion of a statement or of an entire code block",
     "VDL": "Deletion of all occurences of a variable",
     "SLD": "Deletion of either the bottom or top limit of a subsequence selection expression",
-    "ODL": "Deletion of all occurences of a binary operator (and of one of its arguments in order to preserve program validity)",
+    "ODL": "Deletion of all occurrences of a binary operator (and of one of its arguments in order to preserve program validity)",
     "THI": "Insertion of the \\texttt{this} keyword in front of the use of a parameter that has the same name as a class field",
     "THD": "Deletion of the \\texttt{this} keyword in front of the use of a class field that has the same name as a parameter",
     "AMR": "Replacement of the body of an accessor (get) method with another with the same signature",
@@ -53,7 +53,7 @@ mutation_operators_distribution = {
     "MMR": 0, "PRV": 0, "SWS": 0, "SWV": 0
 }
 
-dataset_files="/app/datasets/dafnytestgen_tests_can_run/killed/"
+dataset_files="/app/dataset/data/sample_original_can_run/killed/"
 programs = listdir(dataset_files)
 for program in programs:
     if not (program.endswith(".dfy") and not program.endswith(".test.dfy")):
