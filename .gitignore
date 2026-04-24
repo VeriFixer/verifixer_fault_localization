@@ -10,6 +10,7 @@ dataset/data/*
 !dataset/data/sample_original_can_run.tar.gz
 !dataset/data/dafnytestgen_tests_can_run.tar.gz
 !dataset/data/pos_test.tar.gz
+!dataset/data/cached_results.tar.gz
 
 
 # Byte-compiled / optimized / DLL files

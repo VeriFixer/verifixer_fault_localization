@@ -3,3 +3,4 @@ dataset/data/dafnybench_original_can_run.tar.gz filter=lfs diff=lfs merge=lfs -t
 dataset/data/sample_original_can_run.tar.gz filter=lfs diff=lfs merge=lfs -text
 dataset/data/dafnytestgen_tests_can_run.tar.gz filter=lfs diff=lfs merge=lfs -text
 dataset/data/pos_test.tar.gz filter=lfs diff=lfs merge=lfs -text
+dataset/data/cached_results.tar.gz filter=lfs diff=lfs merge=lfs -text
