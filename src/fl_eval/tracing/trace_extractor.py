@@ -159,20 +159,27 @@ def extract_autofix_summary(csv_path: Path, top_n: int = 10) -> AutoFixSummary |
         return None
 
     rows: list[tuple[int, float]] = []
+    raw_lines: list[str] = []
     with csv_path.open("r", encoding="utf-8") as f:
         for raw_line in f:
-            line = raw_line.strip()
-            if not line:
-                continue
-            parts = line.split(",")
-            if len(parts) < 2:
-                continue
+            stripped = raw_line.strip()
+            if stripped:
+                raw_lines.append(stripped)
+
+    for idx, line in enumerate(raw_lines):
+        parts = line.split(",")
+        try:
+            line_no = int(parts[0].strip())
+        except ValueError:
+            continue
+        if len(parts) >= 2:
             try:
-                line_no = int(parts[0].strip())
                 score = float(parts[1].strip())
             except ValueError:
-                continue
-            rows.append((line_no, score))
+                score = float(len(raw_lines) - idx)
+        else:
+            score = float(len(raw_lines) - idx)
+        rows.append((line_no, score))
 
     if not rows:
         return None

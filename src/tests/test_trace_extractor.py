@@ -178,3 +178,17 @@ def test_extract_autofix_summary_and_find_latest(tmp_path: Path) -> None:
     assert summary.line_count == 2
     assert summary.top_lines[0] == (15, 0.9)
     assert summary.max_score == 0.9
+
+def test_extract_autofix_summary_single_column_csv(tmp_path: Path) -> None:
+    """lines-suspiciousness.csv may contain only line numbers (no scores)."""
+    csv_path = tmp_path / "lines-suspiciousness.csv"
+    csv_path.write_text("13\n14\n15\n16\n", encoding="utf-8")
+
+    summary = extract_autofix_summary(csv_path)
+    assert summary is not None
+    assert summary.line_count == 4
+    # First line gets highest rank-based score
+    assert summary.top_lines[0] == (13, 4.0)
+    assert summary.top_lines[-1] == (16, 1.0)
+    assert summary.max_score == 4.0
+    assert summary.min_score == 1.0
