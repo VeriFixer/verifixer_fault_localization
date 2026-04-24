@@ -6,6 +6,8 @@ from pathlib import Path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from analysis.data_analysis import (
+    PairwiseStatResult,
+    PairwiseTopKResult,
     build_pairwise_stat_results,
     build_pairwise_topk_results,
     compare_two_methods,
@@ -314,66 +316,55 @@ def test_print_pairwise_top1_table_reports_all_pairs():
 
 
 def test_print_pairwise_wilcoxon_latex_table_output():
-    raw_results = {
-        "CNTM": [
-            mk_exam(0.10, True, "f1.dfy"),
-            mk_exam(0.20, True, "f2.dfy"),
-        ],
-        "TECH_A": [
-            mk_exam(0.40, False, "f1.dfy"),
-            mk_exam(0.50, False, "f2.dfy"),
-        ],
-    }
-    rows = build_pairwise_stat_results(raw_results)
+    rows = [
+        PairwiseStatResult(
+            technique_1="CNTM",
+            technique_2="TECH_A",
+            pair_count=2,
+            nonzero_pair_count=2,
+            statistic=51062.0,
+            p_value=5.008e-43,
+            rank_biserial=0.7944,
+            significant=True,
+        )
+    ]
+
     with patch("builtins.print") as mock_print:
         print_pairwise_wilcoxon_latex_table(rows, scope="file")
 
     calls = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
     assert any("LaTeX Table Output (Pairwise Wilcoxon" in call for call in calls)
     assert any("\\begin{table}[h]" in call for call in calls)
-    assert any("Rank-biserial" in call for call in calls)
+    assert any("\\textbf{M.A} & \\textbf{M.B} & \\textbf{NZ} & \\textbf{W} & \\textbf{p} & \\textbf{R-bi} & \\textbf{Sig.}" in call for call in calls)
+    assert any("51062 & 5e-43 & 0.794" in call for call in calls)
+    assert any("R-bi = rank-biserial effect size" in call for call in calls)
     assert any("\\label{tab:pairwise_wilcoxon_file}" in call for call in calls)
 
 
 def test_print_pairwise_topk_latex_table_output():
-    raw_results = {
-        "A": [
-            ExamOutput(
-                filename="f1.dfy",
-                method_name="m",
-                file=ExamScore(score=0.1, found=True, prediction=True, line_ground_truth=10, line_prediction=[10, 11]),
-                method=ExamScore(score=0.1, found=True, prediction=True, line_ground_truth=10, line_prediction=[10, 11]),
-            ),
-            ExamOutput(
-                filename="f2.dfy",
-                method_name="m",
-                file=ExamScore(score=0.4, found=False, prediction=True, line_ground_truth=20, line_prediction=[19, 20]),
-                method=ExamScore(score=0.4, found=False, prediction=True, line_ground_truth=20, line_prediction=[19, 20]),
-            ),
-        ],
-        "B": [
-            ExamOutput(
-                filename="f1.dfy",
-                method_name="m",
-                file=ExamScore(score=0.2, found=True, prediction=True, line_ground_truth=10, line_prediction=[12, 10]),
-                method=ExamScore(score=0.2, found=True, prediction=True, line_ground_truth=10, line_prediction=[12, 10]),
-            ),
-            ExamOutput(
-                filename="f2.dfy",
-                method_name="m",
-                file=ExamScore(score=0.2, found=True, prediction=True, line_ground_truth=20, line_prediction=[20, 21]),
-                method=ExamScore(score=0.2, found=True, prediction=True, line_ground_truth=20, line_prediction=[20, 21]),
-            ),
-        ],
-    }
-    rows = build_pairwise_topk_results(raw_results, k=1)
+    rows = [
+        PairwiseTopKResult(
+            technique_1="A",
+            technique_2="B",
+            pair_count=2,
+            discordant_pairs=109,
+            a_success_b_fail=16,
+            a_fail_b_success=93,
+            p_value=2.209e-14,
+            paired_odds_ratio=0.1765,
+            significant=True,
+        )
+    ]
+
     with patch("builtins.print") as mock_print:
         print_pairwise_topk_latex_table(rows, scope="file", k=1)
 
     calls = [str(call.args[0]) for call in mock_print.call_args_list if call.args]
     assert any("LaTeX Table Output (Pairwise McNemar Top-1" in call for call in calls)
     assert any("\\begin{table}[h]" in call for call in calls)
-    assert any("OR(A/B)" in call for call in calls)
+    assert any("\\textbf{M.A} & \\textbf{M.B} & \\textbf{Disc.} & \\textbf{A-O} & \\textbf{B-O} & \\textbf{p} & \\textbf{OR} & \\textbf{Sig.}" in call for call in calls)
+    assert any("16 & 93 & 2e-14 & 0.176" in call for call in calls)
+    assert any("OR = paired odds ratio" in call for call in calls)
     assert any("\\label{tab:pairwise_mcnemar_top1_file}" in call for call in calls)
 
 if __name__ == "__main__":

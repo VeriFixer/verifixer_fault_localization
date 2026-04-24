@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from itertools import combinations
 import numpy as np
 import matplotlib.pyplot as plt
@@ -37,6 +37,32 @@ class PairwiseTopKResult:
     p_value: float
     paired_odds_ratio: float
     significant: bool
+
+
+def _normalize_scientific_notation(value: str) -> str:
+    if "e" not in value and "E" not in value:
+        return value
+
+    mantissa, exponent = value.lower().split("e", maxsplit=1)
+    exponent = exponent.lstrip("+")
+    sign = ""
+    if exponent.startswith("-"):
+        sign = "-"
+        exponent = exponent[1:]
+
+    exponent = exponent.lstrip("0") or "0"
+    return f"{mantissa}e{sign}{exponent}"
+
+
+def _format_compact_p_value(p_value: float) -> str:
+    rendered = f"{p_value:.3g}"
+    if "e" in rendered.lower():
+        rendered = f"{p_value:.0e}"
+    return _normalize_scientific_notation(rendered)
+
+
+def _format_fixed(value: float, decimals: int) -> str:
+    return f"{value:.{decimals}f}"
 
 
 def _get_exam_score_for_scope(score: ExamOutput, scope: str) -> float:
@@ -330,24 +356,25 @@ def print_pairwise_wilcoxon_latex_table(
     print(f"\n--- LaTeX Table Output (Pairwise Wilcoxon, {scope_label} Scope) ---")
     print(r"\begin{table}[h]")
     print(r"    \centering")
-    print(r"    \begin{tabular}{l|l|r|r|r|r|r|c}")
+    print(r"    \begin{tabular}{l|l|r|r|r|r|c}")
     print(r"        \hline")
-    print(r"        \textbf{Method A} & \textbf{Method B} & \textbf{Pairs} & \textbf{Nonzero} & \textbf{W} & \textbf{p-value} & \textbf{Rank-biserial} & \textbf{Sig.} \\")
+    print(r"        \textbf{M.A} & \textbf{M.B} & \textbf{NZ} & \textbf{W} & \textbf{p} & \textbf{R-bi} & \textbf{Sig.} \\")
     print(r"        \hline")
 
     for row in results:
         name1 = get_technique_display_name(row.technique_1, paper_only=paper_only).replace("_", r"\_")
         name2 = get_technique_display_name(row.technique_2, paper_only=paper_only).replace("_", r"\_")
         sig_label = "yes" if row.significant else "no"
+        statistic = int(round(row.statistic))
         print(
-            f"        {name1} & {name2} & {row.pair_count} & {row.nonzero_pair_count} & "
-            f"{row.statistic:.4f} & {row.p_value:.4g} & {row.rank_biserial:.4f} & {sig_label} \\\\"  # noqa: E501
+            f"        {name1} & {name2} & {row.nonzero_pair_count} & "
+            f"{statistic} & {_format_compact_p_value(row.p_value)} & {_format_fixed(row.rank_biserial, 3)} & {sig_label} \\\\"  # noqa: E501
         )
 
     print(r"        \hline")
     print(r"    \end{tabular}")
     print(
-        rf"    \caption{{Pairwise Wilcoxon signed-rank tests for EXAM scores ({scope_label.lower()} scope), with matched rank-biserial effect sizes.}}"
+        rf"    \caption{{Pairwise Wilcoxon signed-rank tests for EXAM scores ({scope_label.lower()} scope). Compact headers: R-bi = rank-biserial effect size.}}"
     )
     print(rf"    \label{{tab:pairwise_wilcoxon_{scope.lower()}}}")
     print(r"\end{table}")
@@ -380,9 +407,9 @@ def print_pairwise_topk_latex_table(
     print(f"\n--- LaTeX Table Output (Pairwise McNemar Top-{k}, {scope_label} Scope) ---")
     print(r"\begin{table}[h]")
     print(r"    \centering")
-    print(r"    \begin{tabular}{l|l|r|r|r|r|r|r|c}")
+    print(r"    \begin{tabular}{l|l|r|r|r|r|r|c}")
     print(r"        \hline")
-    print(r"        \textbf{Method A} & \textbf{Method B} & \textbf{Pairs} & \textbf{Disc.} & \textbf{A-only} & \textbf{B-only} & \textbf{p-value} & \textbf{OR(A/B)} & \textbf{Sig.} \\")
+    print(r"        \textbf{M.A} & \textbf{M.B} & \textbf{Disc.} & \textbf{A-O} & \textbf{B-O} & \textbf{p} & \textbf{OR} & \textbf{Sig.} \\")
     print(r"        \hline")
 
     for row in results:
@@ -390,14 +417,14 @@ def print_pairwise_topk_latex_table(
         name2 = get_technique_display_name(row.technique_2, paper_only=paper_only).replace("_", r"\_")
         sig_label = "yes" if row.significant else "no"
         print(
-            f"        {name1} & {name2} & {row.pair_count} & {row.discordant_pairs} & "
-            f"{row.a_success_b_fail} & {row.a_fail_b_success} & {row.p_value:.4g} & {row.paired_odds_ratio:.4f} & {sig_label} \\\\"  # noqa: E501
+            f"        {name1} & {name2} & {row.discordant_pairs} & "
+            f"{row.a_success_b_fail} & {row.a_fail_b_success} & {_format_compact_p_value(row.p_value)} & {_format_fixed(row.paired_odds_ratio, 3)} & {sig_label} \\\\"  # noqa: E501
         )
 
     print(r"        \hline")
     print(r"    \end{tabular}")
     print(
-        rf"    \caption{{Pairwise McNemar tests for Top-{k} localization success ({scope_label.lower()} scope), with paired odds ratios.}}"
+        rf"    \caption{{Pairwise McNemar tests for Top-{k} localization success ({scope_label.lower()} scope). Compact headers: OR = paired odds ratio.}}"
     )
     print(rf"    \label{{tab:pairwise_mcnemar_top{k}_{scope.lower()}}}")
     print(r"\end{table}")
