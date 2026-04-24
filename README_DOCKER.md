@@ -42,7 +42,6 @@ docker run --rm -it \
   -v "$(pwd)/tmp:/app/tmp:delegated" \
   -v "$(pwd)/external/tools/dafny-autofix:/app/external/tools/dafny-autofix:delegated" \
   -v "$(pwd)/external/tests_gen/dafny-test-gen:/app/external/tests_gen/dafny-test-gen:delegated" \
-  -v "$(pwd)/external/mutation/mutdafny:/app/external/mutation/mutdafny:delegated" \
   -v "$(pwd)/dataset:/app/dataset:delegated" \
   -v "$(pwd)/strategies:/app/strategies:delegated" \
   -v "$(pwd)/images:/app/images:delegated" \

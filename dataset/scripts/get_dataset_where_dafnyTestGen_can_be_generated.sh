@@ -1,25 +1,39 @@
 #!/usr/bin/env bash
+# Generate contract-based tests for each mutant using DafnyTestGen.
+# Keeps only mutants for which tests compile and run without errors.
+#
+# Usage:
+#   bash dataset/scripts/get_dataset_where_dafnyTestGen_can_be_generated.sh [INPUT_DIR] [OUTPUT_DIR]
+#
+# Arguments:
+#   INPUT_DIR   Path to sampled dataset (with original/ and killed/).
+#               Default: <repo_root>/dataset/data/sampled_4
+#   OUTPUT_DIR  Where to write the filtered dataset with generated tests.
+#               Default: <repo_root>/dataset/data/dafnytestgen_tests_can_run_samp4
+
+set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/find_repo_root.sh"
-BASE_PATH="$(find_repo_root)" || exit 1 
+BASE_PATH="$(find_repo_root)" || exit 1
 
-OUT_DIR="${BASE_PATH}/dataset/data/dafnytestgen_tests_can_run"
+FULL_DATASET_DIR="${1:-${BASE_PATH}/dataset/data/sampled_4}"
+OUT_DIR="${2:-${BASE_PATH}/dataset/data/dafnytestgen_tests_can_run_samp4}"
+
 mkdir -p "$OUT_DIR/killed"
 mkdir -p "$OUT_DIR/original"
 mkdir -p "$OUT_DIR/not_supported"
 mkdir -p "$OUT_DIR/has_errors"
 
-FULL_DATASET_DIR="${BASE_PATH}/dataset/data/sample_original_can_run"
-
 ORIG_DIR="$FULL_DATASET_DIR/original"
-KILLED_DIR="$FULL_DATASET_DIR/killed"   # define killed directory
+KILLED_DIR="$FULL_DATASET_DIR/killed"
 MAX_JOBS=${MAX_JOBS:-$(( $(nproc) ))}
-#MAX_JOBS=1
 
 PROGRESS_LOCK="${BASE_PATH}/tmp/dataset_scripts_progress.lock"
 PROGRESS_TMP="${BASE_PATH}/tmp/dataset_scripts_progress.tmp"
-
 mkdir -p "${BASE_PATH}/tmp"
+
+echo "Input dataset : ${FULL_DATASET_DIR}"
+echo "Output dataset: ${OUT_DIR}"
 
 process_file() {
     killed_file="$1"
@@ -27,20 +41,15 @@ process_file() {
     filename_without_extension="${filename%.dfy}"
 
     out_file="$OUT_DIR/killed/${filename_without_extension}.test.dfy"
-    # Capture DafnyTestGen output
     command="dotnet ${BASE_PATH}/build_output/DafnyTestGen/DafnyTestGen.dll \"$killed_file\" -o \"$out_file\" --grouping by-status -n 20"
     output=$(eval "$command" 2>&1)
-
     status=$?
 
     if [ ! -f "$out_file" ] || [ ! -s "$out_file" ]; then
-        # No tests were generated, making the output file empty or missing
         status=1
     fi
 
-    # real success condition
     if [ $status -eq 0 ]; then
-        # eliminate metadata comments
         sed -i '1,5d' "$out_file"
 
         has_errors=false
@@ -59,7 +68,7 @@ process_file() {
             has_errors=true
         fi
 
-        if [[ $has_errors == false ]]; then 
+        if [[ $has_errors == false ]]; then
             cp "$killed_file" "$OUT_DIR/killed/"
             killed_txt="${killed_file%.dfy}.txt"
             if [ -f "$killed_txt" ]; then
@@ -91,41 +100,37 @@ process_file() {
         echo "Command: $command"
         echo "Exit Status: $status"
 
-        # Save input file for inspection
         cp "$killed_file" "$OUT_DIR/not_supported/"
-
-        # Save metadata for debugging
         echo "Command: $command" >> "$OUT_DIR/not_supported/${filename_without_extension}.debug.log"
         echo "Output: $output" >> "$OUT_DIR/not_supported/${filename_without_extension}.debug.log"
     fi
 
-
-
-    # thread-safe progress update
     (
         flock 200
         count=$(<${PROGRESS_TMP})
         count=$((count + 1))
         echo "$count" > ${PROGRESS_TMP}
-        printf "\r|- Copying files that generated tests to dafnytestgen_tests_can_run: %d/%d" "$count" "$TOTAL"
+        printf "\r|- Generating tests: %d/%d" "$count" "$TOTAL"
     ) 200>${PROGRESS_LOCK}
 }
 
 export -f process_file
+export OUT_DIR BASE_PATH ORIG_DIR PROGRESS_TMP PROGRESS_LOCK
 
 mapfile -t files < <(find "$KILLED_DIR" -name "*.dfy")
 TOTAL=${#files[@]}
+export TOTAL
 echo 0 > ${PROGRESS_TMP}
 touch ${PROGRESS_LOCK}
 
 for file in "${files[@]}"; do
-  ( process_file "$file") &
-
-  while [[ $(jobs -r -p | wc -l) -ge $MAX_JOBS ]]; do
-    wait -n
-  done
+    ( process_file "$file" ) &
+    while [[ $(jobs -r -p | wc -l) -ge $MAX_JOBS ]]; do
+        wait -n
+    done
 done
 
 wait
 echo
 rm -f ${PROGRESS_TMP} ${PROGRESS_LOCK}
+echo "Done. Output at: ${OUT_DIR}"

@@ -121,6 +121,19 @@ RUN --mount=type=cache,target=/root/.nuget/packages \
 # Copy large runtime-only assets last
 COPY external/bench/dafnybench/ /app/external/bench/dafnybench/
 COPY external/mutation/mutdafny/ /app/external/mutation/mutdafny/
+# Build mutdafny following its README: custom dafny fork + z3 binary + plugin
+RUN --mount=type=cache,target=/root/.nuget/packages \
+    cd /app/external/mutation/mutdafny && \
+    make -C dafny exe -j"$(nproc)" && \
+    cd dafny/Binaries && \
+    wget -q https://github.com/dafny-lang/solver-builds/releases/download/snapshot-2023-08-02/z3-4.12.1-x64-ubuntu-20.04-bin.zip && \
+    unzip -q z3-4.12.1-x64-ubuntu-20.04-bin.zip && \
+    mv z3-4.12.1 z3 && \
+    chmod 755 z3 && \
+    rm -f z3-4.12.1-x64-ubuntu-20.04-bin.zip && \
+    cd /app/external/mutation/mutdafny && \
+    dotnet build mutdafny/mutdafny.csproj && \
+    chmod -R a+rwX /app/external/mutation/mutdafny
 COPY dataset/ /app/dataset/
 
 CMD ["bash"]
