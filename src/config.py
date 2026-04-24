@@ -71,6 +71,8 @@ PRETTY_OUTPUTS_DIR: Path = ARTIFACTS_ROOT / "pretty_outputs"
 # Can be overridden via environment variables: FL_MAX_RAM_GB, FL_MAX_TIME_SECONDS
 MAX_RAM_EXTERNAL_PROGRAMS: int = 24 # GB
 MAX_TIME_EXTERNAL_PROGRAMS: int = 60 # Seconds
+# Setting any tinmeout to 0 maked timeout infinite
+MAX_TIME_AUTOFIX: int = 6*60*60 # Seconds (6 hours timeout)
 
 # === Strategy Executable Paths ===
 # These are discovered via BASE_PATH but can be overridden via environment variables

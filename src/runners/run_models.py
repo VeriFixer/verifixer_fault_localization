@@ -8,6 +8,8 @@ from analysis.data_analysis import (
     generate_plots,
     print_ascii_table,
     print_latex_table,
+    print_compact_results_table,
+    print_complete_cases_table,
     print_pairwise_topk_latex_table,
     print_pairwise_topk_table,
     print_pairwise_wilcoxon_latex_table,
@@ -123,6 +125,8 @@ def run_models_for_techniques(
 
         print_ascii_table(stats_summary, paper_only=False)
         print_latex_table(stats_summary, paper_only=False)
+        print_compact_results_table(raw_results, paper_only=False)
+        print_complete_cases_table(raw_results, paper_only=False)
         _log_benchmark_llm_cost_totals(llm_cost_totals_by_technique)
 
         try:

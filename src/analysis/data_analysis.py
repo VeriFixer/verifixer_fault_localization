@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from itertools import combinations
 import numpy as np
 import matplotlib.pyplot as plt
@@ -493,6 +493,187 @@ def print_ascii_table(stats: dict[str, StatsSummaryEntry], paper_only: bool = Tr
         paper_only=paper_only,
     )
     print()
+
+
+@dataclass(frozen=True)
+class CompactMetrics:
+    """Compact metrics for a technique: EXAM1, Top-k, and Found/Empty rates."""
+    exam_file: float
+    exam_method: float
+    top1_success: float
+    top3_success: float
+    top5_success: float
+    found_rate: float
+    empty_rate: float
+    case_count: int
+
+
+def _filter_complete_cases(raw_results: dict[str, list[ExamOutput]]) -> dict[str, list[ExamOutput]]:
+    """Filter to only cases where ALL techniques have non-empty predictions.
+    
+    Returns filtered dict with same structure, keeping only shared indices.
+    """
+    if not raw_results:
+        return {}
+    
+    # Find all unique filenames across all techniques
+    all_filenames: set[str] = set()
+    for scores in raw_results.values():
+        all_filenames.update(s.filename for s in scores)
+    
+    # For each filename, check if ALL techniques have non-empty predictions
+    complete_filenames: set[str] = set()
+    for filename in all_filenames:
+        all_non_empty = True
+        for scores in raw_results.values():
+            score_dict = {s.filename: s for s in scores}
+            if filename not in score_dict or score_dict[filename].empty_file:
+                all_non_empty = False
+                break
+        if all_non_empty:
+            complete_filenames.add(filename)
+    
+    # Filter all techniques to only complete filenames
+    filtered: dict[str, list[ExamOutput]] = {}
+    for tech, scores in raw_results.items():
+        filtered[tech] = [s for s in scores if s.filename in complete_filenames]
+    
+    return filtered
+
+
+def _compute_compact_metrics(scores: list[ExamOutput]) -> CompactMetrics:
+    """Compute compact metrics for a list of ExamOutput (file scope only)."""
+    if not scores:
+        return CompactMetrics(
+            exam_file=0.0, exam_method=0.0, top1_success=0.0, top3_success=0.0,
+            top5_success=0.0, found_rate=0.0, empty_rate=0.0, case_count=0
+        )
+    
+    # EXAM1 (all cases)
+    exam_file = sum(s.score_file for s in scores) / len(scores)
+    exam_method = sum(s.score_method for s in scores) / len(scores)
+    
+    # Found rate
+    found_count = sum(1 for s in scores if s.found_file)
+    found_rate = (found_count / len(scores)) * 100.0 if scores else 0.0
+    
+    # Empty rate
+    empty_count = sum(1 for s in scores if s.empty_file)
+    empty_rate = (empty_count / len(scores)) * 100.0 if scores else 0.0
+    
+    # Top-k success rates (file scope)
+    def top_k_rate(k: int) -> float:
+        hits = sum(1 for s in scores if s.file.line_ground_truth in s.file.line_prediction[:k])
+        return (hits / len(scores)) * 100.0 if scores else 0.0
+    
+    top1_success = top_k_rate(1)
+    top3_success = top_k_rate(3)
+    top5_success = top_k_rate(5)
+    
+    return CompactMetrics(
+        exam_file=exam_file,
+        exam_method=exam_method,
+        top1_success=top1_success,
+        top3_success=top3_success,
+        top5_success=top5_success,
+        found_rate=found_rate,
+        empty_rate=empty_rate,
+        case_count=len(scores)
+    )
+
+
+def print_compact_results_table(raw_results: dict[str, list[ExamOutput]], paper_only: bool = True):
+    """Print compact LaTeX table with EXAM1, Top-k, and Found/Empty rates (all cases)."""
+    if not raw_results:
+        logger.warning("No results to display in compact table.")
+        return
+    
+    metrics_by_tech: dict[str, CompactMetrics] = {}
+    total_cases = 0
+    for tech, scores in raw_results.items():
+        metrics_by_tech[tech] = _compute_compact_metrics(scores)
+        if scores:
+            total_cases = len(scores)
+    
+    print("\n--- Compact Results Table (All Cases) ---")
+    print(r"\begin{table}[t]")
+    print(r"    \centering")
+    print(r"    \small")
+    print(r"    \begin{tabular}{lcccc}")
+    print(r"        \toprule")
+    print(r"        \textbf{Strat.} & \textbf{EX$_F$} & \textbf{EX$_M$} & \textbf{Top-1/3/5} & \textbf{F / E} \\")
+    print(r"        \midrule")
+    
+    for tech in sorted(metrics_by_tech.keys()):
+        metrics = metrics_by_tech[tech]
+        clean_name = get_technique_display_name(tech, paper_only=paper_only).replace("_", r"\_")
+        top_k_str = f"{metrics.top1_success:.2f} / {metrics.top3_success:.2f} / {metrics.top5_success:.2f}"
+        found_empty_str = f"{metrics.found_rate:.2f} / {metrics.empty_rate:.2f}"
+        
+        print(
+            f"        {clean_name} & {metrics.exam_file:.3f} & {metrics.exam_method:.3f} & {top_k_str} & {found_empty_str} \\\\"
+        )
+    
+    print(r"        \bottomrule")
+    print(r"    \end{tabular}")
+    print(
+        f"    \\caption{{Fault localization performance across strategies ({total_cases} programs). "
+        f"EX$_F$ and EX$_M$ report EXAM scores under file and method scope, respectively (lower is better). "
+        f"Top-$k$ shows localization success rates as Top-1 / Top-3 / Top-5 (\\%). "
+        f"F / E denotes percentage of cases where fault is found (F) and where method returns no output (E).}}"
+    )
+    print(r"    \label{tab:compact_results_all}")
+    print(r"\end{table}")
+
+
+def print_complete_cases_table(raw_results: dict[str, list[ExamOutput]], paper_only: bool = True):
+    """Print compact LaTeX table with EXAM1, Top-k, and Found/Empty rates (complete cases only)."""
+    if not raw_results:
+        logger.warning("No results to display in complete cases table.")
+        return
+    
+    filtered_results = _filter_complete_cases(raw_results)
+    
+    if not filtered_results or not any(filtered_results.values()):
+        logger.warning("No complete cases found (all techniques with non-empty predictions).")
+        return
+    
+    metrics_by_tech: dict[str, CompactMetrics] = {}
+    total_cases = 0
+    for tech, scores in filtered_results.items():
+        metrics_by_tech[tech] = _compute_compact_metrics(scores)
+        if scores:
+            total_cases = len(scores)
+    
+    print("\n--- Compact Results Table (Complete Cases Only) ---")
+    print(r"\begin{table}[t]")
+    print(r"    \centering")
+    print(r"    \small")
+    print(r"    \begin{tabular}{lcccc}")
+    print(r"        \toprule")
+    print(r"        \textbf{Strat.} & \textbf{EX$_F$} & \textbf{EX$_M$} & \textbf{Top-1/3/5} & \textbf{F / E} \\")
+    print(r"        \midrule")
+    
+    for tech in sorted(metrics_by_tech.keys()):
+        metrics = metrics_by_tech[tech]
+        clean_name = get_technique_display_name(tech, paper_only=paper_only).replace("_", r"\_")
+        top_k_str = f"{metrics.top1_success:.2f} / {metrics.top3_success:.2f} / {metrics.top5_success:.2f}"
+        found_empty_str = f"{metrics.found_rate:.2f} / {metrics.empty_rate:.2f}"
+        
+        print(
+            f"        {clean_name} & {metrics.exam_file:.3f} & {metrics.exam_method:.3f} & {top_k_str} & {found_empty_str} \\\\"
+        )
+    
+    print(r"        \bottomrule")
+    print(r"    \end{tabular}")
+    print(
+        f"    \\caption{{Fault localization performance across strategies (complete cases: {total_cases} programs where all methods returned non-empty output). "
+        f"EX$_F$ and EX$_M$ report EXAM scores under file and method scope, respectively (lower is better). "
+        f"Top-$k$ shows localization success rates as Top-1 / Top-3 / Top-5 (\\%). "
+        f"F / E denotes percentage of cases where fault is found (F) and where method returns no output (E).}}"
+    )
+    print(r"    \label{tab:compact_results_complete}")
+    print(r"\end{table}")
 
 
 def print_latex_table(stats: dict[str, StatsSummaryEntry], paper_only: bool = True):
