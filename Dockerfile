@@ -94,8 +94,8 @@ COPY .repo_verifixer_fault_localization_marker /app/
 
 COPY external/tests_gen/dafny-test-gen/ /app/external/tests_gen/dafny-test-gen/
 RUN --mount=type=cache,target=/root/.nuget/packages \
-    dotnet restore /app/external/tests_gen/dafny-test-gen/DafnyTestGen/DafnyTestGen.csproj && \
-    dotnet build /app/external/tests_gen/dafny-test-gen/DafnyTestGen/DafnyTestGen.csproj \
+    dotnet restore /app/external/tests_gen/dafny-test-gen/DafnyCBT/DafnyCBT.csproj && \
+    dotnet build /app/external/tests_gen/dafny-test-gen/DafnyCBT/DafnyCBT.csproj \
       -c Release -o /app/build_output/DafnyTestGen --no-restore
 
 # Build strategies

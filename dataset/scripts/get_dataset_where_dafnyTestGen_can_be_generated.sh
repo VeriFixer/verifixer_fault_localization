@@ -41,7 +41,7 @@ process_file() {
     filename_without_extension="${filename%.dfy}"
 
     out_file="$OUT_DIR/killed/${filename_without_extension}.test.dfy"
-    command="dotnet ${BASE_PATH}/build_output/DafnyTestGen/DafnyTestGen.dll \"$killed_file\" -o \"$out_file\" --grouping by-status -n 20"
+    command="dotnet ${BASE_PATH}/build_output/DafnyTestGen/DafnyCBT.dll \"$killed_file\" -o \"$out_file\" --grouping by-status --skip-on-exception --comment-uncompilable -n 20"
     output=$(eval "$command" 2>&1)
     status=$?
 
