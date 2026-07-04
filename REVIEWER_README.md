@@ -105,7 +105,7 @@ To verify that a technique actually runs (not just reads cache), delete its cach
 rm -rf tmp/run_artifacts/cached_results/sample_original_can_run/CNTM
 
 # 2. Run only CNTM on the dataset
-python src/runners/run_1_model.py CNTM dataset/data/sample_original_can_run
+python src/evaluators/eval_1_model.py CNTM dataset/data/sample_original_can_run
 ```
 
 You will see CNTM invoking the verifier for each mutant and producing fresh predictions.
@@ -115,17 +115,17 @@ Once complete, the cache is repopulated and results match the pre-shipped values
 
 ```bash
 rm -rf tmp/run_artifacts/cached_results/sample_original_can_run/<TECHNIQUE_NAME>
-python src/runners/run_1_model.py <TECHNIQUE_NAME> dataset/data/sample_original_can_run
+python src/evaluators/eval_1_model.py <TECHNIQUE_NAME> dataset/data/sample_original_can_run
 ```
 
 Where `<TECHNIQUE_NAME>` is one of: `RAND`, `CNTB`, `CNTS`, `CNTM`, `SNAP`, `LLM`, etc.
 
 ### Run a single mutant with rich output
 
-Use `run_1_model_1_example.py` — it always produces detailed trace output for one file:
+Use `eval_1_model_1_example.py` — it always produces detailed trace output for one file:
 
 ```bash
-python src/runners/run_1_model_1_example.py CNTM \
+python src/evaluators/eval_1_model_1_example.py CNTM \
   dataset/data/sample_original_can_run/killed/Clover_avg__90_AOR_Sub.dfy
 ```
 
@@ -136,7 +136,7 @@ To get rich per-mutant output when running the full dataset, use `--sequential -
 (run the following column in from a clean cache state will take hours for not being made in parallel.)
 
 ```bash
-python src/runners/run_1_model.py CNTM dataset/data/sample_original_can_run \
+python src/evaluators/eval_1_model.py CNTM dataset/data/sample_original_can_run \
   --sequential --pretty-output
 ```
 
@@ -153,14 +153,14 @@ To run them live it is needed a OPENROUTER_API_KEY:
 ```bash
 export OPENROUTER_API_KEY="<your-key>"
 export LLM_REAL_MODEL_NAME=qwen3-coder-next
-python src/runners/run_1_model.py LLM dataset/data/sample_original_can_run
+python src/evaluators/eval_1_model.py LLM dataset/data/sample_original_can_run
 ```
 
 Single-mutant example with LLM:
 
 ```bash
 export OPENROUTER_API_KEY="<your-key>"
-LLM_REAL_MODEL_NAME=qwen3-coder-next python src/runners/run_1_model_1_example.py LLM \
+LLM_REAL_MODEL_NAME=qwen3-coder-next python src/evaluators/eval_1_model_1_example.py LLM \
   dataset/data/sample_original_can_run/killed/Clover_avg__90_AOR_Sub.dfy
 ```
 
@@ -172,7 +172,7 @@ Full replication of SNAP on 500 mutants takes approximately 16 hours. We do not 
 To see SNAP in action on a single mutant with rich output:
 (5-10 minutes)
 ```bash
-python src/runners/run_1_model_1_example.py SNAP \
+python src/evaluators/eval_1_model_1_example.py SNAP \
    /app/dataset/data/sample_original_can_run/killed/se2011_tmp_tmp71eb82zt_ass1_ex4__312-312_EVR_int.dfy
 ```
 
@@ -261,7 +261,7 @@ rm -rf tmp/run_artifacts/cached_results/*
 rm -rf tmp/run_artifacts/images/*
 
 # Run all techniques
-python src/runners/run_all_models_raw_name.py dataset/data/sample_original_can_run --clean-cache
+python src/evaluators/eval_all_models_raw_name.py dataset/data/sample_original_can_run --clean-cache
 
 # Reproduce RQ tables/plots
 python src/research_questions/rq1.py dataset/data/sample_original_can_run
@@ -288,7 +288,7 @@ class MyNewRanker(FLTechnique):
         return [42, 17, 8]
 ```
 
-2. Register it in `src/runners/run_model_common.py` by adding an entry to `TECHNIQUE_CONFIG`:
+2. Register it in `src/evaluators/eval_model_common.py` by adding an entry to `TECHNIQUE_CONFIG`:
 
 ```python
 "MY_NEW": TechniqueConfig(MyNewRanker, run_on_all_models=True),
@@ -297,13 +297,13 @@ class MyNewRanker(FLTechnique):
 3. Run it:
 
 ```bash
-python src/runners/run_1_model.py MY_NEW dataset/data/sample_original_can_run
+python src/evaluators/eval_1_model.py MY_NEW dataset/data/sample_original_can_run
 ```
 
 Or on a single mutant with rich output:
 
 ```bash
-python src/runners/run_1_model_1_example.py MY_NEW \
+python src/evaluators/eval_1_model_1_example.py MY_NEW \
   dataset/data/sample_original_can_run/killed/Clover_avg__90_AOR_Sub.dfy
 ```
 
@@ -318,8 +318,8 @@ The framework handles caching, EXAM computation, method-scope scoring, and repor
 | `python src/research_questions/rq1.py ...` | RQ1 from cache | ~1 min |
 | `python src/research_questions/rq2.py ...` | RQ2 from cache | ~1 min |
 | `python src/research_questions/rq3.py ...` | RQ3 from cache | ~1 min |
-| `python src/runners/run_all_models_raw_name.py ...` | All techniques from cache | ~2 min |
-| `rm -rf .../CNTM && python src/runners/run_1_model.py CNTM ...` | Re-run CNTM fresh | ~2–4 hours |
-| `python src/runners/run_1_model_1_example.py CNTM .../killed/<file>.dfy` | One mutant, rich output | ~1 min |
-| `python src/runners/run_1_model.py CNTM ... --sequential --pretty-output` | Full dataset, rich output | ~4 hours |
+| `python src/evaluators/eval_all_models_raw_name.py ...` | All techniques from cache | ~2 min |
+| `rm -rf .../CNTM && python src/evaluators/eval_1_model.py CNTM ...` | Re-run CNTM fresh | ~2–4 hours |
+| `python src/evaluators/eval_1_model_1_example.py CNTM .../killed/<file>.dfy` | One mutant, rich output | ~1 min |
+| `python src/evaluators/eval_1_model.py CNTM ... --sequential --pretty-output` | Full dataset, rich output | ~4 hours |
 | `python src/integration_tests/health_check.py --clean-cache` | Full repo health check | ~30 min |

@@ -9,13 +9,13 @@ import config as gl
 from logging_config import get_logger
 from fl_eval.metrics.scoring import ExamOutput
 from fl_eval.metrics.summary_stats import StatsSummaryEntry
-from runners.run_model_common import (
+from evaluators.eval_model_common import (
     TECHNIQUE_MAP,
     add_run_control_args,
     generate_report,
     prepare_dataset_cache,
 )
-from runners.run_1_model_1_example import compute_metrics_one_example
+from evaluators.eval_1_model_1_example import compute_metrics_one_example
 
 from fl_eval.execution.parallel_executor import run_parallel_or_seq
 
@@ -292,10 +292,10 @@ How to use:
   Run the script from the project root directory.
 
     Example 1: Evaluate the 'RANDFILE' technique using data in 'dataset/data/pos_test'
-        $ python src/run_1_model.py RANDFILE dataset/data/pos_test
+        $ python src/eval_1_model.py RANDFILE dataset/data/pos_test
 
     Example 2: Evaluate one mutant with a specific LLM model (requires LLM_REAL_MODEL_NAME env var)
-        $ LLM_REAL_MODEL_NAME=qwen3-coder-480b python src/run_1_model.py LLM dataset/data/pos_test/killed/foo__mut1.dfy
+        $ LLM_REAL_MODEL_NAME=qwen3-coder-480b python src/eval_1_model.py LLM dataset/data/pos_test/killed/foo__mut1.dfy
 
 """
     

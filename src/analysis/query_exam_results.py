@@ -12,7 +12,7 @@ from fl_eval.metrics.scoring import (
     load_from_file_output,
 )
 from logging_config import get_logger
-from runners.run_model_common import (
+from evaluators.eval_model_common import (
     TECHNIQUE_MAP,
     build_mutation_context,
     setup_evaluation,

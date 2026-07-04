@@ -4,7 +4,7 @@ Method exam score is to lignint if method predicts something outside the method,
 
 
 Bug to correct on the reassume 
-python src/runners/run_1_model_1_example.py counterExampleIfReassume dataset/data/pos_test/killed/example_to_test_reassume_single_fault__MUTANT.dfy 
+python src/evaluators/eval_1_model_1_example.py counterExampleIfReassume dataset/data/pos_test/killed/example_to_test_reassume_single_fault__MUTANT.dfy 
 
 
 

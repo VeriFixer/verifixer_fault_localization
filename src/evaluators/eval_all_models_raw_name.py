@@ -1,6 +1,6 @@
-from runners.run_model_common import get_techniques_for_all_models, prepare_dataset_cache
-from runners.run_common import parse_common_runner_args
-from runners.run_models import run_models_for_techniques
+from evaluators.eval_model_common import get_techniques_for_all_models, prepare_dataset_cache
+from evaluators.eval_common import parse_common_runner_args
+from evaluators.eval_models import eval_models_for_techniques
 
 
 def main() -> int:
@@ -10,7 +10,7 @@ def main() -> int:
     if not prepare_dataset_cache(args.data_path, args.clean_cache):
         return 1
 
-    run_models_for_techniques(
+    eval_models_for_techniques(
         args.data_path,
         get_techniques_for_all_models(),
         sequential=args.sequential,

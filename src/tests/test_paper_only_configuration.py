@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from runners.run_model_common import (
+from evaluators.eval_model_common import (
     get_technique_display_name,
     get_techniques_for_cntm_ablation,
     get_techniques_for_paper_only,

@@ -31,7 +31,7 @@
             "name": "Python Debug with Args",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/run_1_model.py",
+            "program": "${workspaceFolder}/src/eval_1_model.py",
             "console": "integratedTerminal",
             "args": [
                 "counterExampleIfReassume",

@@ -3,32 +3,61 @@ import argparse
 from pathlib import Path
 
 from fl_eval.core.abstract import FLTechnique
-from runners.run_model_common import (
+from fl_eval.core.gt_parser import GroundTruthAndLineLimit
+from fl_eval.metrics.scoring import ExamOutput
+from evaluators.eval_model_common import (
     TECHNIQUE_MAP,
     execute_single_mutation,
 )
 from fl_eval.reporting.run_one_example_output import (
+    clean_cache_for_run,
     print_one_example_intro,
     print_section,
+    render_one_example_pretty_result,
+    save_one_example_json_artifact,
 )
-from fl_eval.util.terminal_colors import Color, colored, separator
 from logging_config import get_logger
 
 logger = get_logger(__name__)
 
-def compute_one_example(
+def compute_metrics_one_example(
     flt_name: str,
     dfy_path: Path,
     enable_pretty_output: bool = False,
-) -> tuple[FLTechnique, list[int]]:
+) -> tuple[FLTechnique, ExamOutput, Path, GroundTruthAndLineLimit, Path]:
     single_output = execute_single_mutation(
         flt_name,
         dfy_path,
+        to_validate_dataset=False,
     )
     if single_output is None:
         raise RuntimeError("Evaluation failed: could not compute single-mutation metrics.")
 
-    return single_output
+    fl_technique, score, context, base_path = single_output
+
+    artifact_path = save_one_example_json_artifact(
+        flt_name,
+        dfy_path,
+        fl_technique,
+        score,
+        context.diff_path,
+        context.gtruth,
+        base_path,
+    )
+
+    if enable_pretty_output:
+        render_one_example_pretty_result(
+            flt_name,
+            dfy_path,
+            fl_technique,
+            score,
+            context.diff_path,
+            context.gtruth,
+            base_path,
+            artifact_path=artifact_path,
+        )
+
+    return fl_technique, score, context.diff_path, context.gtruth, base_path
 
 
 
@@ -71,27 +100,28 @@ How to use:
 
     args = parser.parse_args()
     
-    print("\n" + separator("="))
-    print(colored("SINGLE FILE FAULT LOCALIZATION", Color.HEADER + Color.BOLD))
-    print(separator("="))
-    print_section("INPUT")
-    print(f"{colored('Technique', Color.BOLD):24}: {args.technique_name}")
-    print(f"{colored('Mutant File', Color.BOLD):24}: {args.dfy_path}")
-    print(separator("="))
+    print_one_example_intro(args.technique_name, args.dfy_path)
 
     if not args.dfy_path.exists():
         print(f"Data path not found: {args.dfy_path}")
         parser.print_help()
     else:
+        clean_cache_for_run(args.dfy_path, args.technique_name, enable_pretty_output=True)
+
+        print_section("EXECUTION")
         try:
-            _, ranking = compute_one_example(
+            _, score, _, _, _ = compute_metrics_one_example(
                 args.technique_name,
                 args.dfy_path,
                 enable_pretty_output=True,
             )
-            print_section("RESULT")
-            print(f"{colored('Predictions', Color.BOLD):24}: {ranking}")
+            print("Evaluation completed")
+            print(
+                    f"Technique={args.technique_name} mutant={args.dfy_path.name} "
+                    f"file_exam={score.file.score:.6f} method_exam={score.method.score:.6f} "
+                    f"found={score.file.found}"
+                )
 
         except Exception as e:
-            logger.error("Single-file fault localization failed: %s", e)
-            print(f"Fault localization failed: {e}")
+            logger.error("Single-file evaluation failed: %s", e)
+            print(f"Evaluation failed: {e}")

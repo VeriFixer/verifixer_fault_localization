@@ -17,7 +17,7 @@ from analysis.data_analysis import (
 )
 from fl_eval.metrics.scoring import ExamOutput
 from fl_eval.metrics.summary_stats import StatsSummaryEntry
-from runners.run_model_common import (
+from evaluators.eval_model_common import (
     get_techniques_for_all_models,
     get_techniques_for_cntm_ablation,
     get_techniques_for_health_check,
@@ -26,7 +26,7 @@ from runners.run_model_common import (
 )
 from fl_eval.execution.parallel_executor import shutdown_parallel_executor
 from logging_config import get_logger
-from runners.run_1_model import compute_metrics_one_dataset
+from evaluators.eval_1_model import compute_metrics_one_dataset
 
 logger = get_logger(__name__)
 
@@ -94,7 +94,7 @@ def _log_benchmark_llm_cost_totals(
     logger.info("=" * 76)
 
 
-def run_models_for_techniques(
+def eval_models_for_techniques(
     base_path: Path,
     techniques_to_run: list[str],
     sequential: bool = False,
@@ -212,7 +212,7 @@ def main() -> int:
         return 1
 
     techniques_to_run = _get_techniques_for_set(args.models_set)
-    run_models_for_techniques(
+    eval_models_for_techniques(
         args.data_path,
         techniques_to_run,
         sequential=args.sequential,

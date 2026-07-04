@@ -9,7 +9,7 @@ For a complete repository validation (type check + tests + safeguard), use
 
 Flow:
     1) Extract dataset/data/pos_test.tar.gz → dataset/data/pos_test
-    2) Execute src/runners/run_models.py on that dataset
+    2) Execute src/evaluators/eval_models.py on that dataset
     3) Validate key outputs:
        - Plot files: tmp/run_artifacts/images/*.png
        - Cache files: tmp/run_artifacts/cached_results/<dataset>/<technique>/<mutant>.json
@@ -50,7 +50,7 @@ import config as gl
 from config import find_repo_root
 from fl_eval.core.gt_parser import GroundTruthAndLineLimit
 from fl_eval.metrics.scoring import compute_exam_score_one_file, load_from_file_output
-from runners.run_model_common import TECHNIQUE_MAP, get_techniques_for_all_models, get_techniques_for_health_check
+from evaluators.eval_model_common import TECHNIQUE_MAP, get_techniques_for_all_models, get_techniques_for_health_check
 
 
 @dataclass(frozen=True)
@@ -163,20 +163,20 @@ def validate_dataset_layout(dataset_dir: Path) -> int:
 
 
 def run_benchmark(
-    run_models: Path,
+    eval_models: Path,
     dataset_dir: Path,
     clean_cache: bool,
     sequential: bool,
     health_check: bool,
 ) -> None:
-    cmd = [sys.executable, str(run_models), str(dataset_dir)]
+    cmd = [sys.executable, str(eval_models), str(dataset_dir)]
     cmd.extend(["--models-set", "health-check" if health_check else "all"])
     if clean_cache:
         cmd.append("--clean-cache")
     if sequential:
         cmd.append("--sequential")
 
-    result = subprocess.run(cmd, cwd=run_models.parent.parent)
+    result = subprocess.run(cmd, cwd=eval_models.parent.parent)
     if result.returncode != 0:
         raise RuntimeError(f"Benchmark command failed with code {result.returncode}: {' '.join(cmd)}")
 
@@ -377,12 +377,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--clean-cache",
         action="store_true",
-        help="Pass --clean-cache to src/runners/run_models.py.",
+        help="Pass --clean-cache to src/evaluators/eval_models.py.",
     )
     parser.add_argument(
         "--sequential",
         action="store_true",
-        help="Pass --sequential to src/runners/run_models.py.",
+        help="Pass --sequential to src/evaluators/eval_models.py.",
     )
     parser.add_argument(
         "--health-check",
@@ -405,9 +405,9 @@ def main() -> int:
     dataset_dir = extract_dataset(dataset_tar, datasets_dir, args.extracted_name)
     mutation_count = validate_dataset_layout(dataset_dir)
 
-    run_models = repo_root / "src" / "runners" / "run_models.py"
+    eval_models = repo_root / "src" / "evaluators" / "eval_models.py"
     run_benchmark(
-        run_models,
+        eval_models,
         dataset_dir,
         args.clean_cache,
         args.sequential,

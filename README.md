@@ -45,7 +45,7 @@ docker run --rm -it -w /app dafny_research:latest bash
 Inside the container, run a fast smoke command:
 
 ```bash
-python src/runners/run_1_model.py random dataset/data/pos_test
+python src/evaluators/eval_1_model.py random dataset/data/pos_test
 ```
 
 For full container usage and troubleshooting, see [README_DOCKER.md](README_DOCKER.md).
@@ -55,7 +55,7 @@ For full container usage and troubleshooting, see [README_DOCKER.md](README_DOCK
 Run one fast technique on the smallest packaged dataset:
 
 ```bash
-python src/runners/run_1_model.py random dataset/data/pos_test
+python src/evaluators/eval_1_model.py random dataset/data/pos_test
 ```
 
 Expected success signal:
@@ -89,7 +89,7 @@ python src/research_questions/rq2.py dataset/data/pos_test
 ### Full benchmark table/plots (cached-first behavior)
 
 ```bash
-python src/runners/run_all_models_raw_name.py dataset/data/pos_test
+python src/evaluators/eval_all_models_raw_name.py dataset/data/pos_test
 ```
 
 Expected outputs:
@@ -137,7 +137,7 @@ rm -rf tmp/run_artifacts/images/*
 ### Step b: Run full benchmark from clean state
 
 ```bash
-python src/runners/run_all_models_raw_name.py dataset/data/pos_test --clean-cache
+python src/evaluators/eval_all_models_raw_name.py dataset/data/pos_test --clean-cache
 ```
 
 ### Step C: Validate complete repository pipeline
@@ -150,7 +150,7 @@ python src/integration_tests/health_check.py --clean-cache
 
 ### Repository layout highlights
 
-1. `src/runners/` contains benchmark entry points.
+1. `src/evaluators/` contains benchmark entry points.
 2. `src/safeguards/` contains safeguard/integration benchmark checks.
 3. `src/integration_tests/` contains repository health-check orchestration.
 4. `external/` contains moved submodules:
@@ -192,14 +192,14 @@ Example dataset: `dataset/data/pos_test` (from `dataset/data/pos_test.tar.gz`).
 Run one example:
 
 ```bash
-python src/runners/run_1_model_1_example.py <technique> <dfy_file>
+python src/evaluators/eval_1_model_1_example.py <technique> <dfy_file>
 ```
 
 Run a real LLM with Qwen via OpenRouter:
 
 ```bash
 export OPENROUTER_API_KEY="<your-openrouter-api-key>" 
-LLM_REAL_MODEL_NAME=qwen3-coder-next python src/runners/run_1_model_1_example.py LLM_ERR_MSG_CNTM dataset/data/pos_test/killed/abs__161-188_CBE.dfy
+LLM_REAL_MODEL_NAME=qwen3-coder-next python src/evaluators/eval_1_model_1_example.py LLM_ERR_MSG_CNTM dataset/data/pos_test/killed/abs__161-188_CBE.dfy
 ```
 
 The technique name goes before the Dafny file path. This form does not require exporting

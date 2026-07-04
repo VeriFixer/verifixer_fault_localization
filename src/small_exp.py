@@ -7,7 +7,7 @@ from fl_eval.metrics.summary_stats import StatsSummaryEntry, build_summary_entry
 import config as gl
 from logging_config import get_logger
 
-from runners.run_model_common import (
+from evaluators.eval_model_common import (
     get_techniques_for_all_models,
     process_mutation,
     setup_evaluation,
