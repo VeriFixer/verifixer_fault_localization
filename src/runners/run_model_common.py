@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 from fl_eval.core.abstract import FLTechnique
-from fl_eval.strategies.autofix_ranker import AutoFixRanker
+from autofix_ranker import AutoFixRanker
 from fl_eval.strategies.counter_example_base_ranker import CounterExampleBaseRanker
 from fl_eval.strategies.counter_example_if import CounterExampleIf
 from fl_eval.strategies.counter_example_if_reassume import CounterExampleIfReassume

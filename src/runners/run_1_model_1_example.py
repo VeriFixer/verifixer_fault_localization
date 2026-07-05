@@ -1,4 +1,3 @@
-
 import argparse
 from pathlib import Path
 
@@ -7,14 +6,12 @@ from runners.run_model_common import (
     TECHNIQUE_MAP,
     execute_single_mutation,
 )
-from fl_eval.reporting.run_one_example_output import (
-    print_one_example_intro,
-    print_section,
-)
+from fl_eval.reporting.run_one_example_output import print_section
 from fl_eval.util.terminal_colors import Color, colored, separator
 from logging_config import get_logger
 
 logger = get_logger(__name__)
+
 
 def compute_one_example(
     flt_name: str,
@@ -29,7 +26,6 @@ def compute_one_example(
         raise RuntimeError("Evaluation failed: could not compute single-mutation metrics.")
 
     return single_output
-
 
 
 if __name__ == "__main__":
@@ -76,7 +72,7 @@ How to use:
     print(separator("="))
     print_section("INPUT")
     print(f"{colored('Technique', Color.BOLD):24}: {args.technique_name}")
-    print(f"{colored('Mutant File', Color.BOLD):24}: {args.dfy_path}")
+    print(f"{colored('Program', Color.BOLD):24}: {args.dfy_path}")
     print(separator("="))
 
     if not args.dfy_path.exists():
