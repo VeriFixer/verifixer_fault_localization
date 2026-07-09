@@ -30,7 +30,7 @@ def compute_intersection(
     exam_num_lines = round(len(cntm_ranking) * 15 / 100)
     for i in range(max(exam_num_lines, MIN_LINES_TO_EXPLORE)):
         line = cntm_ranking[i]
-        line_states = list(filter(lambda s: s[0] == line, snapshots))
+        line_states = list(filter(lambda s: s[0] == str(line), snapshots))
         relevant_states += line_states[:MIN_STATES_TO_EXPLORE]
     for snapshot in snapshots[:MIN_STATES_TO_EXPLORE]:
         if not snapshot in relevant_states:
