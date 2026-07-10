@@ -20,15 +20,15 @@ def compute_intersection(
     with open('snapshots-suspiciousness-score.csv', 'r') as file:
         for line in file:
             snapshot_str = line[line.index('(')+1:line.rindex(')')]
-            elements = snapshot_str.split("', '")
-            elements[0] = elements[0].strip("'")
-            elements[-1] = elements[-1].strip("'")
-            snapshot = (elements[0], elements[2], elements[3])
+            elements = snapshot_str.split(", ")
+            snapshot = (elements[0].strip("'\""), elements[2].strip("'\""), elements[3].strip("'\""))
             snapshots.append(snapshot)
 
     relevant_states = []
     exam_num_lines = round(len(cntm_ranking) * 15 / 100)
     for i in range(max(exam_num_lines, MIN_LINES_TO_EXPLORE)):
+        if i > len(cntm_ranking) - 1:
+            break
         line = cntm_ranking[i]
         line_states = list(filter(lambda s: s[0] == str(line), snapshots))
         relevant_states += line_states[:MIN_STATES_TO_EXPLORE]
