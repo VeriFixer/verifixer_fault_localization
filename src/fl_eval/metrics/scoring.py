@@ -392,7 +392,12 @@ def load_execution_metadata_from_cache(
     return cast(dict[str, Any], metadata)
 
 
-def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir: Path) -> ExamScoreOutput:
+def compute_exam_score(
+    flt: FLTechnique,
+    Gtruth: GroundTruthLike,
+    dataset_dir: Path,
+    suppress_warnings: bool = False,
+) -> ExamScoreOutput:
     """Compute EXAM score for a mutation in both file-wide and method scopes.
     
     Uses cached results if available. Requires method information (method_name, method_start, method_end)
@@ -421,11 +426,12 @@ def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir:
             predictions = load_from_file_output(flt, Gtruth, dataset_dir)
             loaded_from_cache = True
         except (PermissionError, OSError, json.JSONDecodeError, ValueError) as e:
-            logger.warning(
-                "Cache read failed for %s (%s). Recomputing predictions.",
-                results_file,
-                e,
-            )
+            if not suppress_warnings:
+                logger.warning(
+                    "Cache read failed for %s (%s). Recomputing predictions.",
+                    results_file,
+                    e,
+                )
 
     if not loaded_from_cache:
         execution_metadata: dict[str, Any] | None = None
@@ -434,9 +440,10 @@ def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir:
             execution_metadata = run_cmd.get_last_execution_metadata()
         except Exception as e:
             predictions = []
-            print("Exception occurred while running fault localization:", file=sys.stderr)
-            print(str(e), file=sys.stderr)
-            traceback.print_exc(file=sys.stderr)
+            if not suppress_warnings:
+                print("Exception occurred while running fault localization:", file=sys.stderr)
+                print(str(e), file=sys.stderr)
+                traceback.print_exc(file=sys.stderr)
             execution_metadata = run_cmd.get_last_execution_metadata()
 
         get_cost_snapshot = getattr(flt, "get_cost_snapshot", None)
@@ -448,7 +455,8 @@ def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir:
                         execution_metadata = {}
                     execution_metadata["llm_cost"] = llm_cost_snapshot
             except Exception as e:
-                logger.warning("Could not capture LLM cost snapshot for %s: %s", flt.name, e)
+                if not suppress_warnings:
+                    logger.warning("Could not capture LLM cost snapshot for %s: %s", flt.name, e)
 
         save_to_file_output(flt, Gtruth, predictions, dataset_dir, execution_metadata)
     
@@ -463,7 +471,7 @@ def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir:
         total_line_start, 
         total_line_end,
         str(Gtruth.mutantfile),
-        suppress_warnings=flt.suppress_scope_warnings,
+        suppress_warnings=suppress_warnings or flt.suppress_scope_warnings,
     )
     
     # Compute method-scoped EXAM score using mandatory method metadata.
@@ -477,7 +485,7 @@ def compute_exam_score(flt : FLTechnique, Gtruth : GroundTruthLike, dataset_dir:
             Gtruth.method_start,
             Gtruth.method_end,
             str(Gtruth.mutantfile),
-            suppress_warnings=flt.suppress_scope_warnings,
+            suppress_warnings=suppress_warnings or flt.suppress_scope_warnings,
         )
     
     return ExamScoreOutput(

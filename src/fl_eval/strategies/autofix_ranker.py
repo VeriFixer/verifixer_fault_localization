@@ -39,7 +39,8 @@ class AutoFixRanker(FLTechnique):
 
     def get_fault_localization(self, file: Path) -> list[int]:
         if not self.run_script.is_file():
-            print(f"AutoFix runner not found: {self.run_script}")
+            if not self.reduce:
+                print(f"AutoFix runner not found: {self.run_script}")
             return []
 
         self.output_root.mkdir(parents=True, exist_ok=True)
@@ -49,7 +50,8 @@ class AutoFixRanker(FLTechnique):
         # Things autofix is apllied to the file with name .test.dfy and not the .dfy file, so we need to adjust the path accordingly.
         file_test = file.with_suffix(".test.dfy")
         if not file_test.is_file():
-            print(f"AutoFix input file not found: {file_test}")
+            if not self.reduce:
+                print(f"AutoFix input file not found: {file_test}")
             return []
 
         command: list[str] = [
@@ -64,20 +66,21 @@ class AutoFixRanker(FLTechnique):
 
         status, stdout, stderr = run_cmd.run_external_cmd(command, timeout=gl.MAX_TIME_AUTOFIX)
         if status != run_cmd.Status.OK:
-            print(
-                f"AutoFix command crashed\n"
-                f"Command : {" ".join(command)}\n"
-                f"Status  : {status}\n"
-                f"Stdout  : {stdout}\n"
-                f"Stderr  : {stderr}\n"
-                "---------------------"
-            )
+            if not self.reduce:
+                print(
+                    f"AutoFix command crashed\n"
+                    f"Command : {" ".join(command)}\n"
+                    f"Status  : {status}\n"
+                    f"Stdout  : {stdout}\n"
+                    f"Stderr  : {stderr}\n"
+                    "---------------------"
+                )
             return []
 
         result_file = run_out_dir / "lines-suspiciousness.csv"
         ranked_lines = self._parse_ranked_lines(result_file)
 
-        if not ranked_lines:
+        if not ranked_lines and not self.reduce:
             print(f"No lines found in AutoFix output for file {file}")
             print(f"Expected output file: {result_file}")
             print("---------------------")

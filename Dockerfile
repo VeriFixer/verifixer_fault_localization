@@ -93,6 +93,9 @@ COPY .repo_verifixer_fault_localization_marker /app/
 #RUN make -C /app/external/tests_gen/spec-test-generator -j"$(nproc)"
 
 COPY external/tests_gen/dafny-test-gen/ /app/external/tests_gen/dafny-test-gen/
+RUN cp \
+    /app/external/tests_gen/dafny-test-gen/DafnyCBT/DafnyCBT.csproj.template \
+    /app/external/tests_gen/dafny-test-gen/DafnyCBT/DafnyCBT.csproj
 RUN --mount=type=cache,target=/root/.nuget/packages \
     dotnet restore /app/external/tests_gen/dafny-test-gen/DafnyCBT/DafnyCBT.csproj && \
     dotnet build /app/external/tests_gen/dafny-test-gen/DafnyCBT/DafnyCBT.csproj \
@@ -135,5 +138,6 @@ RUN --mount=type=cache,target=/root/.nuget/packages \
     dotnet build mutdafny/mutdafny.csproj && \
     chmod -R a+rwX /app/external/mutation/mutdafny
 COPY dataset/ /app/dataset/
+COPY tmp/ /app/tmp/
 
 CMD ["bash"]

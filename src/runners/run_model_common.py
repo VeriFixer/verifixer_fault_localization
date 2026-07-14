@@ -149,7 +149,12 @@ def get_techniques_for_health_check() -> list[str]:
     ]
 
 
-def setup_evaluation(flt_name: str, base_path: Path, to_validate_dataset : bool = True) -> tuple[FLTechnique, Path, Path] | None:
+def setup_evaluation(
+    flt_name: str,
+    base_path: Path,
+    to_validate_dataset : bool = True,
+    reduce: bool = False,
+) -> tuple[FLTechnique, Path, Path] | None:
     """Validate technique/dataset and return technique, killed_dir and original_dir."""
     if flt_name not in TECHNIQUE_MAP:
         logger.error(f"Fault Localization Technique '{flt_name}' not recognized.")
@@ -165,6 +170,8 @@ def setup_evaluation(flt_name: str, base_path: Path, to_validate_dataset : bool 
         fl_technique = FLT_Class(name=flt_name, ranking_controls=tech_config.ranking_controls)
     else:
         fl_technique = FLT_Class(name=flt_name)
+
+    fl_technique.reduce = reduce
 
     if(to_validate_dataset):
         validation_result = validate_dataset(base_path)
@@ -186,26 +193,35 @@ def process_mutation(
     killed_dir: Path,
     original_dir: Path,
     dataset_dir: Path,
+    reduce: bool = False,
 ) -> Optional[ExamOutput]:
     """Process one mutation and return EXAM output, or None if it fails."""
-    context = build_mutation_context(diff_path, killed_dir, original_dir)
+    context = build_mutation_context(diff_path, killed_dir, original_dir, reduce=reduce)
     if context is None:
         return None
 
     try:
-        return compute_exam_score(fl_technique, context.gtruth, dataset_dir)
+        return compute_exam_score(fl_technique, context.gtruth, dataset_dir, suppress_warnings=reduce)
 
     except ValueError as e:
-        logger.error(f"Error processing {context.diff_path.stem} (Value Error): {e}. Skipping.")
+        if not reduce:
+            logger.error(f"Error processing {context.diff_path.stem} (Value Error): {e}. Skipping.")
     except IOError as e:
-        logger.error(f"File error processing {context.diff_path.stem}: {e}. Skipping.")
+        if not reduce:
+            logger.error(f"File error processing {context.diff_path.stem}: {e}. Skipping.")
     except Exception as e:
-        logger.error(f"An unexpected error occurred for {context.diff_path.stem}: {e}. Skipping.")
+        if not reduce:
+            logger.error(f"An unexpected error occurred for {context.diff_path.stem}: {e}. Skipping.")
 
     return None
 
 
-def build_mutation_context(diff_path: Path, killed_dir: Path, original_dir: Path) -> MutationContext | None:
+def build_mutation_context(
+    diff_path: Path,
+    killed_dir: Path,
+    original_dir: Path,
+    reduce: bool = False,
+) -> MutationContext | None:
     """Resolve a diff path into all mutation files needed for evaluation."""
     mutation_name = diff_path.stem
     mutant_candidates = [
@@ -215,14 +231,16 @@ def build_mutation_context(diff_path: Path, killed_dir: Path, original_dir: Path
     mutant_dfy_path = next((p for p in mutant_candidates if p.is_file()), None)
 
     if mutant_dfy_path is None:
-        logger.warning(f"Corresponding mutant file not found for {diff_path}. Skipping.")
+        if not reduce:
+            logger.warning(f"Corresponding mutant file not found for {diff_path}. Skipping.")
         return None
 
     base_name_raw = "__".join(mutation_name.split("__")[:-1])
     original_file = original_dir / f"{base_name_raw}.dfy"
 
     if not original_file.is_file():
-        logger.error(f"Original file '{original_file.name}' not found. Skipping {mutation_name}.")
+        if not reduce:
+            logger.error(f"Original file '{original_file.name}' not found. Skipping {mutation_name}.")
         return None
 
     gtruth = GroundTruthAndLineLimit(
@@ -242,10 +260,16 @@ def execute_single_mutation(
     flt_name: str,
     mutant_dfy_path: Path,
     to_validate_dataset: bool = False,
+    reduce: bool = False,
 ) -> tuple[FLTechnique, ExamOutput, MutationContext, Path] | None:
     """Run one technique for one mutant file and return execution output."""
     base_path = mutant_dfy_path.parent.parent
-    setup_result = setup_evaluation(flt_name, base_path, to_validate_dataset=to_validate_dataset)
+    setup_result = setup_evaluation(
+        flt_name,
+        base_path,
+        to_validate_dataset=to_validate_dataset,
+        reduce=reduce,
+    )
     if setup_result is None:
         return None
 
@@ -257,18 +281,26 @@ def execute_single_mutation(
 
     diff_path = next((p for p in diff_candidates if p.exists()), None)
     if diff_path is None:
-        logger.error(
-            "Diff file not found for mutant %s. Tried: %s",
-            mutant_dfy_path.name,
-            ", ".join(str(p) for p in diff_candidates),
-        )
+        if not reduce:
+            logger.error(
+                "Diff file not found for mutant %s. Tried: %s",
+                mutant_dfy_path.name,
+                ", ".join(str(p) for p in diff_candidates),
+            )
         return None
 
-    context = build_mutation_context(diff_path, killed_dir, original_dir)
+    context = build_mutation_context(diff_path, killed_dir, original_dir, reduce=reduce)
     if context is None:
         return None
 
-    score = process_mutation(diff_path, fl_technique, killed_dir, original_dir, base_path)
+    score = process_mutation(
+        diff_path,
+        fl_technique,
+        killed_dir,
+        original_dir,
+        base_path,
+        reduce=reduce,
+    )
     if score is None:
         return None
 
@@ -324,6 +356,11 @@ def add_run_control_args(parser: argparse.ArgumentParser) -> None:
         "--sequential",
         action="store_true",
         help="Run evaluations sequentially",
+    )
+    parser.add_argument(
+        "--reduce",
+        action="store_true",
+        help="Suppress nonfatal per-file warnings and error details during execution.",
     )
 
 

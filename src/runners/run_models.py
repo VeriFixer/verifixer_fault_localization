@@ -1,19 +1,15 @@
 import argparse
+from dataclasses import dataclass
 from pathlib import Path
 
 import config as gl
+from analysis.image import generate_file_scope_images
+from analysis.stats import run_file_scope_statistics
 from analysis.data_analysis import (
-    build_pairwise_stat_results,
-    build_pairwise_topk_results,
-    generate_plots,
     print_ascii_table,
     print_latex_table,
     print_compact_results_table,
     print_complete_cases_table,
-    print_pairwise_topk_latex_table,
-    print_pairwise_topk_table,
-    print_pairwise_wilcoxon_latex_table,
-    print_pairwise_wilcoxon_table,
 )
 from fl_eval.metrics.scoring import ExamOutput
 from fl_eval.metrics.summary_stats import StatsSummaryEntry
@@ -94,11 +90,27 @@ def _log_benchmark_llm_cost_totals(
     logger.info("=" * 76)
 
 
+@dataclass(frozen=True)
+class ReportOptions:
+    """Select which benchmark artifacts are printed or generated."""
+
+    show_ascii_tables: bool = True
+    show_latex_tables: bool = True
+    show_compact_tables: bool = True
+    show_complete_cases: bool = True
+    show_images: bool = True
+    show_statistics: bool = True
+    show_llm_costs: bool = True
+
+
 def run_models_for_techniques(
     base_path: Path,
     techniques_to_run: list[str],
     sequential: bool = False,
+    report_options: ReportOptions | None = None,
+    reduce: bool = False,
 ) -> None:
+    options = report_options or ReportOptions()
     try:
         logger.info(f"Starting Benchmark on: {base_path}")
         logger.info(f"Techniques to run: {techniques_to_run}")
@@ -108,7 +120,13 @@ def run_models_for_techniques(
 
         for tech_name in techniques_to_run:
             logger.info(f"\n--- Running {tech_name.upper()} ---")
-            metrics_output = compute_metrics_one_dataset(tech_name, base_path, sequential)
+            metrics_output = compute_metrics_one_dataset(
+                tech_name,
+                base_path,
+                sequential,
+                reduce=reduce,
+                show_llm_costs=options.show_llm_costs,
+            )
             if metrics_output is None:
                 logger.warning(f"Skipping {tech_name} due to setup failure.")
                 continue
@@ -123,48 +141,32 @@ def run_models_for_techniques(
             logger.info("No results collected.")
             return
 
-        print_ascii_table(stats_summary, paper_only=False)
-        print_latex_table(stats_summary, paper_only=False)
-        print_compact_results_table(raw_results, paper_only=False)
-        print_complete_cases_table(raw_results, paper_only=False)
-        _log_benchmark_llm_cost_totals(llm_cost_totals_by_technique)
+        if options.show_ascii_tables:
+            print_ascii_table(stats_summary, paper_only=False)
+        if options.show_latex_tables:
+            print_latex_table(stats_summary, paper_only=False)
+        if options.show_llm_costs:
+            _log_benchmark_llm_cost_totals(llm_cost_totals_by_technique)
 
-        try:
-            images_dir = gl.IMAGES_DIR
-            images_dir.mkdir(parents=True, exist_ok=True)
-            generate_plots(raw_results, images_dir, paper_only=False)  # type: ignore[arg-type]
-            logger.info(f"Plot artifacts saved to: {images_dir}")
-        except Exception as e:
-            logger.error(f"Could not generate plots: {e}")
+        if options.show_images:
+            try:
+                images_dir = gl.IMAGES_DIR
+                images_dir.mkdir(parents=True, exist_ok=True)
+                generate_file_scope_images(raw_results, images_dir, paper_only=False)
+                logger.info(f"Plot artifacts saved to: {images_dir}")
+            except Exception as e:
+                logger.error(f"Could not generate plots: {e}")
 
-        try:
-            pairwise_exam_results = build_pairwise_stat_results(raw_results, scope="file")
-            if pairwise_exam_results:
-                print_pairwise_wilcoxon_table(raw_results, paper_only=False, scope="file")
-                print_pairwise_wilcoxon_latex_table(
-                    pairwise_exam_results,
-                    paper_only=False,
-                    scope="file",
-                )
-            else:
-                print_pairwise_wilcoxon_table(raw_results, paper_only=False, scope="file")
-        except Exception as e:
-            logger.error(f"Could not generate pairwise Wilcoxon table: {e}")
+        if options.show_statistics:
+            try:
+                run_file_scope_statistics(raw_results, paper_only=False)
+            except Exception as e:
+                logger.error(f"Could not generate file-scope statistics: {e}")
 
-        try:
-            pairwise_top1_results = build_pairwise_topk_results(raw_results, scope="file", k=1)
-            if pairwise_top1_results:
-                print_pairwise_topk_table(raw_results, paper_only=False, scope="file", k=1)
-                print_pairwise_topk_latex_table(
-                    pairwise_top1_results,
-                    paper_only=False,
-                    scope="file",
-                    k=1,
-                )
-            else:
-                print_pairwise_topk_table(raw_results, paper_only=False, scope="file", k=1)
-        except Exception as e:
-            logger.error(f"Could not generate pairwise Top-1 McNemar table: {e}")
+        if options.show_compact_tables:
+            print_compact_results_table(raw_results, paper_only=False)
+        if options.show_complete_cases:
+            print_complete_cases_table(raw_results, paper_only=False)
     finally:
         shutdown_parallel_executor(wait=True)
 
@@ -207,6 +209,11 @@ def main() -> int:
         action="store_true",
         help="Run evaluations sequentially",
     )
+    parser.add_argument(
+        "--reduce",
+        action="store_true",
+        help="Suppress nonfatal per-file warnings and error details during execution.",
+    )
     args = parser.parse_args()
     if not prepare_dataset_cache(args.data_path, args.clean_cache):
         return 1
@@ -216,6 +223,7 @@ def main() -> int:
         args.data_path,
         techniques_to_run,
         sequential=args.sequential,
+        reduce=args.reduce,
     )
     return 0
 

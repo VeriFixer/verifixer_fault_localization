@@ -24,11 +24,13 @@ def compute_metrics_one_example(
     flt_name: str,
     dfy_path: Path,
     enable_pretty_output: bool = False,
+    reduce: bool = False,
 ) -> tuple[FLTechnique, ExamOutput, Path, GroundTruthAndLineLimit, Path]:
     single_output = execute_single_mutation(
         flt_name,
         dfy_path,
         to_validate_dataset=False,
+        reduce=reduce,
     )
     if single_output is None:
         raise RuntimeError("Evaluation failed: could not compute single-mutation metrics.")

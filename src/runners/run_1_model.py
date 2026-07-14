@@ -196,16 +196,19 @@ def _evaluate_single_mutant(
     mutant_dfy_path: Path,
     flt_name: str,
     enable_pretty_output: bool,
+    reduce: bool,
 ) -> ExamOutput | None:
     try:
         _, score, _, _, _ = compute_metrics_one_example(
             flt_name,
             mutant_dfy_path,
             enable_pretty_output=enable_pretty_output,
+            reduce=reduce,
         )
         return score
     except Exception as e:
-        logger.error("Error processing %s: %s", mutant_dfy_path.name, e)
+        if not reduce:
+            logger.error("Error processing %s: %s", mutant_dfy_path.name, e)
         return None
 
 
@@ -215,6 +218,8 @@ def compute_metrics_one_dataset(
     base_path: Path,
     sequential: bool = False,
     enable_pretty_output: bool = False,
+    reduce: bool = False,
+    show_llm_costs: bool = True,
 ) -> tuple[StatsSummaryEntry, list[ExamOutput], dict[str, int | float | str] | None] | None:
     """
     Receives a technique name and directory, iterates through mutation files, 
@@ -265,7 +270,8 @@ def compute_metrics_one_dataset(
             mutant_paths.append(fallback_test_mutant)
             continue
 
-        logger.warning("No mutant .dfy found for diff %s; skipping.", diff_path.name)
+        if not reduce:
+            logger.warning("No mutant .dfy found for diff %s; skipping.", diff_path.name)
 
     all_scores = run_parallel_or_seq(
         mutant_paths,
@@ -273,13 +279,16 @@ def compute_metrics_one_dataset(
         f"Get metrics for {flt_name}",
         flt_name,
         enable_pretty_output,
+        reduce,
         parallel=not sequential,
+        quiet=reduce,
     )
     all_scores_clean: list[ExamOutput] = [x for x in all_scores if x is not None]
     summary = generate_report(flt_name, all_scores_clean)
 
     llm_cost_totals = _sum_llm_costs_from_cache(base_path, flt_name, mutant_paths)
-    _log_llm_cost_totals(flt_name, llm_cost_totals)
+    if show_llm_costs:
+        _log_llm_cost_totals(flt_name, llm_cost_totals)
 
     return summary, all_scores_clean, llm_cost_totals
 
@@ -338,4 +347,5 @@ How to use:
             args.data_path,
             args.sequential,
             enable_pretty_output=args.pretty_output,
+            reduce=args.reduce,
         )

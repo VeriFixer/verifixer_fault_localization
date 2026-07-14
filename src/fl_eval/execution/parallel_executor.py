@@ -34,7 +34,14 @@ def shutdown_parallel_executor(wait: bool = True) -> None:
         _SHARED_EXECUTOR.shutdown(wait=wait)
         _EXECUTOR_SHUTDOWN = True
 
-def run_parallel_or_seq(items: Iterable[Any], task_fn: Callable[..., R], desc: str, *task_args: Any, parallel: bool = True) -> list[R]:
+def run_parallel_or_seq(
+    items: Iterable[Any],
+    task_fn: Callable[..., R],
+    desc: str,
+    *task_args: Any,
+    parallel: bool = True,
+    quiet: bool = False,
+) -> list[R]:
     results: list[Any] = []
     cdesc = desc + f" (Active Cores:{SAFE_THREADS})"
 
@@ -56,13 +63,15 @@ def run_parallel_or_seq(items: Iterable[Any], task_fn: Callable[..., R], desc: s
             try:
                 results.append(future.result())
             except Exception as e:
-                print(f"[Warning] Error processing {item}: {e}")
+                if not quiet:
+                    print(f"[Warning] Error processing {item}: {e}")
     else:
         for item in tqdm(items, desc=f"{cdesc} (seq)", miniters=1, smoothing=0):
             try:
                 with CPU_LIMITER:
                     results.append(task_fn(item, *task_args))
             except Exception as e:
-                print(f"[Warning] Error processing {item}: {e}")
+                if not quiet:
+                    print(f"[Warning] Error processing {item}: {e}")
 
     return results
