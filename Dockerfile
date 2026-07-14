@@ -137,7 +137,14 @@ RUN --mount=type=cache,target=/root/.nuget/packages \
     cd /app/external/mutation/mutdafny && \
     dotnet build mutdafny/mutdafny.csproj && \
     chmod -R a+rwX /app/external/mutation/mutdafny
+# Dataset: copy only tarballs and scripts (raw extracted dirs excluded via .dockerignore)
 COPY dataset/ /app/dataset/
-COPY tmp/ /app/tmp/
+
+# Cached results + images + models_log as a single compressed archive
+COPY tmp_run_artifacts.tar.gz /app/tmp_run_artifacts.tar.gz
+
+# Init script to decompress data on first run
+COPY setup_data.sh /app/setup_data.sh
+RUN chmod +x /app/setup_data.sh
 
 CMD ["bash"]

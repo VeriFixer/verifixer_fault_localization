@@ -18,3 +18,14 @@ obj/
 # Ignore large datasets if you don't want them in the build context immediately
 # (Only include them if they are strictly required for the build phase)
 # datasets/
+
+# Local debug/dev run artifacts (git-ignored, not part of the shipped cache/dataset)
+# Entire tmp/ excluded from build context — shipped as tmp_run_artifacts.tar.gz instead
+tmp/
+
+# Large tarball only needed for SNAP dataset regen from scratch (Stage 4)
+dataset/data/dafnytestgen_tests_can_run.tar.gz
+
+# Raw extracted dirs — we ship compressed tarballs instead (setup_data.sh extracts them)
+dataset/data/sample_original_can_run/
+dataset/data/pos_test/

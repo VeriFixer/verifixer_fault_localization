@@ -31,7 +31,7 @@ Right after cloning, the fastest way to evaluate is Docker.
 If you already have the prebuilt image tar:
 
 ```bash
-docker load -i dafny_research_latest.tar
+docker load -i dafny_research_latest.tar.gz
 docker run --rm -it -w /app dafny_research:latest bash
 ```
 
@@ -42,7 +42,19 @@ DOCKER_BUILDKIT=1 docker build -t dafny_research:latest .
 docker run --rm -it -w /app dafny_research:latest bash
 ```
 
-Inside the container, run a fast smoke command:
+To save the built image as a portable tar.gz (for sharing / VM preloading):
+
+```bash
+docker save dafny_research:latest | gzip > dafny_research_latest.tar.gz
+```
+
+Inside the container, first extract the compressed datasets and caches:
+
+```bash
+bash setup_data.sh
+```
+
+Then run a fast smoke command:
 
 5 minutes expected time
 ```bash

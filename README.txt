@@ -98,7 +98,14 @@ See README.md section "Fastest evaluator path (Docker first)" to know how to loa
 --------------------
 Estimated time: under 10 minutes.
 
-Inside the container, run the smoke test on the small pos_test dataset:
+Inside the container, first extract the compressed datasets and cached results:
+    bash setup_data.sh
+
+This extracts dataset/data/pos_test, dataset/data/sample_original_can_run, and
+tmp/run_artifacts/ (cached_results, images, models_log) from their compressed archives.
+It is idempotent — re-running it skips already-extracted directories.
+
+Then run the smoke test on the small pos_test dataset:
     python src/runners/run_1_model.py RAND dataset/data/pos_test
 
 Expected: a progress bar over 21 mutants (~15-25 seconds) followed by an EVALUATION SUMMARY
