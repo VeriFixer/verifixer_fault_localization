@@ -19,9 +19,9 @@ Authors:
   alvaro.silva@fe.up.pt (ORCID: 0009-0005-2941-9942)
 - Isabel Amaral, INESC TEC, Faculty of Engineering, University of Porto, Porto, Portugal
   isabel.andre.amaral@gmail.com
+- Joao Pascoal Faria, INESC TEC, Faculty of Engineering, University of Porto, Porto, Portugal
 - Alexandra Mendes, INESC TEC, Faculty of Engineering, University of Porto, Porto, Portugal
   alexandra@archimendes.com (ORCID: 0000-0001-8060-5920)
-- Joao Pascoal Faria, INESC TEC, Faculty of Engineering, University of Porto, Porto, Portugal
   jpf@fe.up.pt (ORCID: 0000-0003-3825-3954)
 
 4. EXPECTED BEHAVIOUR
@@ -35,7 +35,7 @@ diff), the artifact:
   each produce a ranked list of suspicious source lines per mutant;
 - computes EXAM-score metrics (file-scope and method-scope) comparing predicted rankings
   against the ground-truth faulty line;
-- aggregates results into the tables and plots reported in the paper (RQ1-RQ4, Section V and
+- aggregates results into the tables and plots reported in the paper (RQ1-RQ4 and
   the Annex);
 - caches predictions/results so re-runs are fast and reproducible.
 
@@ -82,10 +82,10 @@ and avoids installing Dafny, Z3, .NET, Daikon and Java natively.
 
 Minimum resources: 4 CPU cores, 8 GB RAM free for the container (default resource limits used
 by the pipeline are configurable via FL_MAX_RAM_GB / FL_MAX_TIME_SECONDS, see README.md).
-Disk: ~5 GB for the image plus dataset tarballs.
+Disk ~10 GB: for the image plus dataset tarballs.
 
-Load the prebuilt image (if shipped as a tar):
-    docker load -i dafny_research_latest.tar
+Load the prebuilt image (if shipped as a tar.gz):
+    docker load -i dafny_research_latest.tar.gz
     docker run --rm -it -w /app dafny_research:latest bash
 
 Or build it locally from the repo root (~15-30 min):
