@@ -57,7 +57,9 @@ class AutoFixRanker(FLTechnique):
         command: list[str] = [
             "bash",
             str(self.run_script),
-            str(file_test),
+            # run.sh does `cd "$OUT_DIR"` before reading PROGRAM, so a relative
+            # path here would no longer resolve; pass it resolved to absolute.
+            str(file_test.resolve()),
             "--strategy",
             self.autofix_strategy,
             "--out-dir",
