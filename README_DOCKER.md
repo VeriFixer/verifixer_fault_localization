@@ -8,12 +8,12 @@ https://docs.docker.com/engine/install/
 # Use a premade docker image
 Load with
 ```shell
-docker load -i dafny_research_latest.tar
+docker load -i dafny_research_latest.tar.gz
 docker run --rm -it -w /app dafny_research:latest bash
 ```
 Image previous saved with:
 ```shell
-docker save -o dafny_research_latest.tar dafny_research:latest
+docker save dafny_research:latest | gzip > dafny_research_latest.tar.gz
 ```
 
 # Build the docker image (from reporoot)
